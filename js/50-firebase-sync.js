@@ -149,7 +149,8 @@ async function commitOps(ops){
 
 /* ---------- đăng nhập / thiết lập lần đầu ---------- */
 function cloudLoginView(){
-  const setup=ui.loginMode==='setup';
+  /* Màn hình "Thiết lập lần đầu" chỉ mở khi địa chỉ có ?setup=1 (Admin dùng đúng một lần). Người dùng thường không thấy link này. */
+  const canSetup=setupUrl(),setup=canSetup&&ui.loginMode==='setup';
   $('#app').innerHTML=`<div class="login"><form class="lcard" data-submit="${setup?'fb-setup':'login'}">${logoBlock()}<h1>${setup?'Thiết lập lần đầu':'Quản lý KPI'}</h1><p>${setup?'Tạo tài khoản Admin':'Đánh giá công việc nhân viên theo tháng · quý · năm'}</p>
     ${inp('username','Email',setup?ADMIN:'',{req:1,type:'email',attrs:'autocomplete="username" autofocus'+(setup&&ADMIN?' readonly':'')})}
     ${setup?inp('name','Họ tên','',{req:1}):''}
@@ -157,10 +158,11 @@ function cloudLoginView(){
     ${setup?inp('password2','Nhập lại mật khẩu','',{type:'password',req:1}):''}
     <button class="btn primary block">${setup?'Tạo tài khoản Admin':'Đăng nhập'}</button>
     ${setup?`<div class="hint">Chỉ dùng cho lần đầu tiên khi hệ thống chưa có ai. Tài khoản Admin duy nhất là <b>${esc(ADMIN||'người thiết lập đầu tiên')}</b>; mọi người khác do Admin tạo tài khoản.</div>`:'<button type="button" class="lnk" data-act="fb-forgot">Quên mật khẩu?</button>'}
-    <button type="button" class="lnk" data-act="fb-mode">${setup?'← Quay lại đăng nhập':'Thiết lập lần đầu (chưa có tài khoản quản trị)'}</button>
+    ${canSetup?`<button type="button" class="lnk" data-act="fb-mode">${setup?'← Quay lại đăng nhập':'Thiết lập lần đầu (chưa có tài khoản Admin)'}</button>`:''}
     ${FIREBASE_CONFIG?'':'<button type="button" class="lnk" data-act="fb-disconnect">Ngắt kết nối Firebase (chế độ cục bộ)</button>'}</form>${creditHTML('login-credit')}</div>`;
 }
-ACT['fb-mode']=()=>{ui.loginMode=ui.loginMode==='setup'?'login':'setup';cloudLoginView()};
+const setupUrl=()=>/[?&]setup(=|&|$)/.test(location.search);
+ACT['fb-mode']=()=>{if(!setupUrl())return;ui.loginMode=ui.loginMode==='setup'?'login':'setup';cloudLoginView()};
 ACT['fb-forgot']=async()=>{
   const em=($('input[name=username]')?.value||'').trim();if(!em)return toast('Nhập email vào ô Email trước.','warn');
   try{await fbAuth.sendPasswordResetEmail(em);toast('Đã gửi email đặt lại mật khẩu (nếu email tồn tại).')}catch(e){toast(authMsg(e),'error')}
@@ -175,6 +177,7 @@ if(CLOUD){
 }
 SUB['fb-setup']=async form=>{
   const d=fd(form),email=d.username.trim().toLowerCase();
+  if(!setupUrl())return;
   if(ADMIN&&email!==ADMIN)return toast('Chỉ '+ADMIN+' được thiết lập làm Admin.','error');
   if(d.password!==d.password2)return toast('Hai mật khẩu không khớp.','error');
   setupPending=true;
@@ -183,7 +186,7 @@ SUB['fb-setup']=async form=>{
     b.set(fbStore.doc('users/'+u.uid),{email,name:d.name.trim(),role:'admin',active:true});
     b.set(fbStore.doc('meta/init'),{by:u.uid,at:Date.now()});
     try{await b.commit()}catch(e){try{await u.delete()}catch(x){}try{await fbAuth.signOut()}catch(x){}throw new Error('Hệ thống đã được thiết lập trước đó. Hãy nhờ Admin tạo tài khoản cho bạn.')}
-    setupPending=false;ui.loginMode='login';await bootSession(u);   /* lần sau đăng xuất sẽ về màn hình đăng nhập, không phải thiết lập */
+    setupPending=false;ui.loginMode='login';try{history.replaceState(null,'',location.pathname+location.hash)}catch(x){}await bootSession(u);   /* lần sau đăng xuất sẽ về màn hình đăng nhập, không phải thiết lập */
   }catch(e){setupPending=false;toast(authMsg(e),'error')}
 };
 

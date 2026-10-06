@@ -87,7 +87,7 @@ Tạo **project Firebase riêng** cho app này, không dùng chung project của
 5. **Firestore Database** → Create database → vị trí `asia-southeast1` → **Production mode**.
 6. Tab **Rules** → dán nội dung `firestore.rules` → **Publish**.
 7. Dán `firebaseConfig` vào `config/firebase-config.js` (thay `null`), commit.
-8. Mở app → **Thiết lập lần đầu** → tạo tài khoản Admin bằng email `ahntuan13@gmail.com` → thêm nhân viên (hoặc nhập Excel) → Settings → User / Permission để tạo tài khoản **Quản lý** và **Nhân viên** (mỗi tài khoản Nhân viên gắn với đúng một nhân viên).
+8. Mở app bằng địa chỉ có thêm `?setup=1` (ví dụ `https://ahntuan13.github.io/kpi-manager-hcm/?setup=1`) → bấm **Thiết lập lần đầu** → tạo tài khoản Admin bằng email `ahntuan13@gmail.com`. Ở địa chỉ thường, màn hình đăng nhập không hiện link này nên người dùng không nhìn thấy → thêm nhân viên (hoặc nhập Excel) → Settings → User / Permission để tạo tài khoản **Quản lý** và **Nhân viên** (mỗi tài khoản Nhân viên gắn với đúng một nhân viên).
 
 **Mỗi khi file `firestore.rules` thay đổi phải dán lại vào Firebase Console → Firestore → Rules → Publish.** App tự kiểm tra sau khi đăng nhập: nếu Firebase còn chạy bản Rules cũ, đầu trang sẽ hiện cảnh báo vàng kèm link. Dấu hiệu thường gặp của Rules cũ: tài khoản Nhân viên thêm việc bị báo “Không có quyền thực hiện (Firestore Rules)”.
 
