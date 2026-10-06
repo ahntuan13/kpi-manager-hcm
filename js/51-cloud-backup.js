@@ -1,7 +1,7 @@
 /* 51-cloud-backup.js – Sao lưu đám mây: tự chụp dữ liệu mỗi ngày lên Firestore, sao lưu thủ công, khôi phục / tải về
    - Mỗi bản sao lưu = backups/{id} (thông tin) + backups/{id}/parts/{n} (dữ liệu JSON chia nhỏ, mỗi phần ≤ 900 KB).
    - Bản sao lưu KHÔNG sửa được sau khi tạo (Rules chặn update) nên lỗi app hay thao tác nhầm không ghi đè được bản cũ.
-   - Tự động: người có quyền ghi mở app lần đầu trong ngày → tạo 1 bản "Tự động". Giữ BACKUP_KEEP bản gần nhất (quản trị viên dọn bớt).
+   - Tự động: người có quyền ghi mở app lần đầu trong ngày → tạo 1 bản "Tự động". Giữ BACKUP_KEEP bản gần nhất (Admin dọn bớt).
    - Trước khi khôi phục, app tự tạo thêm 1 bản "Trước khôi phục" để có thể quay lại. */
 'use strict';
 (self.__mods=self.__mods||[]).push('51-cloud-backup');
@@ -61,7 +61,7 @@ function cloudBackupCard(){
   const adm=can('admin'),w=can('write');
   return card('Sao lưu đám mây (Firebase)',`<p class="note" style="margin-top:-6px">App <b>tự động sao lưu mỗi ngày</b> một lần khi người có quyền ghi mở app. Bản sao lưu lưu trên Firestore, không sửa được sau khi tạo, giữ ${BACKUP_KEEP} bản gần nhất. Khôi phục sẽ thay dữ liệu của <b>tất cả mọi người</b>, trước đó app tự tạo một bản “Trước khôi phục” để có thể quay lại.</p>
     <div class="bar"><button class="btn acc" data-act="bk-now" ${w?'':'disabled'}>☁ Sao lưu ngay</button>${adm?'<button class="btn" data-act="bk-refresh">↻ Tải lại danh sách</button>':''}</div>
-    <div id="bk-list">${adm?'<div class="note">Đang tải danh sách…</div>':'<div class="note">Chỉ quản trị viên xem được danh sách và khôi phục bản sao lưu.</div>'}</div>`);
+    <div id="bk-list">${adm?'<div class="note">Đang tải danh sách…</div>':'<div class="note">Chỉ Admin xem được danh sách và khôi phục bản sao lưu.</div>'}</div>`);
 }
 function bkListHTML(){
   if(!bkList)return '<div class="note">Đang tải danh sách…</div>';
@@ -91,7 +91,7 @@ ACT['bk-del']=async el=>{
   try{await deleteBackup(el.dataset.id);await loadBackupList()}catch(e){toast(authMsg(e),'error')}
 };
 ACT['bk-restore']=async el=>{
-  if(!can('admin'))return toast('Chỉ quản trị viên được khôi phục.','error');
+  if(!can('admin'))return toast('Chỉ Admin được khôi phục.','error');
   const b=(bkList||[]).find(x=>x.id===el.dataset.id);if(!b)return;
   if(!confirm(`Khôi phục dữ liệu về thời điểm ${fmtDT(new Date(b.at).toISOString())}?\n\n${b.counts?.employees??'?'} nhân viên, ${b.counts?.tasks??'?'} công việc.\nDữ liệu hiện tại của TẤT CẢ mọi người sẽ được thay thế (app tự sao lưu bản hiện tại trước).`))return;
   if(bkBusy)return;bkBusy=true;

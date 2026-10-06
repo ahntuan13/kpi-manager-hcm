@@ -6,7 +6,7 @@
 function sideHTML(){
   const al=lateCount(),dl=delaysCount();
   return `<div class="brand">${typeof LOGO_DATA!=='undefined'?`<img class="lg" src="${LOGO_DATA}" alt="KPI">`:'<div class="lg-t">KPI</div>'}<div><b>Quản lý KPI</b><span>${esc(db.company.name||'')}</span></div></div><nav class="nav">`+
-  MENU.map(g=>{
+  menu().map(g=>{
     const items=g.items;
     const active=ui.key.startsWith(g.g+'/');
     const open=ui.open[g.g]===undefined?active:ui.open[g.g];
@@ -17,6 +17,7 @@ function shell(){
   $('#app').innerHTML=`<div class="app"><aside class="side" id="side"></aside><div class="main"><header class="top"><button class="burger" data-act="burger" aria-label="Menu">☰</button><div><div class="crumb" id="crumb"></div><h1 id="ptitle"></h1></div><div class="sp"></div><div class="usr"><span class="av">${esc((session.name||'?').trim().charAt(0).toUpperCase())}</span><div><b>${esc(session.name)}</b><small>${ROLES[session.role]}</small></div><button class="btn sm" data-act="chpw" title="Đổi mật khẩu">🔑</button><button class="btn sm" data-act="logout">Đăng xuất</button></div></header><main class="content" id="content"></main><footer class="page-foot">${esc(CREDIT)}</footer></div></div><div class="scrim" data-act="burger"></div>`;
 }
 function resolvePage(h){
+  if(h==='dash/me'){const e=empOf(session.empId);return e?empPage(e):{t:'KPI của tôi',r:()=>'<div class="empty"><b>Tài khoản của bạn chưa được gắn với nhân viên nào.</b><br>Hãy nhờ Admin gắn tài khoản với tên của bạn ở Settings → User / Permission.</div>'}}
   if(PAGES[h])return PAGES[h];
   const [g,k]=h.split('/');
   if(g==='emp'){const e=empOf(k);if(e)return empPage(e)}
@@ -26,7 +27,8 @@ function render(keep){
   if(!session){loginView();return}
   if(CLOUD&&!cloudReady){$('#app').innerHTML=loadingHTML('Đang tải dữ liệu từ Firebase…');return}
   if(!$('#content'))shell();
-  const h=location.hash.replace(/^#\//,'')||'dash/overview';
+  let h=location.hash.replace(/^#\//,'')||homeHash();
+  if(!allowedHash(h)){h=homeHash();history.replaceState(null,'','#/'+h)}   /* trang không thuộc quyền → về trang chủ của vai trò */
   ui.key=h;PAGE=resolvePage(h);
   $('#side').innerHTML=sideHTML();
   const g=MENU.find(x=>x.g===h.split('/')[0]);
@@ -47,13 +49,14 @@ window.addEventListener('hashchange',()=>render(false));
 /* ---------- đăng nhập ---------- */
 function loginView(){
   if(CLOUD)return cloudLoginView();
-  $('#app').innerHTML=`<div class="login"><form class="lcard" data-submit="login">${logoBlock()}<h1>Quản lý KPI</h1><p>Đánh giá công việc nhân viên theo tháng · quý · năm</p>${inp('username','Tên đăng nhập','',{req:1,attrs:'autocomplete="username" autofocus'})}${inp('password','Mật khẩu','',{type:'password',req:1,attrs:'autocomplete="current-password"'})}<button class="btn primary block">Đăng nhập</button><div class="hint">Tài khoản mặc định: <b>admin</b> / <b>admin123</b>. Hãy đổi mật khẩu sau khi đăng nhập.</div><button type="button" class="lnk" data-act="fb-config">Kết nối Firebase để dùng chung dữ liệu…</button></form>${creditHTML('login-credit')}</div>`;
+  $('#app').innerHTML=`<div class="login"><form class="lcard" data-submit="login">${logoBlock()}<h1>Quản lý KPI</h1><p>Đánh giá công việc nhân viên theo tháng · quý · năm</p>${inp('username','Tên đăng nhập','',{req:1,attrs:'autocomplete="username" autofocus'})}${inp('password','Mật khẩu','',{type:'password',req:1,attrs:'autocomplete="current-password"'})}<button class="btn primary block">Đăng nhập</button><div class="hint">Chế độ dùng thử trên máy này. Tài khoản mặc định: <b>admin</b> / <b>admin123</b>. Để mỗi nhân viên chỉ thấy việc của mình một cách bảo mật, cần bật Firebase.</div><button type="button" class="lnk" data-act="fb-config">Kết nối Firebase để dùng chung dữ liệu…</button></form>${creditHTML('login-credit')}</div>`;
 }
 SUB.login=form=>{
   const d=fd(form),u=db.users.find(x=>x.username.toLowerCase()===d.username.trim().toLowerCase());
   if(!u||!u.active||u.pass!==pw(d.password))return toast('Sai tên đăng nhập hoặc mật khẩu.','error');
-  session={id:u.id,name:u.name,role:u.role,username:u.username};sessionStorage.setItem(SS_KEY,u.id);
-  $('#app').innerHTML='';if(!location.hash)location.hash='#/dash/overview';render(false);
+  if(!ROLES[u.role])return toast('Tài khoản chưa được cấp vai trò. Liên hệ Admin.','error');
+  session={id:u.id,name:u.name,role:u.role,username:u.username,empId:u.empId||''};sessionStorage.setItem(SS_KEY,u.id);
+  $('#app').innerHTML='';render(false);
 };
 ACT.logout=()=>{session=null;sessionStorage.removeItem(SS_KEY);closeModal();$('#app').innerHTML='';render()};
 ACT.chpw=()=>{

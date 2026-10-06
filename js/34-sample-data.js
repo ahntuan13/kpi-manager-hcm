@@ -9,14 +9,14 @@ function loadSample(){
   const iso=(m,d)=>`${y}-${pad(m)}-${pad(Math.max(1,Math.min(d,new Date(y,m,0).getDate())))}`;
   /* [mã, tên, phòng, chức danh, mức đúng hạn 0–1, các việc thường làm] */
   const E=[
-    ['MAU-01','Trần Minh Khoa','S-AD','IT Support',.9,['Cài máy tính cho nhân viên mới','Bảo trì PC / laptop dự án','Rà soát license phần mềm','Báo cáo OT weekly','Gửi bảng chấm công cho nhân viên','Xử lý cảnh báo virus','Cập nhật danh sách thiết bị','Thu hồi máy nhân viên nghỉ việc','Kiểm tra camera văn phòng','Hỗ trợ cài VPN']],
-    ['MAU-02','Lê Thị Hạnh','S-AD','HR Officer',.95,['Tổng hợp chấm công tháng','Đăng tin tuyển dụng','Phỏng vấn ứng viên vòng 1','Cập nhật hồ sơ nhân sự','Báo cáo biến động nhân sự','Làm thủ tục BHXH','Tổ chức đào tạo hội nhập','Rà soát hợp đồng sắp hết hạn']],
-    ['MAU-03','Phạm Quốc Bảo','S-PD','Site Engineer',.7,['Lập tiến độ thi công tuần','Nghiệm thu hạng mục ống gió','Báo cáo an toàn công trường','Kiểm tra vật tư về công trường','Họp giao ban với thầu phụ','Cập nhật bản vẽ hoàn công','Lập hồ sơ thanh toán đợt']],
-    ['MAU-04','Nguyễn Thu Trang','S-PU','Purchasing Staff',.85,['Lấy báo giá 3 nhà cung cấp','Lập PR / PO vật tư','Theo dõi giao hàng','Đối chiếu công nợ nhà cung cấp','Đánh giá nhà cung cấp quý','Cập nhật bảng giá vật tư']],
-    ['MAU-05','Võ Thành Đạt','S-QC','QC Engineer',.6,['Kiểm tra chất lượng lắp đặt','Lập biên bản NCR','Theo dõi khắc phục NCR','Báo cáo chất lượng tháng','Kiểm định thiết bị đo','Đào tạo quy trình QC cho đội thi công']],
-    ['MAU-06','Đặng Ngọc Mai','S-ED','Design Engineer',.92,['Thiết kế hệ thống HVAC','Bóc khối lượng','Phối hợp bản vẽ combine','Trả lời RFI của khách hàng','Cập nhật thư viện CAD / Revit','Tính tải lạnh']],
-    ['MAU-07','Bùi Gia Huy','HCM-EC','Electrical Engineer',.8,['Thiết kế tủ điện điều khiển','Kiểm tra bản vẽ shop drawing điện','Test & commissioning','Lập danh mục vật tư điện','Hỗ trợ kỹ thuật công trường','Báo cáo tiến độ phần điện']],
-    ['MAU-08','Hoàng Anh Thư','S-AZ','Accountant',.97,['Đối chiếu công nợ khách hàng','Lập báo cáo thuế tháng','Kiểm tra chứng từ thanh toán','Phân bổ chi phí dự án','Chốt sổ cuối tháng','Hỗ trợ kiểm toán']]
+    ['MAU-01','Trần Minh Khoa','AD','IT Support',.9,['Cài máy tính cho nhân viên mới','Bảo trì PC / laptop dự án','Rà soát license phần mềm','Báo cáo OT weekly','Gửi bảng chấm công cho nhân viên','Xử lý cảnh báo virus','Cập nhật danh sách thiết bị','Thu hồi máy nhân viên nghỉ việc','Kiểm tra camera văn phòng','Hỗ trợ cài VPN']],
+    ['MAU-02','Lê Thị Hạnh','HR','HR Officer',.95,['Tổng hợp chấm công tháng','Đăng tin tuyển dụng','Phỏng vấn ứng viên vòng 1','Cập nhật hồ sơ nhân sự','Báo cáo biến động nhân sự','Làm thủ tục BHXH','Tổ chức đào tạo hội nhập','Rà soát hợp đồng sắp hết hạn']],
+    ['MAU-03','Phạm Quốc Bảo','AD','Admin Staff',.7,['Đặt vé và khách sạn công tác','Quản lý xe công ty','Mua văn phòng phẩm','Theo dõi hợp đồng thuê văn phòng','Chuẩn bị phòng họp, đón khách','Thanh toán điện, nước, internet','Kiểm kê tài sản văn phòng']],
+    ['MAU-04','Nguyễn Thu Trang','HR','C&B Staff',.85,['Tính lương tháng','Lập báo cáo thuế TNCN','Đối chiếu BHXH','Cập nhật ngày phép','Trả lời thắc mắc lương của nhân viên','Làm thủ tục nghỉ việc']],
+    ['MAU-05','Võ Thành Đạt','AD','GA Staff',.6,['Kiểm tra PCCC định kỳ','Theo dõi vệ sinh, an ninh văn phòng','Báo cáo chi phí hành chính tháng','Làm thẻ ra vào cho nhân viên mới','Sửa chữa nhỏ trong văn phòng','Tổ chức sự kiện nội bộ']],
+    ['MAU-06','Đặng Ngọc Mai','HR','Recruiter',.92,['Sàng lọc hồ sơ ứng viên','Lên lịch phỏng vấn','Gửi thư mời nhận việc','Cập nhật báo cáo tuyển dụng tuần','Làm việc với trường đại học','Đăng tin tuyển dụng']],
+    ['MAU-07','Bùi Gia Huy','AD','IT Support',.8,['Sao lưu dữ liệu máy chủ','Kiểm tra hệ thống mạng','Cài phần mềm cho dự án','Lập danh mục thiết bị thanh lý','Hỗ trợ kỹ thuật phòng họp','Báo cáo sự cố IT tháng']],
+    ['MAU-08','Hoàng Anh Thư','HR','Training Officer',.97,['Lập kế hoạch đào tạo quý','Tổ chức lớp đào tạo nội bộ','Đánh giá sau đào tạo','Cập nhật hồ sơ đào tạo','Báo cáo chi phí đào tạo','Chuẩn bị tài liệu hội nhập']]
   ];
   E.forEach(([code,name,dept,title,q,pool],ei)=>{
     const e={id:uid('e')+ei,code,name,dept,title,email:'',note:'Dữ liệu mẫu',active:true,createdAt:Date.now()-ei*1000};db.employees.push(e);
@@ -35,7 +35,7 @@ function loadSample(){
           t.submitted=sub;t.approval=rnd()<.8?'Đạt':'';t.note=rnd()<.4?'Done':rnd()<.3?'Đã gửi qua email':'';
         }
         /* vài việc tháng trước chưa xong: có việc đã ghi "delays", có việc chỉ quá hạn */
-        if(m===cm-1&&i===n-1&&[0,2,4].includes(ei)){t.submitted=null;t.approval='';t.note=ei===2?'Chờ khách hàng phản hồi':'delays - xin dời sang tháng sau do vướng lịch công trường'}
+        if(m===cm-1&&i===n-1&&[0,2,4].includes(ei)){t.submitted=null;t.approval='';t.note=ei===2?'Chờ nhà cung cấp phản hồi':'delays - xin dời sang tháng sau do vướng lịch đào tạo'}
         sh.months[mm].tasks.push(t);
       });
       /* người làm tốt thường nhận thêm việc phát sinh ngoài kế hoạch → tổng trọng số vượt 100, KPI trên 100 */
@@ -45,5 +45,10 @@ function loadSample(){
       if(m<cm&&rnd()<.5)sh.months[mm].comment=['Hoàn thành tốt, chủ động báo cáo tiến độ.','Cần chú ý hạn nộp các báo cáo định kỳ.','Tinh thần trách nhiệm tốt, hỗ trợ đồng nghiệp tích cực.','Một số việc còn trễ, cần lập kế hoạch tuần rõ hơn.'][ri(0,3)];
     }
   });
-  save();toast('Đã nạp dữ liệu mẫu (tên nhân viên là giả)');
+  /* Chế độ cục bộ: thêm 2 tài khoản dùng thử để xem màn hình của Quản lý và Nhân viên (không tạo khi dùng Firebase) */
+  if(!CLOUD){
+    const add=(username,name,role,empId)=>{if(!db.users.some(x=>x.username===username))db.users.push({id:uid('u'),username,name,role,empId:empId||'',pass:pw(username+'123'),active:true});else{const x=db.users.find(x=>x.username===username);x.empId=empId||''}};
+    add('quanly','Quản lý (dùng thử)','member','');add('nhanvien',db.employees[0].name+' (dùng thử)','staff',db.employees[0].id);
+  }
+  save();toast(CLOUD?'Đã nạp dữ liệu mẫu (tên nhân viên là giả)':'Đã nạp dữ liệu mẫu. Tài khoản thử: quanly / quanly123 và nhanvien / nhanvien123');
 }

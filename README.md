@@ -3,22 +3,22 @@
 Web app đánh giá công việc của từng nhân viên theo **tháng / quý / năm**, dựng trên cùng kiến trúc với app **Quản lý Dự án – TPY** (menu trái, đăng nhập, phân quyền, Firebase, sao lưu, xuất Excel / PDF / In).
 Chạy thuần trình duyệt, đưa lên GitHub Pages là dùng được.
 
-Có 2 chế độ: **cục bộ** (lưu trong trình duyệt) và **Firebase** (cả phòng dùng chung dữ liệu, đồng bộ realtime, phân quyền ở máy chủ).
+Có 2 chế độ: **cục bộ** (lưu trong trình duyệt) và **Firebase** (cả phòng dùng chung dữ liệu, đồng bộ realtime, mỗi nhân viên chỉ đọc được việc của mình).
 
 ## Địa chỉ
 - Repo: **https://github.com/ahntuan13/kpi-manager-hcm**
 - App: **https://ahntuan13.github.io/kpi-manager-hcm/**
 
-Chế độ cục bộ đăng nhập bằng `admin` / `admin123` (đổi mật khẩu ngay sau khi đăng nhập) → Settings → Sao lưu & Hệ thống → **Nạp dữ liệu mẫu** để xem thử (tên nhân viên trong dữ liệu mẫu là giả).
+Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `admin123` → Settings → Sao lưu & Hệ thống → **Nạp dữ liệu mẫu** để xem thử (tên nhân viên trong dữ liệu mẫu là giả).
 
 ## Chức năng chính
 - **Dashboard**: KPI trung bình phòng, KPI tháng gần nhất, tỷ lệ nộp đúng hạn, việc quá hạn, xếp loại; biểu đồ KPI theo tháng; ma trận nhân viên × 12 tháng; bảng xếp hạng.
-- **Nhân viên**: danh sách, lọc theo phòng ban / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–130, vạch xếp loại 80 / 100 / 120, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI.
+- **Nhân viên**: danh sách, lọc theo nhóm / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–130, vạch xếp loại 80 / 100 / 120, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI.
 - **Chuyển việc sang tháng sau**: nút chuyển chỉ bật khi việc **chưa nộp** và cột *Ghi chú / Link bằng chứng* có chữ **`delays`**. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Có trang *Công việc → Chờ chuyển tháng* để chuyển hàng loạt.
 - **Nhập Excel**: chọn một hoặc nhiều file theo mẫu `KPI_Individual_report` (sheet `Summary` + `M01…M12`); nhân viên chưa có sẽ được tạo theo Mã NV.
 - **Công việc**: việc chưa nộp, quá hạn, chờ chuyển tháng, tất cả (lọc theo nhân viên / tháng / trạng thái).
-- **Báo cáo**: theo nhân viên (năm), theo tháng, theo quý, theo phòng ban. Mọi báo cáo xuất **Excel**, **PDF**, **In**. Mỗi tháng của nhân viên in được **Phiếu đánh giá KPI** có chỗ ký.
-- **Settings**: phòng ban, ngày nghỉ lễ, quy chế KPI, người dùng / phân quyền, sao lưu / khôi phục JSON, sao lưu đám mây.
+- **Báo cáo**: theo nhân viên (năm), theo tháng, theo quý, theo nhóm. Mọi báo cáo xuất **Excel**, **PDF**, **In**. Mỗi tháng của nhân viên in được **Phiếu đánh giá KPI** có chỗ ký.
+- **Settings** (chỉ Admin): nhóm, ngày nghỉ lễ, người dùng / phân quyền, sao lưu / khôi phục JSON, sao lưu đám mây. Mục **Quy chế KPI** ai cũng xem được.
 
 ## Công thức KPI (giữ theo file Excel)
 | Mục | Quy tắc |
@@ -47,11 +47,11 @@ js/
   10-ui-core.js            Menu, toast, modal, form, bảng, biểu đồ, xuất Excel / PDF / in
   11-router-auth.js        Thanh menu trái, điều hướng, đăng nhập
   20-dashboard.js          Dashboard: Tổng quan, KPI theo tháng, Xếp hạng
-  21-employees.js          Nhân viên: danh sách, phòng ban, trang chi tiết, bảng việc tháng, phiếu in
+  21-employees.js          Nhân viên: danh sách, theo nhóm, trang chi tiết, bảng việc tháng, phiếu in
   22-tasks.js              Công việc: chưa nộp, quá hạn, chờ chuyển tháng, tất cả
   23-import.js             Nhập file Excel KPI cá nhân
-  31-reports.js            Báo cáo: nhân viên, tháng, quý, phòng ban
-  33-settings.js           Phòng ban & ngày lễ, Quy chế KPI, User / Permission, Sao lưu & Hệ thống
+  31-reports.js            Báo cáo: nhân viên, tháng, quý, nhóm
+  33-settings.js           Nhóm & ngày lễ, Quy chế KPI, User / Permission, Sao lưu & Hệ thống
   34-sample-data.js        Dữ liệu mẫu (tên giả)
   50-firebase-sync.js      Firebase: đăng nhập, đồng bộ realtime, quản lý người dùng
   51-cloud-backup.js       Sao lưu đám mây: tự sao lưu mỗi ngày lên Firestore, khôi phục / tải về
@@ -59,12 +59,22 @@ js/
 ```
 Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổi số phiên bản `?v=` trong `index.html` để trình duyệt tải bản mới.
 
-## Phân quyền
-| Chức năng | Quản trị viên | Quản lý | Chỉ xem |
+## Phân quyền (3 vai trò)
+| Chức năng | Admin | Quản lý | Nhân viên |
 |---|---|---|---|
-| Xem dashboard, nhân viên, công việc, báo cáo | ✔ | ✔ | ✔ |
-| Thêm / sửa nhân viên, nhập Excel, thêm / sửa việc, duyệt, nhận xét, chuyển việc “delays” | ✔ | ✔ | — |
-| Xoá nhân viên, phòng ban, ngày lễ, người dùng, sao lưu / khôi phục | ✔ | — | — |
+| Xem dashboard, công việc, báo cáo | ✔ tất cả | ✔ tất cả | Chỉ của chính mình |
+| Xem danh sách nhân viên, xếp hạng, theo nhóm | ✔ | ✔ | — |
+| Thêm / sửa việc, chuyển việc “delays” | ✔ mọi người | ✔ mọi người | Việc của mình (chưa được duyệt Đạt) |
+| Duyệt, nhận xét, điểm thưởng nhập tay, dời deadline khi chuyển việc | ✔ | ✔ | — |
+| Thêm / sửa / xoá nhân viên, nhập Excel KPI | ✔ | — | — |
+| Settings: nhóm, ngày lễ, người dùng, sao lưu / khôi phục | ✔ | — | — |
+
+- **Admin** là duy nhất: `ahntuan13@gmail.com` (khai báo ở `config/firebase-config.js` và `firestore.rules`). Admin tạo tài khoản cho Quản lý và Nhân viên ở Settings → User / Permission.
+- **Nhân viên** phải được **gắn với một nhân viên** trong danh sách; họ chỉ thấy KPI, công việc, báo cáo của người đó. Gõ thẳng địa chỉ trang khác cũng bị đưa về “KPI của tôi”.
+- Nhân viên không sửa / xoá được việc đã được quản lý duyệt **Đạt**; chỉ xoá được việc chưa có ngày nộp.
+- **Nhóm**: mỗi nhân viên thuộc một nhóm (mặc định `AD`, `HR`; sửa ở Settings → Nhóm & ngày lễ). Gán nhóm khi thêm / sửa nhân viên.
+
+**Quan trọng:** phân quyền chỉ bảo mật thật khi bật **Firebase** (Rules ở máy chủ chặn nhân viên đọc bảng KPI của người khác). Ở chế độ dùng thử, mọi dữ liệu nằm chung trong trình duyệt của một máy; vai trò chỉ để xem trước giao diện. Nạp dữ liệu mẫu ở chế độ dùng thử sẽ tạo sẵn 2 tài khoản thử: `quanly` / `quanly123` và `nhanvien` / `nhanvien123` (xoá ở User / Permission khi không cần).
 
 ## Bật Firebase (cả phòng dùng chung dữ liệu)
 Tạo **project Firebase riêng** cho app này, không dùng chung project của app khác.
@@ -75,7 +85,7 @@ Tạo **project Firebase riêng** cho app này, không dùng chung project của
 5. **Firestore Database** → Create database → vị trí `asia-southeast1` → **Production mode**.
 6. Tab **Rules** → dán nội dung `firestore.rules` → **Publish**.
 7. Dán `firebaseConfig` vào `config/firebase-config.js` (thay `null`), commit.
-8. Mở app → **Thiết lập lần đầu** → tạo quản trị viên → Settings → User / Permission để tạo tài khoản cho quản lý (vai trò **Quản lý**) và nhân viên (vai trò **Chỉ xem**).
+8. Mở app → **Thiết lập lần đầu** → tạo tài khoản Admin bằng email `ahntuan13@gmail.com` → thêm nhân viên (hoặc nhập Excel) → Settings → User / Permission để tạo tài khoản **Quản lý** và **Nhân viên** (mỗi tài khoản Nhân viên gắn với đúng một nhân viên).
 
 Với Firebase, quyền được kiểm tra ở máy chủ bằng `firestore.rules`. `apiKey` trong `firebase-config.js` là khóa công khai theo thiết kế của Firebase, bảo mật nằm ở Rules.
 

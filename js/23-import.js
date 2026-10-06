@@ -32,7 +32,7 @@ function parseKpiWorkbook(wb){
   return{code:String(code).trim(),name:String(name).trim(),year,months,total};
 }
 ACT['imp-open']=()=>{
-  if(!can('write'))return toast('Bạn không có quyền nhập dữ liệu.','error');
+  if(!can('admin'))return toast('Chỉ Admin được nhập file Excel.','error');
   IMP={items:[]};
   modal('Nhập file Excel KPI cá nhân',`<form id="mf" data-submit="imp-save">
     <p class="note" style="padding-top:0">Chọn một hoặc nhiều file <b>.xlsx</b> theo mẫu <b>KPI_Individual_report</b> (sheet Summary + M01…M12). Mỗi file là một nhân viên trong một năm. Nhân viên chưa có trong danh sách sẽ được tạo mới theo Mã NV.</p>
@@ -65,7 +65,7 @@ function impRender(){
   if(ok){ok.disabled=!good.length;ok.textContent=good.length?`Nhập ${good.length} file`:'Nhập'}
 }
 SUB['imp-save']=()=>{
-  if(!IMP||!can('write'))return;const good=IMP.items.filter(x=>x.d);if(!good.length)return;let lastId=null,lastY=null;
+  if(!IMP||!can('admin'))return;const good=IMP.items.filter(x=>x.d);if(!good.length)return;let lastId=null,lastY=null;
   const ok=transact(()=>{good.forEach(({d})=>{
     let e=empByCode(d.code);if(!e){e={id:uid('e'),code:d.code,name:d.name,dept:'',title:'',email:'',note:'',active:true,createdAt:Date.now()};db.employees.push(e)}
     db.sheets=db.sheets.filter(s=>s.id!==sheetId(e.id,d.year));

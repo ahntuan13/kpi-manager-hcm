@@ -12,6 +12,8 @@
      truy cập trái phép ở phía máy chủ.
    ===================================================================== */
 const SYNC=['employees','sheets'];
+/* Email của Admin duy nhất, khai báo ở config/firebase-config.js */
+const ADMIN=(typeof ADMIN_EMAIL==='string'?ADMIN_EMAIL:'').trim().toLowerCase();
 let fbAuth=null,fbStore=null,cloudReady=false,unsubs=[],remote={},remoteCfg={},setupPending=false,pushQ=Promise.resolve(),renderTimer=null;
 const canon=v=>JSON.stringify(v,(k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().reduce((o,kk)=>(o[kk]=x[kk],o),{}):x);
 const loadingHTML=m=>`<div class="login"><div class="lcard">${logoBlock()}<h1>${esc(m)}</h1><p>Vui lòng đợi trong giây lát…</p></div>${creditHTML('login-credit')}</div>`;
@@ -47,10 +49,11 @@ async function cloudBoot(){
 async function bootSession(u){
   try{
     const snap=await fbStore.collection('users').doc(u.uid).get();
-    if(!snap.exists){toast('Tài khoản chưa được cấp quyền. Hãy liên hệ quản trị viên.','error');await fbAuth.signOut();return}
+    if(!snap.exists){toast('Tài khoản chưa được cấp quyền. Hãy liên hệ Admin.','error');await fbAuth.signOut();return}
     const p=snap.data();
     if(p.active===false){toast('Tài khoản đã bị khoá.','error');await fbAuth.signOut();return}
-    session={id:u.uid,name:p.name||u.email,role:p.role,username:u.email};
+    if(!ROLES[p.role]){toast('Tài khoản chưa được cấp vai trò. Hãy liên hệ Admin.','error');await fbAuth.signOut();return}
+    session={id:u.uid,name:p.name||u.email,role:p.role,username:u.email,empId:p.empId||''};
     startSync();
   }catch(e){toast(authMsg(e),'error');try{await fbAuth.signOut()}catch(x){}}
 }
@@ -63,10 +66,18 @@ function startSync(){
   const total=SYNC.length+3,seen=new Set();
   const mark=k=>{seen.add(k);if(!cloudReady&&seen.size===total){cloudReady=true;afterReady()}};
   const fail=e=>{console.error(e);toast('Lỗi đồng bộ: '+authMsg(e),'error')};
-  SYNC.forEach(col=>unsubs.push(fbStore.collection(col).onSnapshot(s=>{applyRemote(col,s.docChanges());mark(col)},fail)));
+  if(isStaff()){
+    /* Nhân viên chỉ tải đúng hồ sơ và bảng KPI của chính mình (Rules ở máy chủ cũng chỉ cho đọc phần này) */
+    const eid=session.empId;
+    if(!eid){mark('employees');mark('sheets')}
+    else{
+      unsubs.push(fbStore.doc('employees/'+eid).onSnapshot(s=>{applyRemote('employees',[{type:s.exists?'modified':'removed',doc:s}]);mark('employees')},fail));
+      unsubs.push(fbStore.collection('sheets').where('empId','==',eid).onSnapshot(s=>{applyRemote('sheets',s.docChanges());mark('sheets')},fail));
+    }
+  }else SYNC.forEach(col=>unsubs.push(fbStore.collection(col).onSnapshot(s=>{applyRemote(col,s.docChanges());mark(col)},fail)));
   unsubs.push(fbStore.doc('config/company').onSnapshot(s=>{if(s.exists){const d=s.data();remoteCfg.company=canon(d);db.company={...db.company,...d};scheduleRender()}mark('company')},fail));
   unsubs.push(fbStore.doc('config/seq').onSnapshot(s=>{if(s.exists){const d=s.data();remoteCfg.seq=canon(d);for(const k in d)db.seq[k]=Math.max(db.seq[k]||0,+d[k]||0)}mark('seq')},fail));
-  const uMap=(id,d)=>({id,username:d.email||'',name:d.name||'',role:d.role,active:d.active!==false});
+  const uMap=(id,d)=>({id,username:d.email||'',name:d.name||'',role:d.role,empId:d.empId||'',active:d.active!==false});
   if(session.role==='admin')unsubs.push(fbStore.collection('users').onSnapshot(s=>{db.users=s.docs.map(d=>uMap(d.id,d.data()));scheduleRender();mark('users')},fail));
   else unsubs.push(fbStore.doc('users/'+session.id).onSnapshot(s=>{db.users=s.exists?[uMap(s.id,s.data())]:[];mark('users')},fail));
 }
@@ -99,15 +110,17 @@ function scheduleRender(){
 
 /* ---------- ghi thay đổi lên Firestore ---------- */
 function cloudPush(){
-  if(!cloudReady||!can('write'))return;
+  const staff=isStaff();
+  if(!cloudReady||!(can('manage')||staff))return;
   const ops=[];
   SYNC.forEach(col=>{
+    if(col==='employees'&&session.role!=='admin')return;   /* danh sách nhân viên: chỉ Admin ghi */
     const cur={};db[col].forEach(r=>{cur[r.id]=canon(r)});const old=remote[col];
     for(const id in cur)if(old[id]!==cur[id])ops.push({col,id,data:JSON.parse(cur[id])});
-    for(const id in old)if(!(id in cur))ops.push({col,id,del:true});
+    if(session.role==='admin')for(const id in old)if(!(id in cur))ops.push({col,id,del:true});   /* xoá: chỉ Admin */
     remote[col]=cur;
   });
-  const sq=canon(db.seq);if(remoteCfg.seq!==sq){ops.push({path:'config/seq',data:JSON.parse(sq)});remoteCfg.seq=sq}
+  const sq=canon(db.seq);if(!staff&&remoteCfg.seq!==sq){ops.push({path:'config/seq',data:JSON.parse(sq)});remoteCfg.seq=sq}
   if(session.role==='admin'){const cc=canon(db.company);if(remoteCfg.company!==cc){ops.push({path:'config/company',data:JSON.parse(cc)});remoteCfg.company=cc}}
   if(!ops.length)return;
   pushQ=pushQ.then(()=>commitOps(ops)).catch(e=>{console.error(e);toast('Không ghi được lên Firebase: '+authMsg(e)+' Trang sẽ tải lại để đồng bộ.','error');setTimeout(()=>location.reload(),3000)});
@@ -123,13 +136,13 @@ async function commitOps(ops){
 /* ---------- đăng nhập / thiết lập lần đầu ---------- */
 function cloudLoginView(){
   const setup=ui.loginMode==='setup';
-  $('#app').innerHTML=`<div class="login"><form class="lcard" data-submit="${setup?'fb-setup':'login'}">${logoBlock()}<h1>${setup?'Thiết lập lần đầu':'Quản lý KPI'}</h1><p>${setup?'Tạo tài khoản quản trị viên đầu tiên':'Đánh giá công việc nhân viên theo tháng · quý · năm'}</p>
-    ${inp('username','Email','',{req:1,type:'email',attrs:'autocomplete="username" autofocus'})}
+  $('#app').innerHTML=`<div class="login"><form class="lcard" data-submit="${setup?'fb-setup':'login'}">${logoBlock()}<h1>${setup?'Thiết lập lần đầu':'Quản lý KPI'}</h1><p>${setup?'Tạo tài khoản Admin':'Đánh giá công việc nhân viên theo tháng · quý · năm'}</p>
+    ${inp('username','Email',setup?ADMIN:'',{req:1,type:'email',attrs:'autocomplete="username" autofocus'+(setup&&ADMIN?' readonly':'')})}
     ${setup?inp('name','Họ tên','',{req:1}):''}
     ${inp('password','Mật khẩu'+(setup?' (tối thiểu 6 ký tự)':''),'',{type:'password',req:1,attrs:`autocomplete="${setup?'new-password':'current-password'}" ${setup?'minlength="6"':''}`})}
     ${setup?inp('password2','Nhập lại mật khẩu','',{type:'password',req:1}):''}
-    <button class="btn primary block">${setup?'Tạo quản trị viên':'Đăng nhập'}</button>
-    ${setup?'<div class="hint">Chỉ dùng cho lần đầu tiên khi hệ thống chưa có ai. Nếu đã có quản trị viên, hãy nhờ họ tạo tài khoản cho bạn.</div>':'<button type="button" class="lnk" data-act="fb-forgot">Quên mật khẩu?</button>'}
+    <button class="btn primary block">${setup?'Tạo tài khoản Admin':'Đăng nhập'}</button>
+    ${setup?`<div class="hint">Chỉ dùng cho lần đầu tiên khi hệ thống chưa có ai. Tài khoản Admin duy nhất là <b>${esc(ADMIN||'người thiết lập đầu tiên')}</b>; mọi người khác do Admin tạo tài khoản.</div>`:'<button type="button" class="lnk" data-act="fb-forgot">Quên mật khẩu?</button>'}
     <button type="button" class="lnk" data-act="fb-mode">${setup?'← Quay lại đăng nhập':'Thiết lập lần đầu (chưa có tài khoản quản trị)'}</button>
     ${FIREBASE_CONFIG?'':'<button type="button" class="lnk" data-act="fb-disconnect">Ngắt kết nối Firebase (chế độ cục bộ)</button>'}</form>${creditHTML('login-credit')}</div>`;
 }
@@ -148,13 +161,14 @@ if(CLOUD){
 }
 SUB['fb-setup']=async form=>{
   const d=fd(form),email=d.username.trim().toLowerCase();
+  if(ADMIN&&email!==ADMIN)return toast('Chỉ '+ADMIN+' được thiết lập làm Admin.','error');
   if(d.password!==d.password2)return toast('Hai mật khẩu không khớp.','error');
   setupPending=true;
   try{
     const cred=await fbAuth.createUserWithEmailAndPassword(email,d.password),u=cred.user,b=fbStore.batch();
     b.set(fbStore.doc('users/'+u.uid),{email,name:d.name.trim(),role:'admin',active:true});
     b.set(fbStore.doc('meta/init'),{by:u.uid,at:Date.now()});
-    try{await b.commit()}catch(e){try{await u.delete()}catch(x){}try{await fbAuth.signOut()}catch(x){}throw new Error('Hệ thống đã được thiết lập trước đó. Hãy nhờ quản trị viên tạo tài khoản cho bạn.')}
+    try{await b.commit()}catch(e){try{await u.delete()}catch(x){}try{await fbAuth.signOut()}catch(x){}throw new Error('Hệ thống đã được thiết lập trước đó. Hãy nhờ Admin tạo tài khoản cho bạn.')}
     setupPending=false;await bootSession(u);
   }catch(e){setupPending=false;toast(authMsg(e),'error')}
 };
@@ -168,12 +182,14 @@ async function createAuthUser(email,password){
 async function cloudUserSave(form){
   const d=fd(form),id=form.dataset.id;
   try{
+    const cur=id?by(db.users,id):null,role=cur&&cur.role==='admin'?'admin':(d.role==='member'?'member':'staff'),empId=role==='admin'?'':(d.empId||'');
+    if(role==='staff'&&!empId)throw new Error('Vai trò Nhân viên phải được gắn với một nhân viên để biết họ được xem việc của ai.');
     if(id){
-      if(id===session.id&&(!d.active||d.role!=='admin'))throw new Error('Không thể tự khoá hoặc hạ quyền tài khoản đang đăng nhập.');
-      await fbStore.doc('users/'+id).update({name:d.name.trim(),role:d.role,active:!!d.active});
+      if(id===session.id&&!d.active)throw new Error('Không thể tự khoá tài khoản đang đăng nhập.');
+      await fbStore.doc('users/'+id).update({name:d.name.trim(),role,empId,active:!!d.active});
     }else{
       const email=d.username.trim().toLowerCase(),uid=await createAuthUser(email,d.password);
-      await fbStore.doc('users/'+uid).set({email,name:d.name.trim(),role:d.role,active:true});
+      await fbStore.doc('users/'+uid).set({email,name:d.name.trim(),role,empId,active:true});
     }
     closeModal();toast('Đã lưu');
   }catch(e){toast(authMsg(e),'error')}

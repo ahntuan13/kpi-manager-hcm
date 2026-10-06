@@ -2,49 +2,68 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Admin duy nhất. Phải trùng ADMIN_EMAIL trong config/firebase-config.js.
+    function adminEmail()    { return 'ahntuan13@gmail.com'; }
+
     function signedIn()      { return request.auth != null; }
     function profilePath()   { return /databases/$(database)/documents/users/$(request.auth.uid); }
     function hasProfile()    { return signedIn() && exists(profilePath()); }
     function me()            { return get(profilePath()).data; }
-    function active()        { return hasProfile() && me().active != false; }
+    function active()        { return hasProfile() && me().active != false && me().role in ['admin', 'member', 'staff']; }
     function isAdmin()       { return active() && me().role == 'admin'; }
-    function canWrite()      { return active() && (me().role == 'admin' || me().role == 'member'); }
+    function isManager()     { return active() && (me().role == 'admin' || me().role == 'member'); }   // Admin + Quản lý
+    function isStaff()       { return active() && me().role == 'staff' && me().empId is string && me().empId != ''; }
     function initialized()   { return exists(/databases/$(database)/documents/meta/init); }
 
-    // Hồ sơ người dùng: mỗi người đọc được hồ sơ của mình, admin đọc/ghi tất cả.
-    // Ngoại lệ: lần thiết lập đầu tiên (chưa có meta/init) cho phép tự tạo admin.
+    // Hồ sơ người dùng (vai trò, nhân viên được gắn): mỗi người đọc hồ sơ của mình, Admin đọc / ghi tất cả.
+    // Admin chỉ tạo được Quản lý và Nhân viên; vai trò admin chỉ dành cho adminEmail() ở lần thiết lập đầu tiên.
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow create: if isAdmin()
-        || (signedIn() && request.auth.uid == uid && !initialized() && request.resource.data.role == 'admin');
-      allow update, delete: if isAdmin();
+      allow create: if (isAdmin() && request.resource.data.role in ['member', 'staff'])
+        || (signedIn() && request.auth.uid == uid && !initialized()
+            && request.resource.data.role == 'admin' && request.auth.token.email == adminEmail());
+      allow update: if isAdmin() && (
+           (uid != request.auth.uid && request.resource.data.role in ['member', 'staff'])
+        || (uid == request.auth.uid && request.resource.data.role == 'admin' && request.resource.data.active == true));
+      allow delete: if isAdmin() && uid != request.auth.uid;
     }
 
     match /meta/{doc} {
       allow read: if signedIn();
-      allow create: if signedIn() && doc == 'init' && !initialized();
+      allow create: if signedIn() && doc == 'init' && !initialized() && request.auth.token.email == adminEmail();
     }
 
-    // Tên đơn vị, phòng ban, ngày lễ: chỉ quản trị viên sửa
+    // Settings (tên đơn vị, nhóm, ngày lễ): mọi người đang hoạt động đọc được để tính điểm, chỉ Admin sửa.
     match /config/company { allow read: if active(); allow write: if isAdmin(); }
-    match /config/seq     { allow read: if active(); allow write: if canWrite(); }
+    match /config/seq     { allow read: if active(); allow write: if isManager(); }
 
-    // Sao lưu đám mây: người có quyền ghi được TẠO bản sao lưu; chỉ admin xem / xoá.
-    // Không ai sửa được bản sao lưu đã tạo (không có quyền update) → lỗi app không ghi đè được bản cũ.
-    match /config/backup { allow read: if active(); allow write: if canWrite(); }
+    // Sao lưu đám mây: Admin + Quản lý được TẠO bản sao lưu; chỉ Admin xem / khôi phục / xoá.
+    // Không ai sửa được bản sao lưu đã tạo (không có quyền update).
+    match /config/backup { allow read, write: if isManager(); }
     match /backups/{id} {
       allow read, delete: if isAdmin();
-      allow create: if canWrite();
+      allow create: if isManager();
       match /parts/{n} {
         allow read, delete: if isAdmin();
-        allow create: if canWrite();
+        allow create: if isManager();
       }
     }
 
-    // Dữ liệu nghiệp vụ (nhân viên, bảng KPI): Quản trị viên + Quản lý được ghi, "Chỉ xem" chỉ đọc
-    match /{col}/{id} {
-      allow read:  if active() && col in ['employees','sheets'];
-      allow write: if canWrite() && col in ['employees','sheets'];
+    // Nhân viên: Admin + Quản lý đọc tất cả; Nhân viên chỉ đọc hồ sơ của chính mình. Chỉ Admin thêm / sửa / xoá.
+    match /employees/{id} {
+      allow read:  if isManager() || (isStaff() && id == me().empId);
+      allow write: if isAdmin();
+    }
+
+    // Bảng KPI (mỗi nhân viên × mỗi năm là 1 document, có trường empId):
+    //  - Admin + Quản lý đọc / ghi tất cả.
+    //  - Nhân viên CHỈ đọc và ghi bảng của chính mình; không đổi được empId, không xoá được.
+    match /sheets/{id} {
+      allow read:   if isManager() || (isStaff() && resource.data.empId == me().empId);
+      allow create: if isManager() || (isStaff() && request.resource.data.empId == me().empId);
+      allow update: if isManager()
+        || (isStaff() && resource.data.empId == me().empId && request.resource.data.empId == me().empId);
+      allow delete: if isAdmin();
     }
   }
 }

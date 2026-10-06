@@ -12,7 +12,7 @@ if(!location.hash)history.replaceState(null,'','#/dash/overview');
 }
 if(CLOUD)cloudBoot();
 else{
-  const uid0=sessionStorage.getItem(SS_KEY),u=db.users.find(x=>x.id===uid0&&x.active);if(u)session={id:u.id,name:u.name,role:u.role,username:u.username};
+  const uid0=sessionStorage.getItem(SS_KEY),u=db.users.find(x=>x.id===uid0&&x.active);if(u&&ROLES[u.role])session={id:u.id,name:u.name,role:u.role,username:u.username,empId:u.empId||''};
   render(false);
 }
 self.__APP_BOOTED=true;

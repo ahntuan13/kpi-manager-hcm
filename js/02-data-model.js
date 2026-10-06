@@ -3,9 +3,11 @@
 (self.__mods=self.__mods||[]).push('02-data-model');
 
 /* ---------- danh mục cố định ---------- */
-const ROLES={admin:'Quản trị viên',member:'Quản lý',viewer:'Chỉ xem'};
-const DEFAULT_DEPTS=['S-AD','S-AZ','S-PD','S-PU','S-QC','S-ED','HCM-EC'];
-/* Ngày nghỉ lễ Việt Nam – lấy từ sheet Holiday_VN của file KPI cá nhân. Sửa ở Settings → Phòng ban & ngày lễ. */
+/* 3 vai trò: Admin (toàn quyền) · Quản lý (xem tất cả, sửa việc, duyệt, nhận xét) · Nhân viên (chỉ thấy và sửa việc của chính mình) */
+const ROLES={admin:'Admin',member:'Quản lý',staff:'Nhân viên'};
+/* Nhóm trong phòng (trường dept của nhân viên). Sửa ở Settings → Nhóm & ngày lễ. */
+const DEFAULT_DEPTS=['AD','HR'];
+/* Ngày nghỉ lễ Việt Nam – lấy từ sheet Holiday_VN của file KPI cá nhân. Sửa ở Settings → Nhóm & ngày lễ. */
 const DEFAULT_HOLIDAYS='2024-01-01,2024-02-10,2024-02-11,2024-02-12,2024-02-13,2024-02-14,2024-04-30,2024-05-01,2024-05-07,2024-06-01,2024-09-02,2024-09-17,2025-01-01,2025-01-29,2025-01-30,2025-01-31,2025-02-01,2025-02-02,2025-04-30,2025-05-01,2025-06-01,2025-09-02,2025-10-06,2026-01-01,2026-02-14,2026-02-16,2026-02-17,2026-02-18,2026-02-19,2026-02-20,2026-02-21,2026-04-25,2026-04-27,2026-04-30,2026-05-01,2026-06-01,2026-09-01,2026-09-02,2026-09-24,2027-01-01,2027-02-06,2027-02-07,2027-02-08,2027-02-09,2027-02-10,2027-04-30,2027-05-01,2027-06-01,2027-09-02,2027-09-14,2028-01-01,2028-01-25,2028-01-26,2028-01-27,2028-01-28,2028-01-29,2028-04-30,2028-05-01,2028-06-01,2028-09-02,2028-10-02,2029-01-01,2029-02-13,2029-02-14,2029-02-15,2029-02-16,2029-02-17,2029-04-30,2029-05-01,2029-06-01,2029-09-02,2029-09-22,2030-01-01,2030-02-02,2030-02-03,2030-02-04,2030-02-05,2030-02-06,2030-04-30,2030-05-01,2030-06-01,2030-09-02,2030-09-11'.split(',');
 const MM=['01','02','03','04','05','06','07','08','09','10','11','12'];
 const QN=['Quý I','Quý II','Quý III','Quý IV'], QR=['T01–T03','T04–T06','T07–T09','T10–T12'];
@@ -114,7 +116,7 @@ const empAv=(e,cls='av')=>`<span class="${cls}" style="background:${empColor(e.i
 const depts=()=>{const d=[...(db.company.depts||[])];db.employees.forEach(e=>{if(e.dept&&!d.includes(e.dept))d.push(e.dept)});return d};
 const deptOpts=(blank)=>[...(blank!==undefined?[['',blank]]:[]),...depts().map(d=>[d,d])];
 const empOpts=(blank)=>[...(blank!==undefined?[['',blank]]:[]),...sortedEmps().map(e=>[e.id,`${e.name} · ${e.code}`])];
-const sortedEmps=()=>[...db.employees].sort((a,b)=>String(a.name).localeCompare(String(b.name),'vi'));
+const sortedEmps=()=>db.employees.filter(mine).sort((a,b)=>String(a.name).localeCompare(String(b.name),'vi'));
 const sheetId=(empId,year)=>`${empId}_${year}`;
 function sheetOf(empId,year,create){
   let s=by(db.sheets,sheetId(empId,year));
@@ -128,7 +130,7 @@ const yearOpts=()=>allYears().map(v=>[String(v),String(v)]);
 const empStats=(e,y)=>yearStats(sheetOf(e.id,y));
 /* Mọi công việc của một năm, kèm nhân viên / tháng / điểm */
 function allRows(y){
-  const o=[];db.sheets.forEach(s=>{if(+s.year!==+y)return;const e=empOf(s.empId);if(!e)return;MM.forEach(mm=>(s.months[mm].tasks||[]).forEach(t=>o.push({e,s,mm,t,sc:scoreTask(t)})))});return o;
+  const o=[];db.sheets.forEach(s=>{if(+s.year!==+y)return;const e=empOf(s.empId);if(!e||!mine(e))return;MM.forEach(mm=>(s.months[mm].tasks||[]).forEach(t=>o.push({e,s,mm,t,sc:scoreTask(t)})))});return o;
 }
 const lateCount=()=>allRows(curYear()).filter(r=>r.sc.state==='overdue').length;
 const delaysCount=()=>allRows(curYear()).filter(r=>carryReady(r.t,r.sc)).length;
@@ -138,7 +140,19 @@ const mLbl=(mm,year,baseYear)=>'T'+mm+(baseYear!==undefined&&+year!==+baseYear?'
 const fmtK=v=>v==null?'–':new Intl.NumberFormat('vi-VN',{maximumFractionDigits:1}).format(v);
 const fmtK2=v=>v==null?'–':new Intl.NumberFormat('vi-VN',{maximumFractionDigits:2}).format(v);
 const fmtDM=(iso,year)=>{if(!iso)return'–';const [y,m,d]=iso.split('-');return `${d}/${m}`+(+y!==+year?`/${y.slice(2)}`:'')};
+/* ---------- phân quyền ----------
+   can('admin')  : chỉ Admin (nhân viên, nhóm, ngày lễ, người dùng, sao lưu, nhập Excel)
+   can('manage') : Admin + Quản lý (xem tất cả; thêm / sửa việc của mọi người; duyệt; nhận xét; chuyển việc "delays")
+   Nhân viên     : chỉ thấy dữ liệu của chính mình (session.empId); thêm / sửa việc của mình khi quản lý chưa duyệt Đạt; chuyển việc "delays" */
 const can=a=>{const r=session?.role;return a==='admin'?r==='admin':(r==='admin'||r==='member')};
+const isStaff=()=>session?.role==='staff';
+const mine=e=>!isStaff()||(!!e&&e.id===session.empId);
+const canSheet=empId=>can('manage')||(isStaff()&&!!empId&&empId===session.empId);
+const approved=t=>/^đạt/i.test((t&&t.approval)||'');
+const canTask=(empId,t)=>can('manage')||(canSheet(empId)&&!approved(t));
+const canDelTask=(empId,t)=>can('manage')||(canSheet(empId)&&t&&!t.submitted&&!t.approval);
+const empHref=e=>isStaff()?'#/dash/me':'#/emp/'+e.id;
+const homeHash=()=>isStaff()?'dash/me':'dash/overview';
 
 /* ---------- chuyển việc "delays" sang tháng sau ---------- */
 function moveTasks(empId,year,mm,ids,newDeadline){
