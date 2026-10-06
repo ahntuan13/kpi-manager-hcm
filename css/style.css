@@ -455,3 +455,5 @@ table.t th.nt,table.t th.ttl{white-space:normal}
 .mstrip b{display:inline-flex;align-items:center;gap:4px}
 .mstrip .mk{font-style:normal;font-size:10.5px;font-weight:700;line-height:15px;min-width:15px;padding:0 4px;border-radius:99px;color:#fff;background:var(--bad)}
 .mstrip .mk.warn{background:#e29a2d}
+.warnbar{background:var(--warn-s);color:#6b4307;border:1px solid #f0d49a;border-radius:10px;padding:12px 16px;margin-bottom:16px;line-height:1.55}
+.warnbar a{color:#6b4307;font-weight:600}

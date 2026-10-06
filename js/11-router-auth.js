@@ -36,7 +36,7 @@ function render(keep){
   destroyCharts();
   const sy=window.scrollY;
   try{
-    $('#content').innerHTML=PAGE.r?PAGE.r():`${PAGE.head?PAGE.head():''}<div id="tbl">${PAGE.tbl()}</div>`;
+    $('#content').innerHTML=(typeof rulesBanner==='function'?rulesBanner():'')+(PAGE.r?PAGE.r():`${PAGE.head?PAGE.head():''}<div id="tbl">${PAGE.tbl()}</div>`);
     PAGE.tm&&PAGE.tm();PAGE.m&&PAGE.m();
   }catch(err){console.error(err);$('#content').innerHTML=`<div class="empty">Lỗi hiển thị trang: ${esc(err.message)}</div>`}
   $('#side').classList.remove('open');

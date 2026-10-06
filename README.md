@@ -89,6 +89,8 @@ Tạo **project Firebase riêng** cho app này, không dùng chung project của
 7. Dán `firebaseConfig` vào `config/firebase-config.js` (thay `null`), commit.
 8. Mở app → **Thiết lập lần đầu** → tạo tài khoản Admin bằng email `ahntuan13@gmail.com` → thêm nhân viên (hoặc nhập Excel) → Settings → User / Permission để tạo tài khoản **Quản lý** và **Nhân viên** (mỗi tài khoản Nhân viên gắn với đúng một nhân viên).
 
+**Mỗi khi file `firestore.rules` thay đổi phải dán lại vào Firebase Console → Firestore → Rules → Publish.** App tự kiểm tra sau khi đăng nhập: nếu Firebase còn chạy bản Rules cũ, đầu trang sẽ hiện cảnh báo vàng kèm link. Dấu hiệu thường gặp của Rules cũ: tài khoản Nhân viên thêm việc bị báo “Không có quyền thực hiện (Firestore Rules)”.
+
 Với Firebase, quyền được kiểm tra ở máy chủ bằng `firestore.rules`. `apiKey` trong `firebase-config.js` là khóa công khai theo thiết kế của Firebase, bảo mật nằm ở Rules.
 
 ## Lưu ý

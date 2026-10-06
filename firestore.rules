@@ -15,6 +15,11 @@ service cloud.firestore {
     function isStaff()       { return active() && me().role == 'staff' && me().empId is string && me().empId != ''; }
     function initialized()   { return exists(/databases/$(database)/documents/meta/init); }
 
+    // Dấu phiên bản Rules (v3). App đọc thử đường dẫn này sau khi đăng nhập: đọc được nghĩa là Rules trên Firebase
+    // đúng là bản này; bị từ chối nghĩa là Firebase đang chạy bản Rules cũ và app sẽ hiện cảnh báo cho Admin.
+    // Mỗi lần sửa Rules: đổi 'v3' ở đây và RULES_VER trong js/50-firebase-sync.js thành số mới.
+    match /rulesCheck/{v} { allow get: if signedIn() && v == 'v3'; }
+
     // Hồ sơ người dùng (vai trò, nhân viên được gắn): mỗi người đọc hồ sơ của mình, Admin đọc / ghi tất cả.
     // Admin chỉ tạo được Quản lý và Nhân viên; vai trò admin chỉ dành cho adminEmail() ở lần thiết lập đầu tiên.
     match /users/{uid} {

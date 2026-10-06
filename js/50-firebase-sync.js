@@ -12,6 +12,20 @@
      truy cập trái phép ở phía máy chủ.
    ===================================================================== */
 const SYNC=['employees','sheets'];
+/* Phiên bản Rules mà app này cần. Phải trùng dấu phiên bản trong firestore.rules (match /rulesCheck/{v}). */
+const RULES_VER='v3';
+let rulesOld=false;
+/* Rules trên Firebase có phải bản mới nhất không? Bản cũ từ chối đường dẫn rulesCheck/<phiên bản>. */
+async function checkRules(){
+  try{await fbStore.doc('rulesCheck/'+RULES_VER).get();if(rulesOld){rulesOld=false;rerender()}}
+  catch(e){if(e&&e.code==='permission-denied'&&!rulesOld){rulesOld=true;rerender()}}
+}
+function rulesBanner(){
+  if(!CLOUD||!rulesOld)return'';
+  return `<div class="warnbar" role="alert"><b>Quy tắc bảo mật (Firestore Rules) trên Firebase chưa phải bản mới nhất.</b> ${can('admin')
+    ?`Vì vậy tài khoản Nhân viên chưa lưu được việc của mình. Cách sửa: mở <a href="https://console.firebase.google.com/project/${esc(FBCFG.projectId)}/firestore/rules" target="_blank" rel="noopener">Firebase Console → Firestore → Rules</a>, xoá hết nội dung cũ, dán toàn bộ file <a href="firestore.rules" target="_blank" rel="noopener">firestore.rules</a> (bản ${RULES_VER}) rồi bấm Publish. Sau đó tải lại trang này.`
+    :'Bạn có thể chưa lưu được thay đổi. Hãy báo Admin cập nhật Rules rồi tải lại trang.'}</div>`;
+}
 /* Email của Admin duy nhất, khai báo ở config/firebase-config.js */
 const ADMIN=(typeof ADMIN_EMAIL==='string'?ADMIN_EMAIL:'').trim().toLowerCase();
 let fbAuth=null,fbStore=null,cloudReady=false,unsubs=[],remote={},remoteCfg={},setupPending=false,pushQ=Promise.resolve(),renderTimer=null;
@@ -84,7 +98,7 @@ function startSync(){
 function afterReady(){
   const need=needsMigrate();migrate();
   if(need&&can('write'))save();
-  render(false);
+  render(false);checkRules();
   if(typeof autoBackup==='function')setTimeout(autoBackup,3000);
 }
 function applyRemote(col,changes){
@@ -123,7 +137,7 @@ function cloudPush(){
   const sq=canon(db.seq);if(!staff&&remoteCfg.seq!==sq){ops.push({path:'config/seq',data:JSON.parse(sq)});remoteCfg.seq=sq}
   if(session.role==='admin'){const cc=canon(db.company);if(remoteCfg.company!==cc){ops.push({path:'config/company',data:JSON.parse(cc)});remoteCfg.company=cc}}
   if(!ops.length)return;
-  pushQ=pushQ.then(()=>commitOps(ops)).catch(e=>{console.error(e);toast('Không ghi được lên Firebase: '+authMsg(e)+' Trang sẽ tải lại để đồng bộ.','error');setTimeout(()=>location.reload(),3000)});
+  pushQ=pushQ.then(()=>commitOps(ops)).catch(e=>{console.error(e);const denied=e&&e.code==='permission-denied';toast('Chưa lưu được lên Firebase: '+authMsg(e)+(denied?(can('admin')?' Hãy dán lại file firestore.rules mới nhất vào Firebase.':' Hãy báo Admin cập nhật Firestore Rules.'):'')+' Trang sẽ tải lại để đồng bộ.','error');setTimeout(()=>location.reload(),denied?6000:3000)});
 }
 async function commitOps(ops){
   for(let i=0;i<ops.length;i+=400){
@@ -169,7 +183,7 @@ SUB['fb-setup']=async form=>{
     b.set(fbStore.doc('users/'+u.uid),{email,name:d.name.trim(),role:'admin',active:true});
     b.set(fbStore.doc('meta/init'),{by:u.uid,at:Date.now()});
     try{await b.commit()}catch(e){try{await u.delete()}catch(x){}try{await fbAuth.signOut()}catch(x){}throw new Error('Hệ thống đã được thiết lập trước đó. Hãy nhờ Admin tạo tài khoản cho bạn.')}
-    setupPending=false;await bootSession(u);
+    setupPending=false;ui.loginMode='login';await bootSession(u);   /* lần sau đăng xuất sẽ về màn hình đăng nhập, không phải thiết lập */
   }catch(e){setupPending=false;toast(authMsg(e),'error')}
 };
 
