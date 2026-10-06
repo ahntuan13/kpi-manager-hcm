@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quản lý KPI nhân viên</title>
+<meta name="description" content="Đánh giá KPI nhân viên theo tháng, quý, năm: bảng việc từng tháng, chấm điểm theo deadline, chuyển việc trễ sang tháng sau, báo cáo">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231f6fd0'/%3E%3Ctext x='32' y='41' font-family='Arial' font-weight='700' font-size='24' fill='white' text-anchor='middle'%3EKPI%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=20261006.1400">
+</head>
+<body>
+<div id="app"><div style="padding:40px;font-family:sans-serif;color:#33445c">Đang tải ứng dụng…</div></div>
+<div id="modal-root"></div>
+<div id="toast-root" class="toasts" role="status" aria-live="polite"></div>
+<div id="print-area"></div>
+
+<!-- Thư viện bên ngoài (CDN, cố định phiên bản) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<!-- Báo lỗi rõ ràng: file nào, dòng nào -->
+<script>
+window.addEventListener('error',function(e){
+  if(!e.filename)return;var b=document.getElementById('err-banner');
+  if(!b){b=document.createElement('div');b.id='err-banner';b.style.cssText='position:fixed;left:0;right:0;bottom:0;background:#b3261e;color:#fff;padding:8px 14px;font:13px sans-serif;z-index:9999;white-space:pre-wrap';document.body.appendChild(b)}
+  b.textContent='Lỗi: '+e.message+'  ('+e.filename.split('/').slice(-2).join('/')+':'+e.lineno+')';
+});
+</script>
+
+<!-- Cấu hình -->
+<script src="config/firebase-config.js?v=20261006.1400"></script>
+
+<!-- Mã nguồn ứng dụng: thứ tự tải quan trọng (số thứ tự trong tên file) -->
+<script src="js/01-core-utils.js?v=20261006.1400"></script>
+<script src="js/02-data-model.js?v=20261006.1400"></script>
+<script src="js/10-ui-core.js?v=20261006.1400"></script>
+<script src="js/11-router-auth.js?v=20261006.1400"></script>
+<script src="js/20-dashboard.js?v=20261006.1400"></script>
+<script src="js/21-employees.js?v=20261006.1400"></script>
+<script src="js/22-tasks.js?v=20261006.1400"></script>
+<script src="js/23-import.js?v=20261006.1400"></script>
+<script src="js/31-reports.js?v=20261006.1400"></script>
+<script src="js/33-settings.js?v=20261006.1400"></script>
+<script src="js/34-sample-data.js?v=20261006.1400"></script>
+<script src="js/50-firebase-sync.js?v=20261006.1400"></script>
+<script src="js/51-cloud-backup.js?v=20261006.1400"></script>
+<script src="js/99-main.js?v=20261006.1400"></script>
+<script>
+setTimeout(function(){if(!self.__APP_BOOTED&&!document.getElementById('err-banner')){var a=document.getElementById('app');if(a&&/Đang tải/.test(a.textContent))a.innerHTML='<div style="padding:30px;font-family:sans-serif"><h2>Không khởi động được ứng dụng</h2><p>Hãy tải lại trang (Ctrl+Shift+R). Nếu vẫn lỗi, mở F12 → Console để xem thông báo.</p></div>'}},5000);
+</script>
+</body>
+</html>

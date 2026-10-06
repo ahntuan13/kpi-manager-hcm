@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()      { return request.auth != null; }
+    function profilePath()   { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasProfile()    { return signedIn() && exists(profilePath()); }
+    function me()            { return get(profilePath()).data; }
+    function active()        { return hasProfile() && me().active != false; }
+    function isAdmin()       { return active() && me().role == 'admin'; }
+    function canWrite()      { return active() && (me().role == 'admin' || me().role == 'member'); }
+    function initialized()   { return exists(/databases/$(database)/documents/meta/init); }
+
+    // Hồ sơ người dùng: mỗi người đọc được hồ sơ của mình, admin đọc/ghi tất cả.
+    // Ngoại lệ: lần thiết lập đầu tiên (chưa có meta/init) cho phép tự tạo admin.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin()
+        || (signedIn() && request.auth.uid == uid && !initialized() && request.resource.data.role == 'admin');
+      allow update, delete: if isAdmin();
+    }
+
+    match /meta/{doc} {
+      allow read: if signedIn();
+      allow create: if signedIn() && doc == 'init' && !initialized();
+    }
+
+    // Tên đơn vị, phòng ban, ngày lễ: chỉ quản trị viên sửa
+    match /config/company { allow read: if active(); allow write: if isAdmin(); }
+    match /config/seq     { allow read: if active(); allow write: if canWrite(); }
+
+    // Sao lưu đám mây: người có quyền ghi được TẠO bản sao lưu; chỉ admin xem / xoá.
+    // Không ai sửa được bản sao lưu đã tạo (không có quyền update) → lỗi app không ghi đè được bản cũ.
+    match /config/backup { allow read: if active(); allow write: if canWrite(); }
+    match /backups/{id} {
+      allow read, delete: if isAdmin();
+      allow create: if canWrite();
+      match /parts/{n} {
+        allow read, delete: if isAdmin();
+        allow create: if canWrite();
+      }
+    }
+
+    // Dữ liệu nghiệp vụ (nhân viên, bảng KPI): Quản trị viên + Quản lý được ghi, "Chỉ xem" chỉ đọc
+    match /{col}/{id} {
+      allow read:  if active() && col in ['employees','sheets'];
+      allow write: if canWrite() && col in ['employees','sheets'];
+    }
+  }
+}
