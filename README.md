@@ -12,11 +12,11 @@ Có 2 chế độ: **cục bộ** (lưu trong trình duyệt) và **Firebase** (
 Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `admin123` → Settings → Sao lưu & Hệ thống → **Nạp dữ liệu mẫu** để xem thử (tên nhân viên trong dữ liệu mẫu là giả).
 
 ## Chức năng chính
-- **Dashboard**: KPI trung bình phòng, KPI tháng gần nhất, tỷ lệ nộp đúng hạn, việc quá hạn, xếp loại; biểu đồ KPI theo tháng; ma trận nhân viên × 12 tháng; bảng xếp hạng.
+- **Dashboard**: KPI trung bình, KPI tháng gần nhất, tỷ lệ nộp đúng hạn, xếp loại; biểu đồ KPI theo tháng; bảng việc quá hạn và việc chờ chuyển tháng; ma trận nhân viên × 12 tháng.
+- **Xếp hạng nhân viên** theo **tháng / quý / năm**: biểu đồ cột xếp từ cao xuống thấp, biểu đồ thứ hạng qua các tháng hoặc các quý, cột “so với kỳ trước” (▲ ▼).
 - **Nhân viên**: danh sách, lọc theo nhóm / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–130, vạch xếp loại 80 / 100 / 120, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI.
-- **Chuyển việc sang tháng sau**: nút chuyển chỉ bật khi việc **chưa nộp** và cột *Ghi chú / Link bằng chứng* có chữ **`delays`**. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Có trang *Công việc → Chờ chuyển tháng* để chuyển hàng loạt.
+- **Chuyển việc sang tháng sau**: nút chuyển chỉ bật khi việc **chưa nộp** và cột *Ghi chú / Link bằng chứng* có chữ **`delays`**. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Việc chờ chuyển cũng hiện ở Dashboard → Tổng quan; dải 12 tháng của mỗi nhân viên đánh dấu tháng còn việc quá hạn.
 - **Nhập Excel**: chọn một hoặc nhiều file theo mẫu `KPI_Individual_report` (sheet `Summary` + `M01…M12`); nhân viên chưa có sẽ được tạo theo Mã NV.
-- **Công việc**: việc chưa nộp, quá hạn, chờ chuyển tháng, tất cả (lọc theo nhân viên / tháng / trạng thái).
 - **Báo cáo**: theo nhân viên (năm), theo tháng, theo quý, theo nhóm. Mọi báo cáo xuất **Excel**, **PDF**, **In**. Mỗi tháng của nhân viên in được **Phiếu đánh giá KPI** có chỗ ký.
 - **Settings** (chỉ Admin): nhóm, ngày nghỉ lễ, người dùng / phân quyền, sao lưu / khôi phục JSON, sao lưu đám mây. Mục **Quy chế KPI** ai cũng xem được.
 
@@ -46,9 +46,8 @@ js/
   02-data-model.js         Mô hình dữ liệu, CÔNG THỨC KPI, chuyển việc “delays”; tải/lưu
   10-ui-core.js            Menu, toast, modal, form, bảng, biểu đồ, xuất Excel / PDF / in
   11-router-auth.js        Thanh menu trái, điều hướng, đăng nhập
-  20-dashboard.js          Dashboard: Tổng quan, KPI theo tháng, Xếp hạng
+  20-dashboard.js          Dashboard: Tổng quan, KPI theo tháng, Xếp hạng (tháng / quý / năm)
   21-employees.js          Nhân viên: danh sách, theo nhóm, trang chi tiết, bảng việc tháng, phiếu in
-  22-tasks.js              Công việc: chưa nộp, quá hạn, chờ chuyển tháng, tất cả
   23-import.js             Nhập file Excel KPI cá nhân
   31-reports.js            Báo cáo: nhân viên, tháng, quý, nhóm
   33-settings.js           Nhóm & ngày lễ, Quy chế KPI, User / Permission, Sao lưu & Hệ thống
@@ -70,6 +69,7 @@ Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổ
 | Settings: nhóm, ngày lễ, người dùng, sao lưu / khôi phục | ✔ | — | — |
 
 - **Admin** là duy nhất: `ahntuan13@gmail.com` (khai báo ở `config/firebase-config.js` và `firestore.rules`). Admin tạo tài khoản cho Quản lý và Nhân viên ở Settings → User / Permission.
+- Admin (và Quản lý) cũng là nhân viên: ở User / Permission, bấm Sửa tài khoản của mình rồi chọn **Gắn với nhân viên** để có mục **KPI của tôi**.
 - **Nhân viên** phải được **gắn với một nhân viên** trong danh sách; họ chỉ thấy KPI, công việc, báo cáo của người đó. Gõ thẳng địa chỉ trang khác cũng bị đưa về “KPI của tôi”.
 - Nhân viên không sửa / xoá được việc đã được quản lý duyệt **Đạt**; chỉ xoá được việc chưa có ngày nộp.
 - **Nhóm**: mỗi nhân viên thuộc một nhóm (mặc định `AD`, `HR`; sửa ở Settings → Nhóm & ngày lễ). Gán nhóm khi thêm / sửa nhân viên.

@@ -47,7 +47,7 @@ const kpiBands={id:'kpiBands',
       const vals=ds.data.map(v=>v==null?-1:v),mx=vals.indexOf(Math.max(...vals)),last=ds.data.reduce((a,v,i)=>v==null?a:i,-1);
       meta.data.forEach((el,i)=>{const v=ds.data[i];if(v==null)return;if(ds.showVal==='last'?i!==last:(few&&n>4&&i!==mx&&i!==last))return;const t=fmtK(v);x.strokeStyle='#fff';x.lineWidth=3;x.strokeText(t,el.x,el.y-5);x.fillStyle='#1f2544';x.fillText(t,el.x,el.y-5)})});x.restore()}};
 const kpiScale=()=>({min:0,max:KPI_CAP,afterBuildTicks:s=>{s.ticks=[0,40,80,100,120,130].map(value=>({value}))},grid:{display:false},border:{display:false},ticks:{callback:v=>v}});
-const kpiOpt=(extra={})=>baseOpt({layout:{padding:{right:86,top:14}},scales:{y:kpiScale(),x:{grid:{display:false}}},...extra});
+const kpiOpt=(extra={})=>baseOpt({layout:{padding:{right:86,top:22}},scales:{y:kpiScale(),x:{grid:{display:false}}},...extra});
 const barColors=d=>d.map(v=>v!=null&&v<80?CC.low:CC.bar);
 const kTip=(extraFn)=>({callbacks:{label:c=>{const v=c.raw;if(v==null)return ' Chưa có điểm';const g=gradeOf(v);return ` ${c.dataset.label}: ${fmtK2(v)}${g&&c.dataset.showVal?' · '+g[2]:''}`},afterBody:items=>extraFn?extraFn(items[0].dataIndex):[]}});
 function kChart(id,cfg,label){cfg.plugins=[...(cfg.plugins||[]),kpiBands];const el=document.getElementById(id);if(el&&cfg.options&&cfg.options.layout)cfg.options.layout.padding.right=padR(el.parentElement.clientWidth);chart(id,cfg);const c=document.getElementById(id);if(c&&c.setAttribute){c.setAttribute('role','img');c.setAttribute('aria-label',label)}}
@@ -65,10 +65,10 @@ PAGES['dash/overview']={t:'Tổng quan',
     let miss=0;rows.forEach(r=>{if(!r.has)return;r.ys.months.forEach((m,i)=>{if(m.kpi==null&&todayStr()>dueOf(y,i))miss++})});
     const top=[...ev].sort((a,b)=>b.ys.avg-a.ys.avg).slice(0,6);
     const all=allRows(y).filter(r=>!f.dept||r.e.dept===f.dept);
-    const overdue=all.filter(r=>r.sc.state==='overdue').sort((a,b)=>b.sc.overdue-a.sc.overdue).slice(0,7);
-    const ready=all.filter(r=>carryReady(r.t,r.sc)).slice(0,7);
+    const overAll=all.filter(r=>r.sc.state==='overdue').sort((a,b)=>b.sc.overdue-a.sc.overdue),overdue=overAll.slice(0,15);
+    const readyAll=all.filter(r=>carryReady(r.t,r.sc)),ready=readyAll.slice(0,15);
     const dps=depts().map(d=>{const rs=ev.filter(r=>r.e.dept===d);return{d,n:rows.filter(r=>r.e.dept===d).length,avg:avgOf(rs.map(r=>r.ys.avg))}}).filter(x=>x.n);
-    return `<div class="kpis k4">${kpi(`KPI trung bình ${f.dept?'nhóm '+esc(f.dept):'chung'} ${y}`,fmtK(team),team==null?'chưa có tháng nào được chấm':`${gradeBd(team)} · ${ev.length}/${rows.length} nhân viên có điểm`,gradeTone(team)||'acc')}${kpi(lastI>=0?`KPI tháng gần nhất (T${MM[lastI]})`:'KPI tháng gần nhất',fmtK(lastI>=0?mAvg[lastI]:null),lastI>=0?gradeBd(mAvg[lastI]):'chưa có điểm','info')}${kpi('Nộp đúng hạn',scored?fmtK(onT/scored*100)+'%':'–',scored?`${onT}/${scored} việc đã chấm`:'chưa có việc được chấm','ok')}${kpi('Việc quá hạn',over,over?'<a href="#/task/late">Xem danh sách</a>':'không có việc quá hạn',over?'bad':'ok')}${kpi('Xuất sắc · Tốt',`${cnt.ok} · ${cnt.info}`,`Đạt ${cnt.mute} · Cần cải thiện ${cnt.bad}`,'ok')}${kpi('Việc chưa nộp',open+over,'đang làm, chưa đặt hạn hoặc quá hạn','info')}${kpi('Chờ chuyển tháng',dl,dl?'<a href="#/task/delays">Ghi chú có “delays” →</a>':'không có việc ghi “delays”',dl?'warn':'')}${kpi('Tháng chưa có điểm',miss,miss?'đã quá tuần đầu tháng sau':'các tháng đã qua đều có điểm',miss?'warn':'ok')}</div>
+    return `<div class="kpis k4">${kpi(`KPI trung bình ${f.dept?'nhóm '+esc(f.dept):'chung'} ${y}`,fmtK(team),team==null?'chưa có tháng nào được chấm':`${gradeBd(team)} · ${ev.length}/${rows.length} nhân viên có điểm`,gradeTone(team)||'acc')}${kpi(lastI>=0?`KPI tháng gần nhất (T${MM[lastI]})`:'KPI tháng gần nhất',fmtK(lastI>=0?mAvg[lastI]:null),lastI>=0?gradeBd(mAvg[lastI]):'chưa có điểm','info')}${kpi('Nộp đúng hạn',scored?fmtK(onT/scored*100)+'%':'–',scored?`${onT}/${scored} việc đã chấm`:'chưa có việc được chấm','ok')}${kpi('Việc quá hạn',over,over?'xem bảng “Việc quá hạn” bên dưới':'không có việc quá hạn',over?'bad':'ok')}${kpi('Xuất sắc · Tốt',`${cnt.ok} · ${cnt.info}`,`Đạt ${cnt.mute} · Cần cải thiện ${cnt.bad}`,'ok')}${kpi('Việc chưa nộp',open+over,'đang làm, chưa đặt hạn hoặc quá hạn','info')}${kpi('Chờ chuyển tháng',dl,dl?'ghi chú có “delays”, xem bảng bên dưới':'không có việc ghi “delays”',dl?'warn':'')}${kpi('Tháng chưa có điểm',miss,miss?'đã quá tuần đầu tháng sau':'các tháng đã qua đều có điểm',miss?'warn':'ok')}</div>
     <div class="grid g2">${card(`KPI trung bình theo tháng – ${y}`,'<div class="ch"><canvas id="c1"></canvas></div><p class="note">Cột: trung bình KPI tháng của các nhân viên đã có điểm. Đường: lũy kế từ đầu năm. Tháng chưa chấm không tính là 0; tháng đang diễn ra chỉ là tạm tính nên chưa đưa vào.</p>')}${card('Xếp loại theo KPI năm',ev.length?'<div class="ch"><canvas id="c2"></canvas></div>':'<div class="note">Chưa có nhân viên nào có điểm trong năm.</div>')}</div>
     <div class="grid g3">
       ${card('KPI năm cao nhất',top.length?`<div class="lst">${top.map((r,i)=>`<div style="display:block"><div style="display:flex;justify-content:space-between;gap:8px"><span>${i+1}. ${empLink(r.e)} <small class="muted">${esc(r.e.dept||'')}</small></span>${gradeBd(r.ys.avg)}</div>${kBar(r.ys.avg)}</div>`).join('')}</div><p class="note"><a href="#/dash/rank">Xem bảng xếp hạng đầy đủ →</a></p>`:'<div class="note">Chưa có điểm.</div>')}
@@ -76,8 +76,8 @@ PAGES['dash/overview']={t:'Tổng quan',
       ${card('Nhân viên cần lưu ý',(()=>{const w=rows.filter(r=>r.ys.overdue||(r.ys.avg!=null&&r.ys.avg<80)||(r.ys.last!=null&&r.ys.months[r.ys.last].kpi<80)).slice(0,6);return w.length?`<div class="lst">${w.map(r=>`<div><span class="mem">${empAv(r.e)}<span><b>${empLink(r.e)}</b><small>${r.ys.avg!=null?'KPI năm '+fmtK(r.ys.avg):'chưa có điểm'}${r.ys.last!=null?' · T'+MM[r.ys.last]+' '+fmtK(r.ys.months[r.ys.last].kpi):''}</small></span></span>${r.ys.overdue?badge('bad',r.ys.overdue+' quá hạn'):badge('warn','KPI dưới 80')}</div>`).join('')}</div>`:'<div class="note">Không có nhân viên nào dưới chuẩn hoặc có việc quá hạn.</div>'})())}
     </div>
     <div class="grid g2">
-      ${card('Việc quá hạn lâu nhất',miniTable(['Công việc / nhân viên','Tháng','Deadline','Quá hạn'],overdue.map(r=>`<tr><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td><a class="lnk" href="${empHref(r.e)}" data-act="goto-month" data-id="${r.e.id}" data-y="${y}" data-mm="${r.mm}">T${r.mm}</a></td><td style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</td><td>${badge('bad',r.sc.overdue+' ngày')}</td></tr>`),'Không có việc quá hạn.'))}
-      ${card('Chờ chuyển sang tháng sau (ghi chú “delays”)',miniTable(['Công việc / nhân viên','Tháng','Deadline',''],ready.map(r=>`<tr><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td>T${r.mm}</td><td style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</td><td class="act">${canSheet(r.e.id)?`<button class="btn sm acc" data-act="kt-move" data-e="${r.e.id}" data-y="${y}" data-mm="${r.mm}" data-id="${r.t.id}">Chuyển → ${mLbl(nextOf(y,r.mm).mm,nextOf(y,r.mm).year,y)}</button>`:''}</td></tr>`),'Chưa có việc nào ghi “delays”. Khi một việc bị trễ cần dời, ghi <b>delays</b> vào Ghi chú của việc đó để mở nút chuyển.'))}
+      ${card(`Việc quá hạn (${overAll.length})${overAll.length>overdue.length?' · 15 việc lâu nhất':''}`,miniTable(['Công việc / nhân viên','Tháng','Deadline','Quá hạn'],overdue.map(r=>`<tr><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td><a class="lnk" href="${empHref(r.e)}" data-act="goto-month" data-id="${r.e.id}" data-y="${y}" data-mm="${r.mm}">T${r.mm}</a></td><td style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</td><td>${badge('bad',r.sc.overdue+' ngày')}</td></tr>`),'Không có việc quá hạn.'))}
+      ${card(`Chờ chuyển sang tháng sau · ghi chú “delays” (${readyAll.length})`,miniTable(['Công việc / nhân viên','Tháng','Deadline',''],ready.map(r=>`<tr><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td>T${r.mm}</td><td style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</td><td class="act">${canSheet(r.e.id)?`<button class="btn sm acc" data-act="kt-move" data-e="${r.e.id}" data-y="${y}" data-mm="${r.mm}" data-id="${r.t.id}">Chuyển → ${mLbl(nextOf(y,r.mm).mm,nextOf(y,r.mm).year,y)}</button>`:''}</td></tr>`),'Chưa có việc nào ghi “delays”. Khi một việc bị trễ cần dời, ghi <b>delays</b> vào Ghi chú của việc đó để mở nút chuyển.'))}
     </div>`;
   },
   tm(){
@@ -117,16 +117,51 @@ PAGES['dash/month']={t:'KPI theo tháng',
       options:kpiOpt({interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom'},tooltip:kTip()}})},`KPI trung bình theo tháng năm ${y}, mỗi đường là một ${f.dept?'nhân viên':'nhóm'}. Số liệu đầy đủ ở bảng bên dưới.`);
   }};
 
-/* ---------- Xếp hạng nhân viên ---------- */
+/* ---------- Xếp hạng nhân viên: theo tháng / quý / năm ---------- */
+const RK={thang:'Tháng',quy:'Quý',nam:'Năm'};
+function rankCtx(f){
+  const y=f.year||curYear(),rows=scopeStats(f),per=RK[f.per]?f.per:'thang';
+  /* kỳ mặc định = tháng / quý gần nhất đã có điểm; chỉ ghi nhớ khi người dùng tự chọn */
+  let rm=f.rm,rq=f.rq;
+  if(!MM.includes(rm)){let li=-1;rows.forEach(r=>r.ys.months.forEach((m,i)=>{if(mVal(m)!=null&&i>li)li=i}));rm=MM[li>=0?li:new Date().getMonth()]}
+  if(!['0','1','2','3'].includes(rq)){let lq=-1;rows.forEach(r=>r.ys.quarters.forEach((q,i)=>{if(q.avg!=null&&i>lq)lq=i}));rq=String(lq>=0?lq:Math.floor(new Date().getMonth()/3))}
+  const mi=+rm-1,qi=+rq,n=per==='thang'?12:per==='quy'?4:1,cur=per==='thang'?mi:per==='quy'?qi:0;
+  const val=(r,i)=>per==='thang'?mVal(r.ys.months[i]):per==='quy'?r.ys.quarters[i].avg:r.ys.avg;
+  /* thứ hạng của từng nhân viên ở từng kỳ (chỉ xếp người đã có điểm trong kỳ đó) */
+  const ranks=Array.from({length:n},(_,i)=>{const m=new Map();rows.filter(r=>val(r,i)!=null).sort((a,b)=>val(b,i)-val(a,i)).forEach((r,k)=>m.set(r.e.id,k+1));return m});
+  const list=rows.map(r=>({...r,v:val(r,cur),rk:ranks[cur].get(r.e.id)||null,prev:cur>0?(ranks[cur-1].get(r.e.id)||null):null})).sort((a,b)=>(a.rk??1e9)-(b.rk??1e9)||String(a.e.name).localeCompare(String(b.e.name),'vi'));
+  return{y,per,mi,qi,rm,rq,n,cur,ranks,list,val,rows,
+    label:per==='thang'?`tháng ${rm}/${y}`:per==='quy'?`${QN[qi]} năm ${y}`:`năm ${y}`,unit:per==='thang'?'tháng':'quý',
+    prov:per==='thang'&&rows.some(r=>r.ys.months[mi].prov)};
+}
+const rkDelta=r=>!r.rk?'–':r.prev==null?'<span class="muted">mới</span>':r.prev>r.rk?`<span class="pos">▲ ${r.prev-r.rk}</span>`:r.prev<r.rk?`<span class="neg">▼ ${r.rk-r.prev}</span>`:'<span class="muted">=</span>';
 PAGES['dash/rank']={t:'Xếp hạng nhân viên',
   head(){return `<div class="bar">${scopeBar()}<div class="sp"></div>${rptBtns('xep-hang-kpi')}</div>`},
-  sub(){const f=F();return `Năm ${f.year||curYear()}${f.dept?' · '+f.dept:''}`},
+  sub(){const f=F(),c=rankCtx(f);return `Xếp hạng ${c.label}${f.dept?' · nhóm '+f.dept:''}`},
   tbl(){
-    const f=F(),rows=scopeStats(f).sort((a,b)=>(b.ys.avg??-1)-(a.ys.avg??-1));let rk=0;rows.forEach(r=>{r.rk=r.ys.avg==null?null:++rk});
-    return table([
-      {h:'Hạng',c:'num',f:r=>r.rk?`<b>${r.rk}</b>`:'–',x:r=>r.rk||''},{h:'Nhân viên',f:r=>empCell(r.e),x:r=>r.e.name},{h:'Nhóm',f:r=>esc(r.e.dept||'—')},
-      {h:'KPI năm',f:r=>kBar(r.ys.avg),x:r=>r.ys.avg==null?'':r2(r.ys.avg)},{h:'Xếp loại',f:r=>gradeBd(r.ys.avg),x:r=>gradeOf(r.ys.avg)?.[2]||''},
-      nc('Tháng đã chấm',r=>r.ys.ev.length),kc('Cao nhất',r=>r.ys.maxI==null?null:r.ys.months[r.ys.maxI].kpi),kc('Thấp nhất',r=>r.ys.minI==null?null:r.ys.months[r.ys.minI].kpi),
-      pctCol('Đúng hạn',r=>r.ys.onPct),nc('Việc trễ',r=>r.ys.late),nc('Chưa nộp',r=>r.ys.open),{h:'Quá hạn',c:'num',f:r=>badNum(r.ys.overdue),x:r=>r.ys.overdue}
-    ],rows,{empty:'Chưa có nhân viên nào trong phạm vi lọc.'});
+    const f=F(),c=rankCtx(f),has=c.list.some(r=>r.rk);
+    return `<div class="bar"><div class="seg" role="group" aria-label="Kỳ xếp hạng">${Object.entries(RK).map(([k,l])=>`<button type="button" data-act="setf" data-k="per" data-v="${k}" aria-pressed="${c.per===k}" class="${c.per===k?'on':''}">${l}</button>`).join('')}</div>${c.per==='thang'?`<select class="in" data-f="rm" aria-label="Tháng xếp hạng">${MM.map(m=>`<option value="${m}" ${m===c.rm?'selected':''}>Tháng ${m}</option>`).join('')}</select>`:c.per==='quy'?`<select class="in" data-f="rq" aria-label="Quý xếp hạng">${QN.map((n,i)=>`<option value="${i}" ${String(i)===c.rq?'selected':''}>${n} (${QR[i]})</option>`).join('')}</select>`:''}${c.prov?badge('info','Tháng chưa kết thúc · điểm tạm tính'):''}</div>
+    ${has?`<div class="grid ${c.per==='nam'?'':'g2'}">${card(`Xếp hạng KPI ${c.label}`,'<div class="ch tall"><canvas id="c1"></canvas></div><p class="note">Cột xếp từ cao xuống thấp. Vạch ngang: mốc xếp loại 80 · 100 · 120. Cột đỏ: dưới 80.</p>')}${c.per==='nam'?'':card(`Thứ hạng qua các ${c.unit} – ${c.y}`,`<div class="ch tall"><canvas id="c2"></canvas></div><p class="note">Mỗi đường là một nhân viên, hạng 1 ở trên cùng. Hiện tối đa 8 người đứng đầu ${c.label}; ${c.unit} nào chưa có điểm thì đường bị ngắt.</p>`)}</div>`:`<div class="empty">Chưa có nhân viên nào có điểm trong ${c.label}.</div>`}`+
+    table([
+      {h:'Hạng',c:'num',f:r=>r.rk?`<b>${r.rk}</b>`:'–',x:r=>r.rk||''},
+      ...(c.per==='nam'?[]:[{h:`So với ${c.unit} trước`,c:'num',f:rkDelta,x:r=>!r.rk?'':r.prev==null?'mới':r.prev-r.rk}]),
+      {h:'Nhân viên',f:r=>empCell(r.e),x:r=>r.e.name},{h:'Nhóm',f:r=>esc(r.e.dept||'—')},
+      {h:`KPI ${c.label}`,f:r=>kBar(r.v),x:r=>r.v==null?'':r2(r.v)},{h:'Xếp loại',f:r=>r.v==null?gradeBd(null):c.prov?badge('info','Tạm tính'):gradeBd(r.v),x:r=>r.v==null?'':c.prov?'Tạm tính':gradeOf(r.v)[2]},
+      ...(c.per==='nam'?[nc('Tháng đã chấm',r=>r.ys.ev.length),kc('Cao nhất',r=>r.ys.maxI==null?null:r.ys.months[r.ys.maxI].kpi),kc('Thấp nhất',r=>r.ys.minI==null?null:r.ys.months[r.ys.minI].kpi)]:[kc('KPI năm',r=>r.ys.avg)]),
+      pctCol('Đúng hạn (năm)',r=>r.ys.onPct),nc('Việc trễ',r=>r.ys.late),nc('Chưa nộp',r=>r.ys.open),{h:'Quá hạn',c:'num',f:r=>badNum(r.ys.overdue),x:r=>r.ys.overdue}
+    ],c.list,{empty:'Chưa có nhân viên nào trong phạm vi lọc.'});
+  },
+  tm(){
+    const f=F(),c=rankCtx(f),R=c.list.filter(r=>r.rk).slice(0,24);if(!R.length)return;
+    const d=R.map(r=>r.v);
+    kChart('c1',{type:'bar',data:{labels:R.map(r=>`${r.rk}. ${String(r.e.name).trim().split(/\s+/).slice(-2).join(' ')}`),datasets:[{label:`KPI ${c.label}`,data:d,backgroundColor:c.prov?d.map(()=>'#b7cdec'):barColors(d),showVal:true}]},
+      options:kpiOpt({plugins:{legend:{display:false},tooltip:kTip(i=>[`Hạng ${R[i].rk} · ${R[i].e.name}`,R[i].e.code+(R[i].e.dept?' · '+R[i].e.dept:'')])}})},
+      `Xếp hạng KPI ${c.label}: `+R.map(r=>`hạng ${r.rk} ${r.e.name} ${fmtK(r.v)}`).join(', '));
+    if(c.per==='nam')return;
+    /* biểu đồ thứ hạng: trục dọc là hạng (1 ở trên), trục ngang là 12 tháng hoặc 4 quý */
+    const top=R.slice(0,8),labels=c.per==='thang'?MM.map(m=>'T'+m):QN,maxRk=Math.max(2,...c.ranks.map(m=>m.size));
+    chart('c2',{type:'line',data:{labels,datasets:top.map((r,i)=>({label:r.e.name,data:c.ranks.map(m=>m.get(r.e.id)??null),borderColor:PAL[i%PAL.length],backgroundColor:PAL[i%PAL.length],borderWidth:2,pointRadius:4,pointHoverRadius:6,pointBorderColor:'#fff',pointBorderWidth:2,cubicInterpolationMode:'monotone',spanGaps:false}))},
+      options:baseOpt({interaction:{mode:'nearest',intersect:false},scales:{y:{reverse:true,min:1,max:maxRk,offset:true,ticks:{stepSize:1,precision:0,callback:v=>'Hạng '+v},grid:{color:'#eef0f6'}},x:{grid:{display:false}}},
+        plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>{const r=top[x.datasetIndex],v=c.val(r,x.dataIndex);return ` ${r.e.name}: hạng ${x.raw}${v!=null?' · KPI '+fmtK(v):''}`}}}}})});
+    const el=document.getElementById('c2');if(el){el.setAttribute('role','img');el.setAttribute('aria-label',`Thứ hạng qua các ${c.unit} năm ${c.y}: `+top.map(r=>`${r.e.name} `+c.ranks.map((m,i)=>m.get(r.e.id)?`${labels[i]} hạng ${m.get(r.e.id)}`:null).filter(Boolean).join(', ')).join('; '))}
   }};

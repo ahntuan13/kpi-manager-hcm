@@ -182,11 +182,12 @@ async function createAuthUser(email,password){
 async function cloudUserSave(form){
   const d=fd(form),id=form.dataset.id;
   try{
-    const cur=id?by(db.users,id):null,role=cur&&cur.role==='admin'?'admin':(d.role==='member'?'member':'staff'),empId=role==='admin'?'':(d.empId||'');
+    const cur=id?by(db.users,id):null,role=cur&&cur.role==='admin'?'admin':(d.role==='member'?'member':'staff'),empId=d.empId||'';
     if(role==='staff'&&!empId)throw new Error('Vai trò Nhân viên phải được gắn với một nhân viên để biết họ được xem việc của ai.');
     if(id){
       if(id===session.id&&!d.active)throw new Error('Không thể tự khoá tài khoản đang đăng nhập.');
       await fbStore.doc('users/'+id).update({name:d.name.trim(),role,empId,active:!!d.active});
+      if(id===session.id){session.empId=empId;session.name=d.name.trim();closeModal();shell();render(true);toast('Đã lưu');return}
     }else{
       const email=d.username.trim().toLowerCase(),uid=await createAuthUser(email,d.password);
       await fbStore.doc('users/'+uid).set({email,name:d.name.trim(),role,empId,active:true});

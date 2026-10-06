@@ -4,13 +4,12 @@
 
 /* ---------- sidebar / shell / router ---------- */
 function sideHTML(){
-  const al=lateCount(),dl=delaysCount();
   return `<div class="brand">${typeof LOGO_DATA!=='undefined'?`<img class="lg" src="${LOGO_DATA}" alt="KPI">`:'<div class="lg-t">KPI</div>'}<div><b>Quản lý KPI</b><span>${esc(db.company.name||'')}</span></div></div><nav class="nav">`+
   menu().map(g=>{
     const items=g.items;
     const active=ui.key.startsWith(g.g+'/');
     const open=ui.open[g.g]===undefined?active:ui.open[g.g];
-    return `<div class="ng ${open?'open':''}"><button class="ngh" data-act="grp" data-g="${g.g}"><span class="ic">${g.icon}</span>${g.label}<span class="chev">▶</span></button><div class="ngi">${items.map(([k,l])=>`<a href="#/${g.g}/${k}" class="${ui.key===g.g+'/'+k?'on':''}">${esc(l)}${g.g==='task'&&k==='late'&&al?`<span class="bubble">${al}</span>`:''}${g.g==='task'&&k==='delays'&&dl?`<span class="bubble warn">${dl}</span>`:''}</a>`).join('')}</div></div>`;
+    return `<div class="ng ${open?'open':''}"><button class="ngh" data-act="grp" data-g="${g.g}"><span class="ic">${g.icon}</span>${g.label}<span class="chev">▶</span></button><div class="ngi">${items.map(([k,l])=>`<a href="#/${g.g}/${k}" class="${ui.key===g.g+'/'+k?'on':''}">${esc(l)}</a>`).join('')}</div></div>`;
   }).join('')+`</nav>${creditHTML('credit side-credit')}`;
 }
 function shell(){

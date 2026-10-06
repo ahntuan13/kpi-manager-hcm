@@ -132,8 +132,6 @@ const empStats=(e,y)=>yearStats(sheetOf(e.id,y));
 function allRows(y){
   const o=[];db.sheets.forEach(s=>{if(+s.year!==+y)return;const e=empOf(s.empId);if(!e||!mine(e))return;MM.forEach(mm=>(s.months[mm].tasks||[]).forEach(t=>o.push({e,s,mm,t,sc:scoreTask(t)})))});return o;
 }
-const lateCount=()=>allRows(curYear()).filter(r=>r.sc.state==='overdue').length;
-const delaysCount=()=>allRows(curYear()).filter(r=>carryReady(r.t,r.sc)).length;
 const taskCount=()=>db.sheets.reduce((a,s)=>a+MM.reduce((b,m)=>b+((s.months[m]&&s.months[m].tasks)||[]).length,0),0);
 const nextOf=(year,mm)=>mm==='12'?{year:+year+1,mm:'01'}:{year:+year,mm:pad(+mm+1)};
 const mLbl=(mm,year,baseYear)=>'T'+mm+(baseYear!==undefined&&+year!==+baseYear?'/'+year:'');

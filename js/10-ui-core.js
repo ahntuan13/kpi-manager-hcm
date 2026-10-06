@@ -18,16 +18,15 @@ const PAL=['#2f7de1','#0e9f8b','#e29a2d','#6c5ce7','#ec6a5e','#22b8c9','#d6447a'
 /* Màu biểu đồ theo ý nghĩa */
 const CC={bar:'#2f7de1',low:'#dc4f47',line:'#0e9f8b',prev:'#a3abc4',xs:'#0e9f8b',tot:'#2f7de1',dat:'#a3abc4',cct:'#dc4f47'};
 
-/* Mục có nhãn thứ 3: 'admin' = chỉ Admin · 'mgr' = Admin + Quản lý · 'staff' = chỉ Nhân viên · không ghi = mọi vai trò */
+/* Mục có nhãn thứ 3: 'admin' = chỉ Admin · 'mgr' = Admin + Quản lý · 'me' = tài khoản đã gắn với một nhân viên · không ghi = mọi vai trò */
 const MENU=[
- {g:'dash',icon:'📊',label:'Dashboard',items:[['me','KPI của tôi','staff'],['overview','Tổng quan','mgr'],['month','KPI theo tháng','mgr'],['rank','Xếp hạng nhân viên','mgr']]},
+ {g:'dash',icon:'📊',label:'Dashboard',items:[['me','KPI của tôi','me'],['overview','Tổng quan','mgr'],['month','KPI theo tháng','mgr'],['rank','Xếp hạng nhân viên','mgr']]},
  {g:'emp',icon:'👥',label:'Nhân viên',items:[['list','Tất cả nhân viên','mgr'],['dept','Theo nhóm','mgr']]},
- {g:'task',icon:'✅',label:'Công việc',items:[['open','Việc chưa nộp'],['late','Quá hạn'],['delays','Chờ chuyển tháng'],['all','Tất cả công việc']]},
  {g:'rpt',icon:'📅',label:'Báo cáo',items:[['employee','Theo nhân viên'],['monthly','Theo tháng'],['quarter','Theo quý'],['dept','Theo nhóm','mgr']]},
  {g:'help',icon:'📘',label:'Quy chế',items:[['rules','Quy chế KPI']]},
  {g:'set',icon:'⚙️',label:'Settings',items:[['org','Nhóm & ngày lễ','admin'],['users','User / Permission','admin'],['system','Sao lưu & Hệ thống','admin']]}
 ];
-const itemOk=it=>{const w=it[2];return !w||(w==='admin'?can('admin'):w==='mgr'?can('manage'):isStaff())};
+const itemOk=it=>{const w=it[2];return !w||(w==='admin'?can('admin'):w==='mgr'?can('manage'):(isStaff()||!!(session&&session.empId)))};
 const menu=()=>MENU.map(g=>({...g,items:g.items.filter(itemOk)})).filter(g=>g.items.length);
 /* Trang có được mở với vai trò hiện tại không (gõ thẳng địa chỉ cũng bị chặn) */
 function allowedHash(h){const [g,k]=h.split('/'),grp=MENU.find(x=>x.g===g);if(!grp||!session)return false;const it=grp.items.find(i=>i[0]===k);if(it)return itemOk(it);return g==='emp'&&(can('manage')||(!!k&&k===session.empId))}
