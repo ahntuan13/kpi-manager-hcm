@@ -77,6 +77,8 @@ Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổ
 **Quan trọng:** phân quyền chỉ bảo mật thật khi bật **Firebase** (Rules ở máy chủ chặn nhân viên đọc bảng KPI của người khác). Ở chế độ dùng thử, mọi dữ liệu nằm chung trong trình duyệt của một máy; vai trò chỉ để xem trước giao diện. Nạp dữ liệu mẫu ở chế độ dùng thử sẽ tạo sẵn 2 tài khoản thử: `quanly` / `quanly123` và `nhanvien` / `nhanvien123` (xoá ở User / Permission khi không cần).
 
 ## Bật Firebase (cả phòng dùng chung dữ liệu)
+App đang nối với project Firebase **`kpi-adhr-hcm`** (cấu hình trong `config/firebase-config.js`). Các bước dưới đây dùng khi dựng lại từ đầu hoặc đổi project.
+
 Tạo **project Firebase riêng** cho app này, không dùng chung project của app khác.
 1. https://console.firebase.google.com → Create a project (ví dụ `kpi-manager-hcm`).
 2. Trang chủ project → biểu tượng `</>` (Web) → Register app (không tick Hosting) → copy `firebaseConfig`.
