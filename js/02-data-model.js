@@ -80,9 +80,16 @@ function scoreTask(t,today=todayStr()){
   r.counted=r.ap==='ok';   /* chỉ việc đã Duyệt mới góp điểm vào KPI */
   return r;
 }
-/* Việc chưa hoàn thành thì mới chuyển tháng được; và chỉ chuyển khi Ghi chú có chữ "delays" */
+/* Việc chưa hoàn thành là chuyển sang tháng sau được (không còn bắt buộc ghi "delays").
+   Chữ "delays" ở Ghi chú chỉ còn là dấu đề nghị dời việc: việc đó được liệt kê ở Tổng quan. */
 const canCarry=(t,sc)=>sc.comp==null&&sc.state!=='moved'&&!t.submitted;
-const carryReady=(t,sc)=>canCarry(t,sc)&&DELAYS_RE.test(t.note||'');
+const hasDelays=t=>DELAYS_RE.test((t&&t.note)||'');
+/* Việc do quản lý giao (By Manager) và tag của việc */
+const TAGS={pri:'★ Ưu tiên',imp:'◆ Quan trọng'};
+const byMgr=t=>!!t&&t.by==='manager';
+const tagsOf=t=>((t&&t.tags)||[]).filter(k=>TAGS[k]);
+/* Comment by Manager: quản lý ghi khi chọn Re-check; done = nhân viên đã cập nhật lại (hiện mờ, gạch đi) */
+const mcOf=t=>t&&t.mgrComment&&String(t.mgrComment.text||'').trim()?t.mgrComment:null;
 function monthStats(m){
   const rows=((m&&m.tasks)||[]).map(t=>({t,sc:scoreTask(t)}));
   /* scored = việc đã hoàn thành (có deadline + ngày hoàn thành) · counted = đã Duyệt · pending = chờ duyệt · recheck = Re-check
@@ -94,7 +101,7 @@ function monthStats(m){
     if(sc.comp!=null){st.scored++;
       if(sc.ap==='ok'){st.counted++;st.raw+=sc.comp;st.bonus+=sc.bonus}else if(sc.ap==='recheck')st.recheck++;else st.pending++;
       if(sc.ap!=='recheck')st.rawSelf+=sc.comp}
-    if(carryReady(t,sc))st.delays++;
+    if(canCarry(t,sc)&&hasDelays(t))st.delays++;
   }
   st.weight=r2(st.weight);
   const cap=v=>Math.min(KPI_CAP,Math.max(0,v));
@@ -154,19 +161,19 @@ const fmtK2=v=>v==null?'–':new Intl.NumberFormat('vi-VN',{maximumFractionDigit
 const fmtDM=(iso,year)=>{if(!iso)return'–';const [y,m,d]=iso.split('-');return `${d}/${m}`+(+y!==+year?`/${y.slice(2)}`:'')};
 /* ---------- phân quyền ----------
    can('admin')  : chỉ Admin (nhân viên, nhóm, ngày lễ, người dùng, sao lưu, nhập Excel)
-   can('manage') : Admin + Quản lý (xem tất cả; thêm / sửa việc của mọi người; duyệt; nhận xét; chuyển việc "delays")
-   Nhân viên     : chỉ thấy dữ liệu của chính mình (session.empId); thêm / sửa việc và tự chấm trọng số khi quản lý chưa Duyệt; chuyển việc "delays" */
+   can('manage') : Admin + Quản lý (xem tất cả; thêm / sửa / giao việc cho mọi người; duyệt; nhận xét; chuyển việc sang tháng sau)
+   Nhân viên     : chỉ thấy dữ liệu của chính mình (session.empId); thêm / sửa việc và tự chấm trọng số khi quản lý chưa Duyệt; chuyển việc chưa hoàn thành sang tháng sau */
 const can=a=>{const r=session?.role;return a==='admin'?r==='admin':(r==='admin'||r==='member')};
 const isStaff=()=>session?.role==='staff';
 const mine=e=>!isStaff()||(!!e&&e.id===session.empId);
 const canSheet=empId=>can('manage')||(isStaff()&&!!empId&&empId===session.empId);
 const approved=t=>apOf(t)==='ok';
 const canTask=(empId,t)=>can('manage')||(canSheet(empId)&&!approved(t));
-const canDelTask=(empId,t)=>can('manage')||(canSheet(empId)&&t&&!t.submitted&&!t.approval);
+const canDelTask=(empId,t)=>can('manage')||(canSheet(empId)&&t&&!t.submitted&&!t.approval&&!byMgr(t));   /* việc By Manager: nhân viên không xoá được */
 const empHref=e=>isStaff()?'#/dash/me':'#/emp/'+e.id;
 const homeHash=()=>isStaff()?'dash/me':'dash/overview';
 
-/* ---------- chuyển việc "delays" sang tháng sau ---------- */
+/* ---------- chuyển việc chưa hoàn thành sang tháng sau ---------- */
 function moveTasks(empId,year,mm,ids,newDeadline){
   const nx=nextOf(year,mm);let n=0;
   const ok=transact(()=>{
@@ -174,9 +181,11 @@ function moveTasks(empId,year,mm,ids,newDeadline){
     const dst=sheetOf(empId,nx.year,true);
     src.months[mm].tasks.forEach(t=>{
       if(!ids.includes(t.id))return;const sc=scoreTask(t);
-      if(!carryReady(t,sc))throw new Error(`Việc “${t.title.split('\n')[0]}” chưa ghi “delays” ở Ghi chú hoặc đã hoàn thành, không chuyển được.`);
+      if(!canCarry(t,sc))throw new Error(`Việc “${t.title.split('\n')[0]}” đã hoàn thành hoặc đã được chuyển, không chuyển được.`);
       const c={id:uid('t'),title:t.title,weight:t.weight,deadline:newDeadline||t.deadline||null,submitted:null,approval:'',
         note:(t.note||'').replace(/\s*\bdelays?\b\s*/ig,' ').trim(),carriedFrom:{year:+year,month:mm,id:t.id,deadline:t.deadline||null}};
+      if(byMgr(t)){c.by='manager';c.byName=t.byName||'';c.byAt=t.byAt||''}
+      if(tagsOf(t).length)c.tags=tagsOf(t);
       dst.months[nx.mm].tasks.push(c);t.movedTo={year:nx.year,month:nx.mm,id:c.id,at:todayStr()};n++;
     });
     if(!n)throw new Error('Không có việc nào để chuyển.');

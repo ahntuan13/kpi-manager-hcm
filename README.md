@@ -17,9 +17,11 @@ Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `a
 - **Nhân viên**: danh sách, lọc theo nhóm / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–130, vạch xếp loại 80 / 100 / 120, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI: Trọng số · Deadline · Ngày hoàn thành · Điểm cơ bản · Điểm thưởng (tự động) · Điểm thành phần · Quản lý duyệt · Ghi chú.
 - **Trọng số** do nhân viên tự chấm cho từng việc theo thang **1–10** (số nguyên).
 - **Quản lý duyệt** ngay trên bảng: **Duyệt** → điểm thành phần được tính vào KPI; **Re-check** → không tính điểm, dòng việc báo đỏ (nhân viên sửa lại thì việc quay về Chờ duyệt); **Chờ duyệt** → chưa tính. Có nút duyệt hàng loạt theo tháng, theo năm của một nhân viên, hoặc tất cả ở Tổng quan.
-- **Chuyển việc sang tháng sau**: nút chuyển nằm trong hộp **Sửa việc**, chỉ bật khi việc **chưa hoàn thành** và cột *Ghi chú / Link bằng chứng* có chữ **`delays`**. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Việc chờ chuyển cũng được liệt kê ở Dashboard → Tổng quan; dải 12 tháng của mỗi nhân viên đánh dấu tháng còn việc quá hạn.
+- **Giao việc (By Manager)**: Admin / Quản lý bấm **Giao việc** ở trang nhân viên hoặc danh sách nhân viên; việc được gắn nhãn **By Manager**, có thể gắn tag **Ưu tiên**, **Quan trọng**. Trọng số, deadline nhập như Thêm việc. Nhân viên cập nhật Ngày hoàn thành, Ghi chú, trọng số; không đổi được nội dung, deadline và không xoá được.
+- **Comment by Manager**: khi chọn **Re-check**, ô comment hiện ở cột cuối bảng (và trong hộp Sửa việc) để quản lý ghi cần sửa gì. Nhân viên thấy comment; khi nhân viên cập nhật lại việc, việc quay về Chờ duyệt và comment hiện mờ, gạch đi.
+- **Chuyển việc sang tháng sau**: nút **Chuyển sang tháng…** nằm trong hộp **Sửa việc**, luôn bật với việc **chưa hoàn thành** (không cần ghi `delays`). Ghi `delays` vào Ghi chú chỉ để việc được liệt kê ở Tổng quan. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Việc ghi `delays` được liệt kê ở Dashboard → Tổng quan; dải 12 tháng của mỗi nhân viên đánh dấu tháng còn việc quá hạn.
 - **Nhập Excel**: chọn một hoặc nhiều file theo mẫu `KPI_Individual_report` (sheet `Summary` + `M01…M12`); nhân viên chưa có sẽ được tạo theo Mã NV. Mặc định các việc đã có điểm trong file được coi là đã Duyệt (bỏ chọn được khi nhập). Cột Điểm thưởng của file không được đọc vì điểm thưởng luôn tính tự động.
-- **Báo cáo**: theo nhân viên (năm), theo tháng, theo quý, theo nhóm. Mọi báo cáo xuất **Excel**, **PDF**, **In**. Mỗi tháng của nhân viên in được **Phiếu đánh giá KPI** có chỗ ký.
+- **Báo cáo**: theo nhân viên (năm), theo tháng, theo quý, theo nhóm. Mọi báo cáo xuất **Excel**, **PDF**, **In**. Mỗi tháng của nhân viên in được **Phiếu đánh giá KPI** có chỗ ký. Bản In / PDF của trang nhân viên có nhận xét của quản lý và 2 ô chữ ký (Nhân viên tự đánh giá · Quản lý duyệt); PDF không cắt ngang dòng, tiêu đề cột lặp lại ở đầu mỗi trang, khổ A4 ngang.
 - **Settings** (chỉ Admin): nhóm, ngày nghỉ lễ, người dùng / phân quyền, sao lưu / khôi phục JSON, sao lưu đám mây. Mục **Quy chế KPI** ai cũng xem được.
 
 ## Công thức KPI (giữ theo file Excel)
@@ -47,7 +49,7 @@ config/firebase-config.js  ⚙ Cấu hình Firebase – FILE DUY NHẤT cần s�
 firestore.rules            Rules bảo mật dán vào Firebase Console
 js/
   01-core-utils.js         Tiện ích chung (định dạng số, ngày, tìm kiếm không dấu)
-  02-data-model.js         Mô hình dữ liệu, CÔNG THỨC KPI, chuyển việc “delays”; tải/lưu
+  02-data-model.js         Mô hình dữ liệu, CÔNG THỨC KPI, chuyển việc sang tháng sau; tải/lưu
   10-ui-core.js            Menu, toast, modal, form, bảng, biểu đồ, xuất Excel / PDF / in
   11-router-auth.js        Thanh menu trái, điều hướng, đăng nhập
   20-dashboard.js          Dashboard: Tổng quan, KPI theo tháng, Xếp hạng (tháng / quý / năm)
@@ -67,8 +69,9 @@ Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổ
 |---|---|---|---|
 | Xem dashboard, công việc, báo cáo | ✔ tất cả | ✔ tất cả | Chỉ của chính mình |
 | Xem danh sách nhân viên, xếp hạng, theo nhóm | ✔ | ✔ | — |
-| Thêm / sửa việc, tự chấm trọng số 1–10, chuyển việc “delays” | ✔ mọi người | ✔ mọi người | Việc của mình (chưa được Duyệt) |
-| Duyệt / Re-check, nhận xét, dời deadline khi chuyển việc | ✔ | ✔ | — |
+| Thêm / sửa việc, tự chấm trọng số 1–10, chuyển việc chưa hoàn thành sang tháng sau | ✔ mọi người | ✔ mọi người | Việc của mình (chưa được Duyệt) |
+| Giao việc (By Manager), gắn tag Ưu tiên / Quan trọng | ✔ | ✔ | — |
+| Duyệt / Re-check, Comment by Manager, nhận xét, dời deadline khi chuyển việc | ✔ | ✔ | — |
 | Thêm / sửa / xoá nhân viên, nhập Excel KPI | ✔ | — | — |
 | Settings: nhóm, ngày lễ, người dùng, sao lưu / khôi phục | ✔ | — | — |
 

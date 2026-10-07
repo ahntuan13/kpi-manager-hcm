@@ -35,10 +35,12 @@ function loadSample(){
           if(sub>today)sub=today;
           /* tháng đã qua: quản lý đã duyệt gần hết; tháng trước còn vài việc chờ duyệt / Re-check; tháng này mới hoàn thành nên đang chờ duyệt */
           t.submitted=sub;t.approval=m<cm-1?(rnd()<.985?AP_VAL.ok:AP_VAL.recheck):m===cm-1?(rnd()<.8?AP_VAL.ok:''):(rnd()<.35?AP_VAL.ok:'');t.note=rnd()<.4?'Done':rnd()<.3?'Đã gửi qua email':'';
-          if(t.approval===AP_VAL.recheck)t.note='Thiếu file bằng chứng, cần bổ sung';
+          if(t.approval===AP_VAL.recheck)t.mgrComment={text:'Thiếu file bằng chứng, cần bổ sung',by:'Quản lý',at:today,done:false};
         }
         /* vài việc tháng trước chưa xong: có việc đã ghi "delays", có việc chỉ quá hạn */
-        if(m===cm-1&&i===0&&ei===1&&t.submitted){t.approval=AP_VAL.recheck;t.note='Số liệu chưa khớp bảng chấm công, cần kiểm tra lại'}
+        if(m===cm-1&&i===0&&ei===1&&t.submitted){t.approval=AP_VAL.recheck;t.mgrComment={text:'Số liệu chưa khớp bảng chấm công, cần kiểm tra lại',by:'Quản lý',at:today,done:false}}
+        /* vài việc do quản lý giao (By Manager), có tag Ưu tiên / Quan trọng */
+        if(m>=cm-1&&i===1&&ei%2===0){t.by='manager';t.byName='Quản lý';t.byAt=iso(m,1);t.tags=ei===0?['pri','imp']:ei===2?['imp']:['pri']}
         if(m===cm-1&&i===n-1&&[0,2,4].includes(ei)){t.submitted=null;t.approval='';t.note=ei===2?'Chờ nhà cung cấp phản hồi':'delays - xin dời sang tháng sau do vướng lịch đào tạo'}
         sh.months[mm].tasks.push(t);
       });
