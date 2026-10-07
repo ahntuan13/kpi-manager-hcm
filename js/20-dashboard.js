@@ -6,10 +6,10 @@
 const kpi=(l,v,s='',tone='')=>`<div class="kpi ${tone}"><div class="kl">${l}</div><div class="kv">${v}</div>${s?`<div class="ks">${s}</div>`:''}</div>`;
 const card=(title,body,cls='')=>`<section class="card ${cls}">${title?`<h4>${title}</h4>`:''}${body}</section>`;
 const miniTable=(heads,rows,empty='Không có dữ liệu.')=>rows.length?`<div class="tw"><table class="t"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<div class="note">${empty}</div>`;
-const gradeBd=v=>{const g=gradeOf(v);return g?badge(g[1],g[2]):'<span class="muted">Chưa chấm</span>'};
+const gradeBd=v=>{const g=gradeOf(v);return g?badge(g[1],g[2]):'<span class="muted">Chưa có điểm</span>'};
 const gradeTone=v=>{const g=gradeOf(v);return g?(g[1]==='mute'?'':g[1]):''};
 const kCell=v=>v==null?'<span class="muted">–</span>':`<span class="kc ${v<80?'low':v>=120?'top':''}">${fmtK(v)}</span>`;
-const kBar=v=>v==null?'<span class="muted">Chưa chấm</span>':`<div class="pgw"><div class="pg" style="flex:1"><i style="width:${Math.min(100,v/KPI_CAP*100)}%${v<80?';background:var(--bad)':''}"></i></div><small><b>${fmtK(v)}</b></small></div>`;
+const kBar=v=>v==null?'<span class="muted">Chưa có điểm</span>':`<div class="pgw"><div class="pg" style="flex:1"><i style="width:${Math.min(100,v/KPI_CAP*100)}%${v<80?';background:var(--bad)':''}"></i></div><small><b>${fmtK(v)}</b></small></div>`;
 const empLink=e=>e?`<a class="lnk" href="${empHref(e)}">${esc(e.name)}</a>`:'<span class="muted">(đã xoá)</span>';
 const empCell=e=>`<span class="mem">${empAv(e)}<span>${empLink(e)}<small>${esc(e.code||'')}${e.title?' · '+esc(e.title):''}</small></span></span>`;
 const kc=(h,fn)=>({h,c:'num',f:r=>kCell(fn(r)),x:r=>{const v=fn(r);return v==null?'':r2(v)}});
@@ -22,7 +22,6 @@ function stBd(t,sc,year){
     case 'early':return badge('ok',`▲ Sớm ${-sc.late} ngày`);
     case 'late':return badge(sc.late>10?'bad':'warn',`! Trễ ${sc.late} ngày`);
     case 'overdue':return badge('bad',`! Quá hạn ${sc.overdue} ngày`);
-    case 'rejected':return badge('warn','↩ Bị trả lại');
     case 'open':return badge('info','○ Đang làm');
     default:return badge('mute',t.submitted?'○ Thiếu deadline':'○ Chưa đặt hạn');
   }
@@ -58,7 +57,7 @@ PAGES['dash/overview']={t:'Tổng quan',
   tbl(){
     const f=F(),y=f.year||curYear(),rows=scopeStats(f),ev=rows.filter(r=>r.ys.avg!=null);
     if(!db.employees.length)return `<div class="empty"><b>Chưa có nhân viên nào.</b><br>${can('admin')?'Nhập file Excel KPI cá nhân (mẫu KPI_Individual_report) của từng nhân viên, hoặc thêm nhân viên rồi nhập việc từng tháng.<br>Muốn xem thử: Settings → Sao lưu & Hệ thống → Nạp dữ liệu mẫu.':'Admin chưa thêm nhân viên vào hệ thống.'}<div class="bar" style="justify-content:center;margin:14px 0 0">${addBtns()}</div></div>`;
-    const team=avgOf(ev.map(r=>r.ys.avg)),scored=sumK(rows,'scored'),onT=sumK(rows,'onTime'),over=sumK(rows,'overdue'),dl=sumK(rows,'delays'),open=sumK(rows,'open');
+    const team=avgOf(ev.map(r=>r.ys.avg)),scored=sumK(rows,'scored'),onT=sumK(rows,'onTime'),over=sumK(rows,'overdue'),dl=sumK(rows,'delays'),open=sumK(rows,'open'),pend=sumK(rows,'pending'),rck=sumK(rows,'recheck');
     const mAvg=MM.map((_,i)=>avgOf(rows.map(r=>r.ys.months[i].kpi).filter(v=>v!=null)));
     const lastI=mAvg.reduce((a,v,i)=>v==null?a:i,-1);
     const cnt={ok:0,info:0,mute:0,bad:0};ev.forEach(r=>cnt[gradeOf(r.ys.avg)[1]]++);
@@ -67,9 +66,10 @@ PAGES['dash/overview']={t:'Tổng quan',
     const all=allRows(y).filter(r=>!f.dept||r.e.dept===f.dept);
     const overAll=all.filter(r=>r.sc.state==='overdue').sort((a,b)=>b.sc.overdue-a.sc.overdue),overdue=overAll.slice(0,15);
     const readyAll=all.filter(r=>carryReady(r.t,r.sc)),ready=readyAll.slice(0,15);
+    const rckAll=all.filter(r=>r.sc.ap==='recheck'&&r.sc.state!=='moved'),pendRows=[];rows.forEach(r=>r.ys.months.forEach((m,i)=>{if(m.pending)pendRows.push({e:r.e,mm:MM[i],m})}));
     const dps=depts().map(d=>{const rs=ev.filter(r=>r.e.dept===d);return{d,n:rows.filter(r=>r.e.dept===d).length,avg:avgOf(rs.map(r=>r.ys.avg))}}).filter(x=>x.n);
-    return `<div class="kpis k4">${kpi(`KPI trung bình ${f.dept?'nhóm '+esc(f.dept):'chung'} ${y}`,fmtK(team),team==null?'chưa có tháng nào được chấm':`${gradeBd(team)} · ${ev.length}/${rows.length} nhân viên có điểm`,gradeTone(team)||'acc')}${kpi(lastI>=0?`KPI tháng gần nhất (T${MM[lastI]})`:'KPI tháng gần nhất',fmtK(lastI>=0?mAvg[lastI]:null),lastI>=0?gradeBd(mAvg[lastI]):'chưa có điểm','info')}${kpi('Nộp đúng hạn',scored?fmtK(onT/scored*100)+'%':'–',scored?`${onT}/${scored} việc đã chấm`:'chưa có việc được chấm','ok')}${kpi('Việc quá hạn',over,over?'xem bảng “Việc quá hạn” bên dưới':'không có việc quá hạn',over?'bad':'ok')}${kpi('Xuất sắc · Tốt',`${cnt.ok} · ${cnt.info}`,`Đạt ${cnt.mute} · Cần cải thiện ${cnt.bad}`,'ok')}${kpi('Việc chưa nộp',open+over,'đang làm, chưa đặt hạn hoặc quá hạn','info')}${kpi('Chờ chuyển tháng',dl,dl?'ghi chú có “delays”, xem bảng bên dưới':'không có việc ghi “delays”',dl?'warn':'')}${kpi('Tháng chưa có điểm',miss,miss?'đã quá tuần đầu tháng sau':'các tháng đã qua đều có điểm',miss?'warn':'ok')}</div>
-    <div class="grid g2">${card(`KPI trung bình theo tháng – ${y}`,'<div class="ch"><canvas id="c1"></canvas></div><p class="note">Cột: trung bình KPI tháng của các nhân viên đã có điểm. Đường: lũy kế từ đầu năm. Tháng chưa chấm không tính là 0; tháng đang diễn ra chỉ là tạm tính nên chưa đưa vào.</p>')}${card('Xếp loại theo KPI năm',ev.length?'<div class="ch"><canvas id="c2"></canvas></div>':'<div class="note">Chưa có nhân viên nào có điểm trong năm.</div>')}</div>
+    return `<div class="kpis k4">${kpi(`KPI trung bình ${f.dept?'nhóm '+esc(f.dept):'chung'} ${y}`,fmtK(team),team==null?'chưa có tháng nào có điểm được duyệt':`${gradeBd(team)} · ${ev.length}/${rows.length} nhân viên có điểm`,gradeTone(team)||'acc')}${kpi(lastI>=0?`KPI tháng gần nhất (T${MM[lastI]})`:'KPI tháng gần nhất',fmtK(lastI>=0?mAvg[lastI]:null),lastI>=0?gradeBd(mAvg[lastI]):'chưa có điểm','info')}${kpi('Hoàn thành đúng hạn',scored?fmtK(onT/scored*100)+'%':'–',scored?`${onT}/${scored} việc đã hoàn thành`:'chưa có việc hoàn thành','ok')}${kpi('Việc quá hạn',over,over?'xem bảng “Việc quá hạn” bên dưới':'không có việc quá hạn',over?'bad':'ok')}${kpi('Xuất sắc · Tốt',`${cnt.ok} · ${cnt.info}`,`Đạt ${cnt.mute} · Cần cải thiện ${cnt.bad}`,'ok')}${kpi('Chờ quản lý duyệt',pend,rck?`<span class="tag-bad">${rck} việc Re-check · không tính điểm</span>`:pend?'điểm chưa tính vào KPI, xem bảng bên dưới':`${open+over} việc chưa hoàn thành`,rck?'bad':pend?'warn':'info')}${kpi('Chờ chuyển tháng',dl,dl?'ghi chú có “delays”, xem bảng bên dưới':'không có việc ghi “delays”',dl?'warn':'')}${kpi('Tháng chưa có điểm',miss,miss?'đã quá tuần đầu tháng sau':'các tháng đã qua đều có điểm',miss?'warn':'ok')}</div>
+    <div class="grid g2">${card(`KPI trung bình theo tháng – ${y}`,'<div class="ch"><canvas id="c1"></canvas></div><p class="note">Cột: trung bình KPI tháng của các nhân viên đã có điểm. Đường: lũy kế từ đầu năm. Tháng chưa có điểm không tính là 0; tháng đang diễn ra chỉ là tạm tính nên chưa đưa vào.</p>')}${card('Xếp loại theo KPI năm',ev.length?'<div class="ch"><canvas id="c2"></canvas></div>':'<div class="note">Chưa có nhân viên nào có điểm trong năm.</div>')}</div>
     <div class="grid g3">
       ${card('KPI năm cao nhất',top.length?`<div class="lst">${top.map((r,i)=>`<div style="display:block"><div style="display:flex;justify-content:space-between;gap:8px"><span>${i+1}. ${empLink(r.e)} <small class="muted">${esc(r.e.dept||'')}</small></span>${gradeBd(r.ys.avg)}</div>${kBar(r.ys.avg)}</div>`).join('')}</div><p class="note"><a href="#/dash/rank">Xem bảng xếp hạng đầy đủ →</a></p>`:'<div class="note">Chưa có điểm.</div>')}
       ${card('Theo nhóm',dps.length?`<div class="lst">${dps.map(x=>`<div style="display:block"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(x.d)}</b><small class="muted">${x.n} nhân viên</small></div>${kBar(x.avg)}</div>`).join('')}</div><p class="note"><a href="#/emp/dept">Chi tiết theo nhóm →</a></p>`:'<div class="note">Chưa gán nhóm cho nhân viên.</div>')}
@@ -77,7 +77,11 @@ PAGES['dash/overview']={t:'Tổng quan',
     </div>
     <div class="grid g2">
       ${card(`Việc quá hạn (${overAll.length})${overAll.length>overdue.length?' · 15 việc lâu nhất':''}`,miniTable(['Công việc / nhân viên','Tháng','Deadline','Quá hạn'],overdue.map(r=>`<tr><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td><a class="lnk" href="${empHref(r.e)}" data-act="goto-month" data-id="${r.e.id}" data-y="${y}" data-mm="${r.mm}">T${r.mm}</a></td><td style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</td><td>${badge('bad',r.sc.overdue+' ngày')}</td></tr>`),'Không có việc quá hạn.'))}
-      ${card(`Chờ chuyển sang tháng sau · ghi chú “delays” (${readyAll.length})`,miniTable(['Công việc / nhân viên','Tháng','Deadline',''],ready.map(r=>`<tr><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td>T${r.mm}</td><td style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</td><td class="act">${canSheet(r.e.id)?`<button class="btn sm acc" data-act="kt-move" data-e="${r.e.id}" data-y="${y}" data-mm="${r.mm}" data-id="${r.t.id}">Chuyển → ${mLbl(nextOf(y,r.mm).mm,nextOf(y,r.mm).year,y)}</button>`:''}</td></tr>`),'Chưa có việc nào ghi “delays”. Khi một việc bị trễ cần dời, ghi <b>delays</b> vào Ghi chú của việc đó để mở nút chuyển.'))}
+      ${card(`Chờ chuyển sang tháng sau · ghi chú “delays” (${readyAll.length})`,miniTable(['Công việc / nhân viên','Tháng','Deadline',''],ready.map(r=>`<tr><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td>T${r.mm}</td><td style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</td><td class="act"><a class="lnk" href="${empHref(r.e)}" data-act="goto-month" data-id="${r.e.id}" data-y="${y}" data-mm="${r.mm}">Mở T${r.mm} →</a></td></tr>`),'Chưa có việc nào ghi “delays”. Khi một việc bị trễ cần dời, bấm Sửa việc đó và ghi <b>delays</b> vào Ghi chú để bật nút chuyển tháng.')+(readyAll.length?'<p class="note">Mở tháng của nhân viên, bấm <b>Sửa</b> ở việc cần dời rồi chọn <b>Chuyển sang tháng sau</b>.</p>':''))}
+    </div>
+    <div class="grid g2">
+      ${card(`Chờ quản lý duyệt (${pend} việc)`,miniTable(['Nhân viên','Tháng','Chờ duyệt','KPI hiện tại → nếu duyệt hết',''],pendRows.slice(0,15).map(p=>`<tr><td>${empLink(p.e)}<small>${esc(p.e.dept||'')}</small></td><td><a class="lnk" href="${empHref(p.e)}" data-act="goto-month" data-id="${p.e.id}" data-y="${y}" data-mm="${p.mm}">T${p.mm}</a></td><td class="num">${p.m.pending}</td><td style="white-space:nowrap">${fmtK(mVal(p.m))} → <b>${fmtK(p.m.self)}</b></td><td class="act">${can('manage')?`<button class="btn sm" data-act="ap-all" data-e="${p.e.id}" data-y="${y}" data-mm="${p.mm}" aria-label="Duyệt ${p.m.pending} việc chờ duyệt của ${esc(p.e.name)} tháng ${p.mm}">✓ Duyệt</button>`:''}</td></tr>`),'Không có việc nào đang chờ duyệt.')+(pendRows.length?`<p class="note">Điểm thành phần chỉ tính vào KPI khi quản lý chọn <b>Duyệt</b>.${pendRows.length>15?` Đang hiện 15/${pendRows.length} dòng.`:''}</p>${can('manage')?`<div class="bar" style="margin:0"><button class="btn" data-act="ap-all" data-y="${y}" data-dept="${esc(f.dept||'')}">✓ Duyệt tất cả ${pend} việc chờ duyệt</button></div>`:''}`:''))}
+      ${card(`Việc Re-check · không tính điểm (${rckAll.length})`,miniTable(['Công việc / nhân viên','Tháng','Điểm thành phần'],rckAll.slice(0,15).map(r=>`<tr class="recheck"><td>${esc(r.t.title.split('\n')[0])}<small>${esc(r.e.name)}</small></td><td><a class="lnk" href="${empHref(r.e)}" data-act="goto-month" data-id="${r.e.id}" data-y="${y}" data-mm="${r.mm}">T${r.mm}</a></td><td class="num">${r.sc.comp==null?'–':fmtK2(r.sc.comp)}<small class="tag-bad">không tính</small></td></tr>`),'Không có việc nào bị Re-check.'))}
     </div>`;
   },
   tm(){
@@ -147,8 +151,8 @@ PAGES['dash/rank']={t:'Xếp hạng nhân viên',
       ...(c.per==='nam'?[]:[{h:`So với ${c.unit} trước`,c:'num',f:rkDelta,x:r=>!r.rk?'':r.prev==null?'mới':r.prev-r.rk}]),
       {h:'Nhân viên',f:r=>empCell(r.e),x:r=>r.e.name},{h:'Nhóm',f:r=>esc(r.e.dept||'—')},
       {h:`KPI ${c.label}`,f:r=>kBar(r.v),x:r=>r.v==null?'':r2(r.v)},{h:'Xếp loại',f:r=>r.v==null?gradeBd(null):c.prov?badge('info','Tạm tính'):gradeBd(r.v),x:r=>r.v==null?'':c.prov?'Tạm tính':gradeOf(r.v)[2]},
-      ...(c.per==='nam'?[nc('Tháng đã chấm',r=>r.ys.ev.length),kc('Cao nhất',r=>r.ys.maxI==null?null:r.ys.months[r.ys.maxI].kpi),kc('Thấp nhất',r=>r.ys.minI==null?null:r.ys.months[r.ys.minI].kpi)]:[kc('KPI năm',r=>r.ys.avg)]),
-      pctCol('Đúng hạn (năm)',r=>r.ys.onPct),nc('Việc trễ',r=>r.ys.late),nc('Chưa nộp',r=>r.ys.open),{h:'Quá hạn',c:'num',f:r=>badNum(r.ys.overdue),x:r=>r.ys.overdue}
+      ...(c.per==='nam'?[nc('Tháng có điểm',r=>r.ys.ev.length),kc('Cao nhất',r=>r.ys.maxI==null?null:r.ys.months[r.ys.maxI].kpi),kc('Thấp nhất',r=>r.ys.minI==null?null:r.ys.months[r.ys.minI].kpi)]:[kc('KPI năm',r=>r.ys.avg)]),
+      pctCol('Đúng hạn (năm)',r=>r.ys.onPct),nc('Việc trễ',r=>r.ys.late),nc('Chưa hoàn thành',r=>r.ys.open),nc('Chờ duyệt',r=>r.ys.pending),{h:'Quá hạn',c:'num',f:r=>badNum(r.ys.overdue),x:r=>r.ys.overdue}
     ],c.list,{empty:'Chưa có nhân viên nào trong phạm vi lọc.'});
   },
   tm(){

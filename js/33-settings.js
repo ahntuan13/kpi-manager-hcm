@@ -9,7 +9,7 @@ PAGES['set/org']={t:'Nhóm & ngày lễ',
     const hs=(db.company.holidays||[]).filter(d=>d.startsWith(f.hy)).sort(),ys=[...new Set([...(db.company.holidays||[]).map(d=>d.slice(0,4)),curYear(),String(+curYear()+1)])].sort();
     return `<div class="grid g2">
     ${card('Nhóm',`<form data-submit="depts"><label class="f"><span>Mỗi dòng một nhóm</span><textarea class="in" name="depts" rows="9" ${adm?'':'readonly'}>${esc((db.company.depts||[]).join('\n'))}</textarea></label><p class="note">Nhóm dùng để lọc Dashboard, báo cáo và gán cho nhân viên. Nhóm đang có nhân viên vẫn hiện ở bộ lọc kể cả khi bị xoá khỏi danh sách này.</p><div class="bar" style="margin:0"><button class="btn primary" ${adm?'':'disabled'}>Lưu nhóm</button></div></form>`)}
-    ${card('Ngày nghỉ lễ',`<form data-submit="holidays"><div class="bar"><label class="fl">Năm ${fSel('hy','Năm',ys.map(v=>[v,v]))}</label><span class="muted">${hs.length} ngày</span></div><label class="f"><span>Mỗi dòng một ngày, dạng dd/mm/yyyy</span><textarea class="in" name="days" rows="9" ${adm?'':'readonly'}>${esc(hs.map(fmtDate).join('\n'))}</textarea></label><p class="note">Ngày lễ không được tính là ngày làm việc khi cộng điểm <b>nộp sớm</b> (cùng với Thứ 7, Chủ nhật). Nộp trễ luôn tính đủ ngày lịch. Danh sách ban đầu lấy từ sheet Holiday_VN của file KPI.</p><div class="bar" style="margin:0"><button class="btn primary" ${adm?'':'disabled'}>Lưu ngày lễ năm ${esc(f.hy)}</button></div></form>`)}
+    ${card('Ngày nghỉ lễ',`<form data-submit="holidays"><div class="bar"><label class="fl">Năm ${fSel('hy','Năm',ys.map(v=>[v,v]))}</label><span class="muted">${hs.length} ngày</span></div><label class="f"><span>Mỗi dòng một ngày, dạng dd/mm/yyyy</span><textarea class="in" name="days" rows="9" ${adm?'':'readonly'}>${esc(hs.map(fmtDate).join('\n'))}</textarea></label><p class="note">Ngày lễ không được tính là ngày làm việc khi cộng điểm <b>hoàn thành sớm</b> (cùng với Thứ 7, Chủ nhật). Hoàn thành trễ luôn tính đủ ngày lịch. Danh sách ban đầu lấy từ sheet Holiday_VN của file KPI.</p><div class="bar" style="margin:0"><button class="btn primary" ${adm?'':'disabled'}>Lưu ngày lễ năm ${esc(f.hy)}</button></div></form>`)}
     </div>`;
   }};
 SUB.depts=form=>{if(!can('admin'))return toast('Chỉ Admin được sửa.','error');
@@ -26,17 +26,18 @@ SUB.holidays=form=>{if(!can('admin'))return toast('Chỉ Admin được sửa.',
 PAGES['help/rules']={t:'Quy chế KPI',
   r(){return `<div class="grid g2">
     ${card('Cách tính điểm',miniTable(['Mục','Quy tắc'],[
-      ['Số ngày trễ','Nộp <b>trễ</b>: tính đủ ngày lịch (kể cả Chủ nhật, lễ). Nộp <b>sớm</b>: chỉ tính ngày làm việc (bỏ Thứ 7, Chủ nhật, ngày lễ).'],
+      ['Trọng số',`Nhân viên tự chấm cho từng việc theo thang <b>${W_MIN}–${W_MAX}</b> (số nguyên). Tổng trọng số chuẩn của một tháng là 100.`],
+      ['Số ngày trễ','So Ngày hoàn thành với Deadline. Hoàn thành <b>trễ</b>: tính đủ ngày lịch (kể cả Chủ nhật, lễ). Hoàn thành <b>sớm</b>: chỉ tính ngày làm việc (bỏ Thứ 7, Chủ nhật, ngày lễ).'],
       ['Điểm cơ bản',`100 điểm, trễ 1 ngày trừ ${LATE_PENALTY} điểm, không thấp hơn 0.`],
-      ['Điểm thưởng',`Sớm 1 ngày làm việc cộng ${BONUS_PER_DAY} điểm, tối đa ${BONUS_CAP}. Quản lý có thể nhập tay cho sáng kiến, việc phát sinh.`],
-      ['Điểm thành phần','(Điểm cơ bản × Trọng số + Điểm thưởng) / 100.'],
-      ['KPI tháng',`Tổng điểm thành phần, khống chế từ 0 đến ${KPI_CAP}. Tổng trọng số của tháng theo quy chế là 100%.`],
-      ['KPI quý, năm','Trung bình các tháng <b>đã có điểm</b>. Tháng chưa chấm không bị tính là 0.'],
-      ['Reject','Việc bị trả lại chưa có điểm; thời gian tính lại khi nộp bản sửa cuối cùng.']
+      ['Điểm thưởng (tự động)',`Sớm 1 ngày làm việc cộng ${BONUS_PER_DAY} điểm, tối đa ${BONUS_CAP}. Tính tự động, không nhập tay.`],
+      ['Điểm thành phần','(Điểm cơ bản × Trọng số + Điểm thưởng) / 100. Đây là điểm KPI của từng việc.'],
+      ['Quản lý duyệt','<b>Duyệt</b>: điểm thành phần được tính vào KPI. <b>Re-check</b>: không tính điểm, dòng việc báo đỏ; nhân viên sửa lại thì việc quay về Chờ duyệt. <b>Chờ duyệt</b>: chưa tính điểm.'],
+      ['KPI tháng',`Tổng điểm thành phần của các việc <b>đã Duyệt</b>, khống chế từ 0 đến ${KPI_CAP}.`],
+      ['KPI quý, năm','Trung bình các tháng <b>đã có điểm</b>. Tháng chưa có điểm không bị tính là 0.']
     ].map(r=>`<tr><td style="white-space:nowrap"><b>${r[0]}</b></td><td>${r[1]}</td></tr>`)))}
     ${card('Xếp loại',miniTable(['Xếp loại','KPI'],[[gradeBd(125),'từ 120 trở lên'],[gradeBd(105),'100 – dưới 120'],[gradeBd(85),'80 – dưới 100'],[gradeBd(10),'dưới 80']].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`))+
-      `<h4 style="margin:16px 0 8px">Chuyển việc sang tháng sau</h4><p class="note" style="padding-top:0">Một việc chỉ được chuyển khi <b>chưa nộp</b> và cột Ghi chú / Link bằng chứng có chữ <b>delays</b>. Khi chuyển, quản lý chọn giữ deadline gốc (tiếp tục tính ngày trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển”, không tính trọng số và điểm.</p>
-      <h4 style="margin:16px 0 8px">Quy trình</h4><p class="note" style="padding-top:0">Chu kỳ hàng tháng. Nhân viên tự đánh giá kèm bằng chứng trong tuần đầu tháng sau. Quy tắc 24h: quản lý không phản hồi trong 1 ngày làm việc thì mặc định Đạt và đúng hạn. Deadline chỉ điều chỉnh khi quản lý phê duyệt trước hạn hoặc bất khả kháng. KPI công khai.</p>`)}
+      `<h4 style="margin:16px 0 8px">Chuyển việc sang tháng sau</h4><p class="note" style="padding-top:0">Một việc chỉ được chuyển khi <b>chưa hoàn thành</b> và cột Ghi chú / Link bằng chứng có chữ <b>delays</b>. Nút chuyển nằm trong hộp <b>Sửa việc</b>. Khi chuyển, quản lý chọn giữ deadline gốc (tiếp tục tính ngày trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển”, không tính trọng số và điểm.</p>
+      <h4 style="margin:16px 0 8px">Quy trình</h4><p class="note" style="padding-top:0">Chu kỳ hàng tháng. Nhân viên nhập việc, tự chấm trọng số và ghi Ngày hoàn thành kèm bằng chứng, chậm nhất trong tuần đầu tháng sau. Quản lý phản hồi Duyệt hoặc Re-check; điểm chỉ được tính vào KPI khi quản lý chọn Duyệt. Deadline chỉ điều chỉnh khi quản lý phê duyệt trước hạn hoặc bất khả kháng. KPI công khai.</p>`)}
     </div>`}};
 
 /* ---------- người dùng / phân quyền ---------- */

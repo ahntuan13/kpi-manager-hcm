@@ -22,25 +22,29 @@ function loadSample(){
     const e={id:uid('e')+ei,code,name,dept,title,email:'',note:'Dữ liệu mẫu',active:true,createdAt:Date.now()-ei*1000};db.employees.push(e);
     const sh={id:sheetId(e.id,y),empId:e.id,year:y,months:emptyMonths(),updatedAt:today,source:'Dữ liệu mẫu'};db.sheets.push(sh);
     for(let m=1;m<=cm;m++){
-      const mm=pad(m),n=ri(5,8),ws=[];let left=100;
-      for(let i=0;i<n;i++){const w=i===n-1?left:Math.max(5,Math.min(left-(n-1-i)*5,ri(8,24)));ws.push(w);left-=w}
-      const titles=[...pool].sort(()=>rnd()-.5).slice(0,n);
+      /* trọng số do nhân viên tự chấm theo thang 1–10; cả tháng cộng lại đúng 100 */
+      const mm=pad(m),n=ri(12,16),ws=Array.from({length:n},()=>ri(4,10));let sum=ws.reduce((a,b)=>a+b,0);
+      while(sum!==100){const k=ri(0,n-1);if(sum>100&&ws[k]>W_MIN){ws[k]--;sum--}else if(sum<100&&ws[k]<W_MAX){ws[k]++;sum++}}
+      const titles=[...pool].sort(()=>rnd()-.5);
       ws.forEach((w,i)=>{
-        const dl=iso(m,ri(4,28)),t={id:uid('t')+ei+m+i,title:titles[i%titles.length],weight:w,deadline:dl,submitted:null,approval:'',note:''};
+        const dl=iso(m,ri(4,28)),rep=Math.floor(i/titles.length),t={id:uid('t')+ei+m+i,title:titles[i%titles.length]+(rep?` (đợt ${rep+1})`:''),weight:w,deadline:dl,submitted:null,approval:'',note:''};
         const past=dl<today,r=rnd();
         if(m<cm||(past&&rnd()<.75)){
           const d=dayNum(dl);let sub;
           if(r<q*.25)sub=isoOf(d-ri(1,4));else if(r<q+.02)sub=dl;else sub=isoOf(d+ri(1,ei===4?9:5));
           if(sub>today)sub=today;
-          t.submitted=sub;t.approval=rnd()<.8?'Đạt':'';t.note=rnd()<.4?'Done':rnd()<.3?'Đã gửi qua email':'';
+          /* tháng đã qua: quản lý đã duyệt gần hết; tháng trước còn vài việc chờ duyệt / Re-check; tháng này mới hoàn thành nên đang chờ duyệt */
+          t.submitted=sub;t.approval=m<cm-1?(rnd()<.985?AP_VAL.ok:AP_VAL.recheck):m===cm-1?(rnd()<.8?AP_VAL.ok:''):(rnd()<.35?AP_VAL.ok:'');t.note=rnd()<.4?'Done':rnd()<.3?'Đã gửi qua email':'';
+          if(t.approval===AP_VAL.recheck)t.note='Thiếu file bằng chứng, cần bổ sung';
         }
         /* vài việc tháng trước chưa xong: có việc đã ghi "delays", có việc chỉ quá hạn */
+        if(m===cm-1&&i===0&&ei===1&&t.submitted){t.approval=AP_VAL.recheck;t.note='Số liệu chưa khớp bảng chấm công, cần kiểm tra lại'}
         if(m===cm-1&&i===n-1&&[0,2,4].includes(ei)){t.submitted=null;t.approval='';t.note=ei===2?'Chờ nhà cung cấp phản hồi':'delays - xin dời sang tháng sau do vướng lịch đào tạo'}
         sh.months[mm].tasks.push(t);
       });
       /* người làm tốt thường nhận thêm việc phát sinh ngoài kế hoạch → tổng trọng số vượt 100, KPI trên 100 */
-      if(m<cm&&q>=.9){const k=ei%3===1?ri(2,4):ri(0,2);for(let i=0;i<k;i++){const dl=iso(m,ri(8,27));sh.months[mm].tasks.push({id:uid('t')+'x'+ei+m+i,title:'Việc phát sinh: '+pool[ri(0,pool.length-1)].toLowerCase(),weight:ri(5,9),deadline:dl,submitted:rnd()<.5?isoOf(dayNum(dl)-ri(1,3)):dl,approval:'Đạt',note:'Phát sinh ngoài kế hoạch tháng'})}}
-      /* người hay trễ: thỉnh thoảng còn việc tháng cũ chưa nộp */
+      if(m<cm&&q>=.9){const k=ei%3===1?ri(2,4):ri(0,2);for(let i=0;i<k;i++){const dl=iso(m,ri(8,27));sh.months[mm].tasks.push({id:uid('t')+'x'+ei+m+i,title:'Việc phát sinh: '+pool[ri(0,pool.length-1)].toLowerCase(),weight:ri(3,8),deadline:dl,submitted:rnd()<.5?isoOf(dayNum(dl)-ri(1,3)):dl,approval:AP_VAL.ok,note:'Phát sinh ngoài kế hoạch tháng'})}}
+      /* người hay trễ: thỉnh thoảng còn việc tháng cũ chưa hoàn thành */
       if(m<cm-1&&q<.75&&rnd()<.45){const t=sh.months[mm].tasks[ri(0,n-1)];t.submitted=null;t.approval='';t.note='Chưa hoàn thành'}
       if(m<cm&&rnd()<.5)sh.months[mm].comment=['Hoàn thành tốt, chủ động báo cáo tiến độ.','Cần chú ý hạn nộp các báo cáo định kỳ.','Tinh thần trách nhiệm tốt, hỗ trợ đồng nghiệp tích cực.','Một số việc còn trễ, cần lập kế hoạch tuần rõ hơn.'][ri(0,3)];
     }

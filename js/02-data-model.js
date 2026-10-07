@@ -11,8 +11,14 @@ const DEFAULT_DEPTS=['AD','HR'];
 const DEFAULT_HOLIDAYS='2024-01-01,2024-02-10,2024-02-11,2024-02-12,2024-02-13,2024-02-14,2024-04-30,2024-05-01,2024-05-07,2024-06-01,2024-09-02,2024-09-17,2025-01-01,2025-01-29,2025-01-30,2025-01-31,2025-02-01,2025-02-02,2025-04-30,2025-05-01,2025-06-01,2025-09-02,2025-10-06,2026-01-01,2026-02-14,2026-02-16,2026-02-17,2026-02-18,2026-02-19,2026-02-20,2026-02-21,2026-04-25,2026-04-27,2026-04-30,2026-05-01,2026-06-01,2026-09-01,2026-09-02,2026-09-24,2027-01-01,2027-02-06,2027-02-07,2027-02-08,2027-02-09,2027-02-10,2027-04-30,2027-05-01,2027-06-01,2027-09-02,2027-09-14,2028-01-01,2028-01-25,2028-01-26,2028-01-27,2028-01-28,2028-01-29,2028-04-30,2028-05-01,2028-06-01,2028-09-02,2028-10-02,2029-01-01,2029-02-13,2029-02-14,2029-02-15,2029-02-16,2029-02-17,2029-04-30,2029-05-01,2029-06-01,2029-09-02,2029-09-22,2030-01-01,2030-02-02,2030-02-03,2030-02-04,2030-02-05,2030-02-06,2030-04-30,2030-05-01,2030-06-01,2030-09-02,2030-09-11'.split(',');
 const MM=['01','02','03','04','05','06','07','08','09','10','11','12'];
 const QN=['Quý I','Quý II','Quý III','Quý IV'], QR=['T01–T03','T04–T06','T07–T09','T10–T12'];
-/* Quy chế KPI (theo file Excel): trễ 1 ngày −3 điểm, sớm 1 ngày làm việc +3 điểm thưởng (tối đa 30), KPI tháng khống chế 0–130 */
-const KPI_CAP=130, LATE_PENALTY=3, BONUS_PER_DAY=3, BONUS_CAP=30;
+/* Quy chế KPI (theo file Excel): trễ 1 ngày −3 điểm, sớm 1 ngày làm việc +3 điểm thưởng (tối đa 30), KPI tháng khống chế 0–130.
+   Trọng số do nhân viên tự chấm theo thang 1–10. */
+const KPI_CAP=130, LATE_PENALTY=3, BONUS_PER_DAY=3, BONUS_CAP=30, W_MIN=1, W_MAX=10;
+/* Quản lý duyệt: 'ok' = Duyệt → điểm thành phần được tính vào KPI · 'recheck' = Re-check → không tính điểm, báo đỏ · '' = chờ duyệt → chưa tính.
+   Dữ liệu cũ / file Excel ghi "Đạt", "Reject" vẫn được hiểu đúng. */
+const apOf=t=>{const a=String((t&&t.approval)||'').normalize('NFC').trim();return /^(duyệt|đạt|approved?)/i.test(a)?'ok':/^(re-?check|reject)/i.test(a)?'recheck':''};
+const AP={'':['mute','Chờ duyệt'],ok:['ok','Duyệt'],recheck:['bad','Re-check']};
+const AP_VAL={'':'',ok:'Duyệt',recheck:'Re-check'};
 /* Xếp loại: [ngưỡng, màu badge, nhãn] */
 const GRADES=[[120,'ok','Xuất sắc'],[100,'info','Tốt'],[80,'mute','Đạt'],[-1e9,'bad','Cần cải thiện']];
 const DELAYS_RE=/\bdelays?\b/i;
@@ -45,9 +51,11 @@ const nextCode=(k,len=3)=>{db.seq[k]=(db.seq[k]||0)+1;return `${k}-${String(db.s
 /* =====================================================================
    CÔNG THỨC KPI – giữ đúng theo file Excel KPI cá nhân
    - Số ngày trễ: nộp trễ tính ngày lịch; nộp sớm tính ngày làm việc (bỏ T7, CN, lễ) và ra số âm.
-   - Điểm cơ bản = 100 − 3 × ngày trễ (không âm). Điểm thưởng = 3 × ngày sớm (tối đa 30), hoặc số nhập tay.
-   - Điểm thành phần = (Điểm cơ bản × Trọng số + Điểm thưởng) / 100.
-   - KPI tháng = tổng điểm thành phần, khống chế 0–130.
+   - Số ngày trễ (F): hoàn thành trễ tính ngày lịch; hoàn thành sớm tính ngày làm việc và ra số âm.
+   - Điểm cơ bản (G) = 100 − 3 × ngày trễ (không âm).
+   - Điểm thưởng (H, tự động) = IF(F<0, MIN(30, ABS(F)*3), 0). Không còn điểm thưởng nhập tay.
+   - Điểm thành phần (I) = (G × Trọng số + H) / 100. Đây là điểm KPI của việc; chỉ được tính khi quản lý chọn Duyệt.
+   - KPI tháng = tổng điểm thành phần của các việc đã Duyệt, khống chế 0–130.
    ===================================================================== */
 const dayNum=iso=>{const [y,m,d]=iso.split('-').map(Number);return Math.round(Date.UTC(y,m-1,d)/864e5)};
 const isoOf=n=>new Date(n*864e5).toISOString().slice(0,10);
@@ -55,37 +63,43 @@ let _hol=null;
 const holSet=()=>_hol||(_hol=new Set(db.company.holidays||[]));
 function networkdays(a,b){let n=0;const H=holSet();for(let x=a;x<=b;x++){const wd=new Date(x*864e5).getUTCDay();if(wd!==0&&wd!==6&&!H.has(isoOf(x)))n++}return n}
 function scoreTask(t,today=todayStr()){
-  const r={w:+t.weight||0,late:null,base:null,bonus:null,comp:null,state:'nodate',overdue:0};
+  const r={w:+t.weight||0,late:null,base:null,bonus:null,comp:null,state:'nodate',overdue:0,ap:apOf(t),counted:false};
   if(t.movedTo){r.state='moved';return r}
   if(!t.deadline||!t.submitted){
     if(t.deadline&&!t.submitted){if(t.deadline<today){r.state='overdue';r.overdue=dayNum(today)-dayNum(t.deadline)}else r.state='open'}
     return r;
   }
-  if(/^reject/i.test(t.approval||'')){r.state='rejected';return r}
   const d=dayNum(t.deadline),s=dayNum(t.submitted);let late=0;
   if(s>d)late=s-d;
-  else if(s<d){late=-(networkdays(s,d)-1);if(late>0)late=0}   /* nộp sớm không bao giờ bị tính thành trễ */
+  else if(s<d){late=-(networkdays(s,d)-1);if(late>0)late=0}   /* hoàn thành sớm không bao giờ bị tính thành trễ */
   late=late||0;r.late=late;
   r.base=late>0?Math.max(0,100-late*LATE_PENALTY):100;
-  r.bonus=(t.bonusManual!=null&&t.bonusManual!=='')?+t.bonusManual:(late<0?Math.min(BONUS_CAP,-late*BONUS_PER_DAY):0);
+  r.bonus=late<0?Math.min(BONUS_CAP,-late*BONUS_PER_DAY):0;
   r.comp=(r.base*r.w+r.bonus)/100;
   r.state=late>0?'late':late<0?'early':'ontime';
+  r.counted=r.ap==='ok';   /* chỉ việc đã Duyệt mới góp điểm vào KPI */
   return r;
 }
-/* Việc chưa nộp thì mới chuyển tháng được; và chỉ chuyển khi Ghi chú có chữ "delays" */
+/* Việc chưa hoàn thành thì mới chuyển tháng được; và chỉ chuyển khi Ghi chú có chữ "delays" */
 const canCarry=(t,sc)=>sc.comp==null&&sc.state!=='moved'&&!t.submitted;
 const carryReady=(t,sc)=>canCarry(t,sc)&&DELAYS_RE.test(t.note||'');
 function monthStats(m){
   const rows=((m&&m.tasks)||[]).map(t=>({t,sc:scoreTask(t)}));
-  const st={rows,n:0,weight:0,raw:0,scored:0,ontime:0,early:0,late:0,open:0,nodate:0,overdue:0,moved:0,rejected:0,delays:0,kpi:null};
+  /* scored = việc đã hoàn thành (có deadline + ngày hoàn thành) · counted = đã Duyệt · pending = chờ duyệt · recheck = Re-check
+     kpi = điểm chính thức (chỉ việc đã Duyệt) · self = điểm tự chấm (đã Duyệt + chờ duyệt, không gồm Re-check) */
+  const st={rows,n:0,weight:0,raw:0,rawSelf:0,bonus:0,scored:0,counted:0,pending:0,recheck:0,ontime:0,early:0,late:0,open:0,nodate:0,overdue:0,moved:0,delays:0,kpi:null,self:null};
   for(const {t,sc} of rows){
     if(sc.state==='moved'){st.moved++;continue}
     st.n++;st.weight+=sc.w;st[sc.state]++;
-    if(sc.comp!=null){st.scored++;st.raw+=sc.comp}
+    if(sc.comp!=null){st.scored++;
+      if(sc.ap==='ok'){st.counted++;st.raw+=sc.comp;st.bonus+=sc.bonus}else if(sc.ap==='recheck')st.recheck++;else st.pending++;
+      if(sc.ap!=='recheck')st.rawSelf+=sc.comp}
     if(carryReady(t,sc))st.delays++;
   }
   st.weight=r2(st.weight);
-  if(st.scored)st.kpi=Math.min(KPI_CAP,Math.max(0,st.raw));
+  const cap=v=>Math.min(KPI_CAP,Math.max(0,v));
+  if(st.counted)st.kpi=cap(st.raw);
+  if(st.counted+st.pending)st.self=cap(st.rawSelf);
   return st;
 }
 const avgOf=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
@@ -101,7 +115,7 @@ function yearStats(sheet){
   const maxI=ev.length?ev.reduce((a,b)=>months[b].kpi>months[a].kpi?b:a):null,minI=ev.length?ev.reduce((a,b)=>months[b].kpi<months[a].kpi?b:a):null;
   const scored=tot('scored'),onTime=tot('ontime')+tot('early');
   return{months,ev,avg:avgOf(vals),maxI,minI,quarters,ytd,last:ev.length?ev[ev.length-1]:null,
-    scored,onTime,onPct:scored?onTime/scored*100:null,late:tot('late'),open:tot('open')+tot('nodate'),overdue:tot('overdue'),delays:tot('delays'),rejected:tot('rejected'),tasks:tot('n')};
+    scored,onTime,onPct:scored?onTime/scored*100:null,late:tot('late'),open:tot('open')+tot('nodate'),overdue:tot('overdue'),delays:tot('delays'),pending:tot('pending'),recheck:tot('recheck'),counted:tot('counted'),tasks:tot('n')};
 }
 const gradeOf=v=>v==null?null:GRADES.find(g=>v>=g[0]);
 const mVal=m=>m.kpi??m.kpiProv??null;   /* điểm tháng, kể cả tạm tính */
@@ -141,12 +155,12 @@ const fmtDM=(iso,year)=>{if(!iso)return'–';const [y,m,d]=iso.split('-');return
 /* ---------- phân quyền ----------
    can('admin')  : chỉ Admin (nhân viên, nhóm, ngày lễ, người dùng, sao lưu, nhập Excel)
    can('manage') : Admin + Quản lý (xem tất cả; thêm / sửa việc của mọi người; duyệt; nhận xét; chuyển việc "delays")
-   Nhân viên     : chỉ thấy dữ liệu của chính mình (session.empId); thêm / sửa việc của mình khi quản lý chưa duyệt Đạt; chuyển việc "delays" */
+   Nhân viên     : chỉ thấy dữ liệu của chính mình (session.empId); thêm / sửa việc và tự chấm trọng số khi quản lý chưa Duyệt; chuyển việc "delays" */
 const can=a=>{const r=session?.role;return a==='admin'?r==='admin':(r==='admin'||r==='member')};
 const isStaff=()=>session?.role==='staff';
 const mine=e=>!isStaff()||(!!e&&e.id===session.empId);
 const canSheet=empId=>can('manage')||(isStaff()&&!!empId&&empId===session.empId);
-const approved=t=>/^đạt/i.test((t&&t.approval)||'');
+const approved=t=>apOf(t)==='ok';
 const canTask=(empId,t)=>can('manage')||(canSheet(empId)&&!approved(t));
 const canDelTask=(empId,t)=>can('manage')||(canSheet(empId)&&t&&!t.submitted&&!t.approval);
 const empHref=e=>isStaff()?'#/dash/me':'#/emp/'+e.id;
@@ -160,7 +174,7 @@ function moveTasks(empId,year,mm,ids,newDeadline){
     const dst=sheetOf(empId,nx.year,true);
     src.months[mm].tasks.forEach(t=>{
       if(!ids.includes(t.id))return;const sc=scoreTask(t);
-      if(!carryReady(t,sc))throw new Error(`Việc “${t.title.split('\n')[0]}” chưa ghi “delays” ở Ghi chú hoặc đã nộp, không chuyển được.`);
+      if(!carryReady(t,sc))throw new Error(`Việc “${t.title.split('\n')[0]}” chưa ghi “delays” ở Ghi chú hoặc đã hoàn thành, không chuyển được.`);
       const c={id:uid('t'),title:t.title,weight:t.weight,deadline:newDeadline||t.deadline||null,submitted:null,approval:'',
         note:(t.note||'').replace(/\s*\bdelays?\b\s*/ig,' ').trim(),carriedFrom:{year:+year,month:mm,id:t.id,deadline:t.deadline||null}};
       dst.months[nx.mm].tasks.push(c);t.movedTo={year:nx.year,month:nx.mm,id:c.id,at:todayStr()};n++;
@@ -174,7 +188,7 @@ function undoMove(empId,year,mm,tid){
   return transact(()=>{
     const src=sheetOf(empId,year),t=src&&by(src.months[mm].tasks,tid);if(!t||!t.movedTo)throw new Error('Việc này chưa được chuyển.');
     const mv=t.movedTo,dst=sheetOf(empId,mv.year),copy=dst&&by(dst.months[mv.month].tasks,mv.id);
-    if(copy&&copy.submitted)throw new Error(`Việc đã được nộp ở T${mv.month}. Hãy xoá ngày nộp ở đó trước khi hoàn tác.`);
+    if(copy&&copy.submitted)throw new Error(`Việc đã hoàn thành ở T${mv.month}. Hãy xoá ngày hoàn thành ở đó trước khi hoàn tác.`);
     if(dst)dst.months[mv.month].tasks=dst.months[mv.month].tasks.filter(x=>x.id!==mv.id);
     delete t.movedTo;src.updatedAt=todayStr();
   });

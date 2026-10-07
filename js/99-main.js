@@ -16,4 +16,4 @@ else{
   render(false);
 }
 self.__APP_BOOTED=true;
-window.__kpi={get db(){return db},get session(){return session},ACT,SUB,PAGES,render,loadSample,parseKpiWorkbook,yearStats,scoreTask,get ready(){return CLOUD?cloudReady:true}};
+window.__kpi={get db(){return db},get session(){return session},ACT,SUB,PAGES,render,loadSample,parseKpiWorkbook,yearStats,monthStats,scoreTask,get ready(){return CLOUD?cloudReady:true}};

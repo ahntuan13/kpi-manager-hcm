@@ -12,28 +12,32 @@ Có 2 chế độ: **cục bộ** (lưu trong trình duyệt) và **Firebase** (
 Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `admin123` → Settings → Sao lưu & Hệ thống → **Nạp dữ liệu mẫu** để xem thử (tên nhân viên trong dữ liệu mẫu là giả).
 
 ## Chức năng chính
-- **Dashboard**: KPI trung bình, KPI tháng gần nhất, tỷ lệ nộp đúng hạn, xếp loại; biểu đồ KPI theo tháng; bảng việc quá hạn và việc chờ chuyển tháng; ma trận nhân viên × 12 tháng.
+- **Dashboard**: KPI trung bình, KPI tháng gần nhất, tỷ lệ hoàn thành đúng hạn, xếp loại; biểu đồ KPI theo tháng; bảng việc quá hạn, việc chờ chuyển tháng, việc **chờ quản lý duyệt** và việc **Re-check**; ma trận nhân viên × 12 tháng.
 - **Xếp hạng nhân viên** theo **tháng / quý / năm**: biểu đồ cột xếp từ cao xuống thấp, biểu đồ thứ hạng qua các tháng hoặc các quý, cột “so với kỳ trước” (▲ ▼).
-- **Nhân viên**: danh sách, lọc theo nhóm / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–130, vạch xếp loại 80 / 100 / 120, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI.
-- **Chuyển việc sang tháng sau**: nút chuyển chỉ bật khi việc **chưa nộp** và cột *Ghi chú / Link bằng chứng* có chữ **`delays`**. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Việc chờ chuyển cũng hiện ở Dashboard → Tổng quan; dải 12 tháng của mỗi nhân viên đánh dấu tháng còn việc quá hạn.
-- **Nhập Excel**: chọn một hoặc nhiều file theo mẫu `KPI_Individual_report` (sheet `Summary` + `M01…M12`); nhân viên chưa có sẽ được tạo theo Mã NV.
+- **Nhân viên**: danh sách, lọc theo nhóm / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–130, vạch xếp loại 80 / 100 / 120, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI: Trọng số · Deadline · Ngày hoàn thành · Điểm cơ bản · Điểm thưởng (tự động) · Điểm thành phần · Quản lý duyệt · Ghi chú.
+- **Trọng số** do nhân viên tự chấm cho từng việc theo thang **1–10** (số nguyên).
+- **Quản lý duyệt** ngay trên bảng: **Duyệt** → điểm thành phần được tính vào KPI; **Re-check** → không tính điểm, dòng việc báo đỏ (nhân viên sửa lại thì việc quay về Chờ duyệt); **Chờ duyệt** → chưa tính. Có nút duyệt hàng loạt theo tháng, theo năm của một nhân viên, hoặc tất cả ở Tổng quan.
+- **Chuyển việc sang tháng sau**: nút chuyển nằm trong hộp **Sửa việc**, chỉ bật khi việc **chưa hoàn thành** và cột *Ghi chú / Link bằng chứng* có chữ **`delays`**. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Việc chờ chuyển cũng được liệt kê ở Dashboard → Tổng quan; dải 12 tháng của mỗi nhân viên đánh dấu tháng còn việc quá hạn.
+- **Nhập Excel**: chọn một hoặc nhiều file theo mẫu `KPI_Individual_report` (sheet `Summary` + `M01…M12`); nhân viên chưa có sẽ được tạo theo Mã NV. Mặc định các việc đã có điểm trong file được coi là đã Duyệt (bỏ chọn được khi nhập). Cột Điểm thưởng của file không được đọc vì điểm thưởng luôn tính tự động.
 - **Báo cáo**: theo nhân viên (năm), theo tháng, theo quý, theo nhóm. Mọi báo cáo xuất **Excel**, **PDF**, **In**. Mỗi tháng của nhân viên in được **Phiếu đánh giá KPI** có chỗ ký.
 - **Settings** (chỉ Admin): nhóm, ngày nghỉ lễ, người dùng / phân quyền, sao lưu / khôi phục JSON, sao lưu đám mây. Mục **Quy chế KPI** ai cũng xem được.
 
 ## Công thức KPI (giữ theo file Excel)
 | Mục | Quy tắc |
 |---|---|
-| Số ngày trễ | Nộp trễ: ngày lịch. Nộp sớm: ngày làm việc (bỏ Thứ 7, Chủ nhật, ngày lễ), không bao giờ bị tính thành trễ |
-| Điểm cơ bản | 100 − 3 × số ngày trễ (không âm) |
-| Điểm thưởng | 3 × số ngày sớm, tối đa 30; hoặc số nhập tay |
-| Điểm thành phần | (Điểm cơ bản × Trọng số + Điểm thưởng) / 100 |
-| KPI tháng | Tổng điểm thành phần, khống chế 0–130 |
-| KPI quý / năm | Trung bình các tháng **đã có điểm và đã kết thúc**. Tháng chưa chấm không tính là 0; tháng đang diễn ra chỉ là điểm tạm tính |
+| Trọng số | Nhân viên tự chấm, số nguyên 1–10. Tổng trọng số chuẩn của một tháng là 100 |
+| Số ngày trễ (F) | So Ngày hoàn thành với Deadline. Trễ: ngày lịch. Sớm: ngày làm việc (bỏ Thứ 7, Chủ nhật, ngày lễ), ra số âm, không bao giờ bị tính thành trễ |
+| Điểm cơ bản (G) | 100 − 3 × số ngày trễ (không âm) |
+| Điểm thưởng (H, tự động) | `=IF(F<0, MIN(30, ABS(F)*3), 0)`. Không nhập tay |
+| Điểm thành phần (I) | `=(G × Trọng số + H) / 100`. Đây là điểm KPI của từng việc |
+| Quản lý duyệt | Duyệt: tính điểm. Re-check: không tính điểm, báo đỏ. Chờ duyệt: chưa tính |
+| KPI tháng | Tổng điểm thành phần của các việc **đã Duyệt**, khống chế 0–130 |
+| KPI quý / năm | Trung bình các tháng **đã có điểm và đã kết thúc**. Tháng chưa có điểm không tính là 0; tháng đang diễn ra chỉ là điểm tạm tính |
 | Xếp loại | Xuất sắc ≥ 120 · Tốt 100–119 · Đạt 80–99 · Cần cải thiện < 80 |
 
 Hai điểm khác file Excel gốc (cố ý):
-1. Sheet `Summary` của Excel lấy trung bình cả 12 tháng, tháng chưa chấm tính là 0. App chỉ tính tháng đã có điểm.
-2. Công thức Excel tính nhầm “nộp sớm vào cuối tuần” thành trễ 1 ngày (ví dụ deadline Chủ nhật, nộp Thứ 7). App tính là đúng hạn.
+1. Sheet `Summary` của Excel lấy trung bình cả 12 tháng, tháng chưa có điểm tính là 0. App chỉ tính tháng đã có điểm.
+2. Công thức Excel tính nhầm “hoàn thành sớm vào cuối tuần” thành trễ 1 ngày (ví dụ deadline Chủ nhật, hoàn thành Thứ 7). App tính là đúng hạn.
 
 ## Cấu trúc thư mục
 ```
@@ -63,15 +67,16 @@ Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổ
 |---|---|---|---|
 | Xem dashboard, công việc, báo cáo | ✔ tất cả | ✔ tất cả | Chỉ của chính mình |
 | Xem danh sách nhân viên, xếp hạng, theo nhóm | ✔ | ✔ | — |
-| Thêm / sửa việc, chuyển việc “delays” | ✔ mọi người | ✔ mọi người | Việc của mình (chưa được duyệt Đạt) |
-| Duyệt, nhận xét, điểm thưởng nhập tay, dời deadline khi chuyển việc | ✔ | ✔ | — |
+| Thêm / sửa việc, tự chấm trọng số 1–10, chuyển việc “delays” | ✔ mọi người | ✔ mọi người | Việc của mình (chưa được Duyệt) |
+| Duyệt / Re-check, nhận xét, dời deadline khi chuyển việc | ✔ | ✔ | — |
 | Thêm / sửa / xoá nhân viên, nhập Excel KPI | ✔ | — | — |
 | Settings: nhóm, ngày lễ, người dùng, sao lưu / khôi phục | ✔ | — | — |
 
 - **Admin** là duy nhất: `ahntuan13@gmail.com` (khai báo ở `config/firebase-config.js` và `firestore.rules`). Admin tạo tài khoản cho Quản lý và Nhân viên ở Settings → User / Permission.
 - Admin (và Quản lý) cũng là nhân viên: ở User / Permission, bấm Sửa tài khoản của mình rồi chọn **Gắn với nhân viên** để có mục **KPI của tôi**.
 - **Nhân viên** phải được **gắn với một nhân viên** trong danh sách; họ chỉ thấy KPI, công việc, báo cáo của người đó. Gõ thẳng địa chỉ trang khác cũng bị đưa về “KPI của tôi”.
-- Nhân viên không sửa / xoá được việc đã được quản lý duyệt **Đạt**; chỉ xoá được việc chưa có ngày nộp.
+- Nhân viên không sửa / xoá được việc đã được quản lý **Duyệt**; chỉ xoá được việc chưa có ngày hoàn thành. Việc bị **Re-check** thì nhân viên sửa được; lưu xong việc quay về Chờ duyệt.
+- Ô Quản lý duyệt chỉ hiện cho Admin / Quản lý. Lưu ý: Firestore Rules chặn nhân viên đọc và ghi bảng KPI của người khác, nhưng không kiểm tra được từng ô trong bảng của chính họ; việc khoá ô duyệt đối với nhân viên được làm ở giao diện.
 - **Nhóm**: mỗi nhân viên thuộc một nhóm (mặc định `AD`, `HR`; sửa ở Settings → Nhóm & ngày lễ). Gán nhóm khi thêm / sửa nhân viên.
 
 **Quan trọng:** phân quyền chỉ bảo mật thật khi bật **Firebase** (Rules ở máy chủ chặn nhân viên đọc bảng KPI của người khác). Ở chế độ dùng thử, mọi dữ liệu nằm chung trong trình duyệt của một máy; vai trò chỉ để xem trước giao diện. Nạp dữ liệu mẫu ở chế độ dùng thử sẽ tạo sẵn 2 tài khoản thử: `quanly` / `quanly123` và `nhanvien` / `nhanvien123` (xoá ở User / Permission khi không cần).
