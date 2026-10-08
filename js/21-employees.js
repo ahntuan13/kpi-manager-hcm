@@ -84,7 +84,9 @@ function empPage(e){const P={t:e.name,sign:true,   /* bản in / PDF của trang
     const mCell=m=>m.prov?fmtK(m.kpiProv)+'*':m.kpi!=null?fmtK(m.kpi):m.self!=null?`<i class="self" title="Điểm tự chấm, đang chờ quản lý duyệt">(${fmtK(m.self)})</i>`:'–';
     const mMark=m=>m.overdue?`<em class="mk bad" title="${m.overdue} việc quá hạn">${m.overdue}</em>`:m.recheck?`<em class="mk bad" title="${m.recheck} việc Re-check">R</em>`:m.delays?`<em class="mk warn" title="${m.delays} việc ghi delays, đề nghị dời sang tháng sau">${m.delays}</em>`:'';
     const mAria=m=>`KPI ${mVal(m)==null?(m.self!=null?'chờ duyệt, tự chấm '+fmtK(m.self):'chưa có điểm'):fmtK(mVal(m))+(m.prov?' tạm tính':'')}${m.overdue?', '+m.overdue+' việc quá hạn':''}${m.recheck?', '+m.recheck+' việc Re-check':''}`;
-    return `<section class="card"><div class="hdr"><div><div class="tags">${e.dept?`<span class="pf">${esc(e.dept)}</span>`:''}${e.active===false?badge('mute','Ngừng theo dõi'):''}${gradeBd(ys.avg)}</div><h2>${esc(e.name)}</h2>
+    const inv=session&&session.empId===e.id?myInvites(e.id):[];
+    const invCard=inv.length?`<section class="card invc"><h4>📨 Lời mời làm chung (${inv.length})</h4><div class="lst">${inv.map(g=>`<div><span><b>${esc(String(g.title||'').split('\n')[0])}</b><small>${esc((g.invitedBy&&g.invitedBy[e.id]&&g.invitedBy[e.id].name)||g.byName||'')} mời · T${g.mm}/${g.year}${g.deadline?' · deadline '+fmtDM(g.deadline,g.year):''}${g.members.length?' · cùng '+esc(g.members.map(x=>gName(g,x)).join(', ')):''}</small></span><span class="acts"><button class="btn sm acc" data-act="grp-accept" data-g="${g.id}" data-e="${e.id}">Nhận</button><button class="btn sm" data-act="grp-decline" data-g="${g.id}" data-e="${e.id}">Từ chối</button></span></div>`).join('')}</div></section>`:'';
+    return `${invCard}<section class="card"><div class="hdr"><div><div class="tags">${e.dept?`<span class="pf">${esc(e.dept)}</span>`:''}${e.active===false?badge('mute','Ngừng theo dõi'):''}${gradeBd(ys.avg)}</div><h2>${esc(e.name)}</h2>
       <p>Mã NV ${esc(e.code)}${e.title?' · '+esc(e.title):''}${e.email?' · '+esc(e.email):''}${sheet?' · cập nhật '+fmtDate(sheet.updatedAt):''}</p>${e.note?`<p class="desc">${esc(e.note)}</p>`:''}</div>
       ${w?`<div class="acts">${adm?`<button class="btn" data-act="emp-edit" data-id="${e.id}">Sửa thông tin</button><button class="btn" data-act="imp-open">⬆ Nhập Excel KPI</button>`:''}${mg&&ys.pending?`<button class="btn" data-act="ap-all" data-e="${e.id}" data-y="${y}">✓ Duyệt cả năm (${ys.pending} việc chờ)</button>`:''}${mg?`<button class="btn" data-act="kt-assign" ${dA}>📌 Giao việc T${mm}</button>`:''}<button class="btn acc" data-act="kt-new" ${dA}>＋ Thêm việc T${mm}</button></div>`:''}</div></section>
     <div class="kpis">${kpi(`KPI trung bình năm ${y}`,fmtK(ys.avg),ys.avg==null?'chưa có tháng nào có điểm được duyệt':`${gradeBd(ys.avg)} · ${ys.ev.length} tháng có điểm`,gradeTone(ys.avg)||'acc')}${kpi(lq!=null?`${QN[lq]} (${QR[lq]})`:'Quý gần nhất',fmtK(lq!=null?ys.quarters[lq].avg:null),lq!=null?`trung bình ${ys.quarters[lq].n}/3 tháng`:'chưa có điểm','info')}${kpi('Cao nhất · Thấp nhất',ys.maxI!=null?`${fmtK(ys.months[ys.maxI].kpi)} · ${fmtK(ys.months[ys.minI].kpi)}`:'–',ys.maxI!=null?`T${MM[ys.maxI]} · T${MM[ys.minI]}`:'','acc')}${kpi('Hoàn thành đúng hạn',ys.onPct==null?'–':fmtK(ys.onPct)+'%',ys.scored?`${ys.onTime}/${ys.scored} việc đã hoàn thành · ${ys.late} việc trễ`:'chưa có việc hoàn thành','ok')}${kpi('Việc chưa hoàn thành',ys.open+ys.overdue,ys.overdue?`<span class="tag-bad">${ys.overdue} quá hạn</span>`:'không có việc quá hạn',ys.overdue?'bad':'ok')}${kpi('Chờ quản lý duyệt',ys.pending,ys.recheck?`<span class="tag-bad">${ys.recheck} việc Re-check · không tính điểm</span>`:ys.pending?'điểm chưa tính vào KPI':'không có việc Re-check',ys.recheck?'bad':ys.pending?'warn':'ok')}</div>
@@ -121,7 +123,11 @@ function linkify(text){return esc(text).replace(/https?:\/\/[^\s<]+/g,u=>`<a hre
 const CP_TIP={ok:'Đã duyệt: tính vào KPI',recheck:'Re-check: không tính điểm','':'Chờ quản lý duyệt: chưa tính vào KPI'};
 /* Nhãn trên tên việc: By Manager (việc quản lý giao) + tag Ưu tiên / Quan trọng */
 const tagBd=t=>`${byMgr(t)?`<span class="pf mgr" title="Việc do quản lý giao${t.byName?' · '+esc(t.byName):''}${t.byAt?' · '+fmtDate(t.byAt):''}">By Manager</span>`:''}${tagsOf(t).map(k=>`<span class="pf tg ${k}">${TAGS[k]}</span>`).join('')}`;
-const tagText=t=>[byMgr(t)?'By Manager':'',...tagsOf(t).map(k=>TAGS[k].replace(/^\S+\s/,''))].filter(Boolean).join(', ');
+const tagText=t=>{const g=grpOfT(t);return [byMgr(t)?'By Manager':'',...tagsOf(t).map(k=>TAGS[k].replace(/^\S+\s/,'')),g?'Làm chung: '+g.members.map(x=>gName(g,x)).join(', '):''].filter(Boolean).join(', ')};
+/* Nhãn việc làm chung: những người cùng làm, người đang được mời / đã từ chối */
+function grpBd(t,eid){const g=grpOfT(t);if(!g)return'';const o=g.members.filter(x=>x!==eid).map(x=>gName(g,x)),inv=(g.invited||[]).map(x=>gName(g,x)),dec=(g.declined||[]).filter(x=>!g.members.includes(x)).map(x=>gName(g,x));
+  if(!o.length&&!inv.length&&!dec.length)return'';
+  return `<span class="pf grp" title="Việc làm chung: Ngày hoàn thành áp dụng cho cả nhóm${g.locked?' · đã được quản lý duyệt':''}">👥 ${o.length?'Làm chung: '+esc(o.join(', ')):'Làm chung'}${inv.length?` · chờ nhận: ${esc(inv.join(', '))}`:''}${dec.length?` · từ chối: ${esc(dec.join(', '))}`:''}</span>`}
 /* Ô Quản lý duyệt: quản lý chọn ngay trên bảng; nhân viên chỉ thấy kết quả */
 function apCell(e,y,mm,r){
   const sc=r.sc;if(sc.state==='moved')return '';
@@ -142,11 +148,11 @@ function monthTable(e,y,mm,st){
   const showMc=rows.some(r=>r.sc.state!=='moved'&&(mcOf(r.t)||(mg&&r.sc.ap==='recheck'))),mcX=r=>{const c=mcOf(r.t);return c?c.text+(c.done?' (nhân viên đã cập nhật)':''):''};
   return table([
     {h:'STT',c:'num',f:r=>r.i+1,x:r=>r.i+1},
-    {h:'Nội dung công việc / Đóng góp',c:'ttl',f:r=>`${r.t.carriedFrom?`<span class="pf">Chuyển từ ${mLbl(r.t.carriedFrom.month,r.t.carriedFrom.year,y)}</span>`:''}${tagBd(r.t)}<span class="tt">${esc(r.t.title)}</span>`,x:r=>r.t.title},
-    {h:'Giao bởi / Tag',xonly:1,x:r=>tagText(r.t)},
+    {h:'Nội dung công việc / Đóng góp',c:'ttl',f:r=>`${r.t.carriedFrom?`<span class="pf">Chuyển từ ${mLbl(r.t.carriedFrom.month,r.t.carriedFrom.year,y)}</span>`:''}${tagBd(r.t)}${grpBd(r.t,e.id)}<span class="tt">${esc(r.t.title)}</span>`,x:r=>r.t.title},
+    {h:'Giao bởi / Tag / Làm chung',xonly:1,x:r=>tagText(r.t)},
     {h:'Trọng số',c:'num',f:r=>fmtK(r.sc.w),x:r=>r.sc.w},
     {h:'Deadline',f:r=>`<span style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</span>${r.t.carriedFrom&&r.t.carriedFrom.deadline&&r.t.carriedFrom.deadline!==r.t.deadline?`<small>gốc ${fmtDM(r.t.carriedFrom.deadline,y)}</small>`:''}`,x:r=>fmtDate(r.t.deadline)},
-    {h:'Ngày hoàn thành',f:r=>`<span style="white-space:nowrap">${fmtDM(r.t.submitted,y)}</span>`,x:r=>fmtDate(r.t.submitted)},
+    {h:'Ngày hoàn thành',f:r=>{const g=grpOfT(r.t);return `<span style="white-space:nowrap">${fmtDM(r.t.submitted,y)}</span>${g&&r.t.submitted&&g.doneBy&&g.doneBy.empId!==e.id?`<small title="Việc làm chung: ngày hoàn thành do ${esc(g.doneBy.name)} ghi">ghi bởi ${esc(String(g.doneBy.name).split(' ').pop())}</small>`:''}`},x:r=>fmtDate(r.t.submitted)},
     {h:'Số ngày trễ',xonly:1,x:r=>r.sc.late??''},
     {h:'Trạng thái',c:'stc',f:r=>stBd(r.t,r.sc,y),x:r=>stText(r.t,r.sc,y)},
     {h:'Điểm cơ bản',c:'num',f:r=>r.sc.base==null?'–':fmtK(r.sc.base),x:r=>r.sc.base??''},
@@ -163,32 +169,51 @@ function monthTable(e,y,mm,st){
 }
 
 /* ---------- thêm / sửa / giao việc ---------- */
-/* opt.assign: quản lý giao việc cho nhân viên → việc được đánh dấu By Manager; chọn được nhân viên và tháng ngay trong hộp thoại */
+/* opt.assign: quản lý giao việc → đánh dấu By Manager; chọn 1 hoặc nhiều nhân viên (nhiều người = việc làm chung) và tháng ngay trong hộp thoại */
+let MATE_OPTS={};
 function taskForm(empId,y,mm,id,opt={}){
   const assign=!!opt.assign&&!id,sh=empId?sheetOf(empId,y):null,t=id?by(sh.months[mm].tasks,id):{title:'',weight:1,deadline:'',submitted:'',approval:'',note:''};
   if(!t)return toast('Việc này không còn tồn tại.','error');
   if(assign&&!can('manage'))return toast('Chỉ quản lý được giao việc.','error');
   const ap=apOf(t),mg=can('manage'),legacy=!!id&&!wOk(+t.weight),nx=nextOf(y,mm),nxL=mLbl(nx.mm,nx.year,y),mv=!!id&&canSheet(empId)&&canCarry(t,scoreTask(t));
   if(!assign&&!canTask(empId,id?t:null))return toast(canSheet(empId)?'Việc đã được quản lý Duyệt, chỉ quản lý sửa được.':'Bạn không có quyền sửa việc này.','error');
-  const lock=!mg&&byMgr(t),c=mcOf(t),tg=tagsOf(t);   /* việc By Manager: nhân viên không đổi được nội dung, deadline, tag */
+  const g=grpOfT(t),glock=!mg&&!!(g&&g.locked),lock=!mg&&byMgr(t)||glock,c=mcOf(t),tg=tagsOf(t);   /* việc By Manager / nhóm đã được duyệt: nhân viên không đổi nội dung, deadline */
+  /* người làm chung: thành viên hiện có, người đang được mời, và danh sách để chọn thêm */
+  const inGrp=g?[...g.members,...(g.invited||[])]:[],opts=assign?[]:dirEmps().filter(x=>x.id!==empId&&!inGrp.includes(x.id));
+  MATE_OPTS={};opts.forEach(x=>{MATE_OPTS[`${x.name} · ${x.code}`]=x.id});
+  const mateBlk=assign?'':`<div class="f full"><span>Người làm chung <small class="muted">(gõ tên hoặc mã NV rồi chọn trong danh sách)</small></span>
+      <div class="mates" id="kt-mates">${g?[...g.members.filter(x=>x!==empId).map(x=>`<span class="chip">👥 ${esc(gName(g,x))}</span>`),...(g.invited||[]).map(x=>`<span class="chip wait">${esc(gName(g,x))} · chờ nhận</span>`)].join(''):''}<span id="kt-mates-new"></span></div>
+      <input class="in" list="dl-emps" id="kt-mate-in" placeholder="VD: Tuấn hoặc S21401" autocomplete="off" aria-label="Thêm người làm chung"><datalist id="dl-emps">${Object.keys(MATE_OPTS).map(v=>`<option value="${esc(v)}"></option>`).join('')}</datalist><input type="hidden" name="mates" value="">
+      <small class="muted">${mg?'Quản lý thêm người là vào việc ngay.':'Người được thêm sẽ nhận lời mời và tự bấm Nhận.'} Ngày hoàn thành do một người ghi được áp dụng cho cả nhóm; trọng số và duyệt tính riêng từng người.</small></div>`;
+  const empPick=assign?`<div class="f full"><span>Giao cho nhân viên <i style="color:var(--bad);font-style:normal">*</i> <small class="muted">(chọn nhiều người = việc làm chung)</small></span><input class="in" id="as-q" placeholder="Lọc theo tên hoặc mã NV" autocomplete="off" aria-label="Lọc nhân viên"><div class="empck" id="as-list">${sortedEmps().filter(x=>x.active!==false||x.id===empId).map(x=>`<label class="chk" data-k="${esc(norm(x.name+' '+x.code))}"><input type="checkbox" name="emp_${x.id}" value="${x.id}" ${x.id===empId?'checked':''}> ${esc(x.name)} <small class="muted">${esc(x.code)}${x.dept?' · '+esc(x.dept):''}</small></label>`).join('')}</div></div>`:'';
   modal(assign?'Giao việc cho nhân viên':id?'Sửa việc':`Thêm việc tháng ${mm}/${y}`,`<form id="mf" data-submit="kt-save" data-e="${empId||''}" data-y="${y}" data-mm="${mm}" data-id="${id||''}" data-assign="${assign?1:''}"><div class="fg">
-    ${assign?`${sel('emp','Giao cho nhân viên',empOpts(),empId||'',{req:1,blank:'— Chọn nhân viên —'})}${inp('ym','Tháng',`${y}-${mm}`,{type:'month',req:1,ph:'yyyy-mm'})}<p class="hint full">Việc này được đánh dấu <b>By Manager</b> trong bảng việc của nhân viên. Nhân viên cập nhật Ngày hoàn thành, Ghi chú và tự chấm trọng số; không đổi được nội dung, deadline và không xoá được.</p>`:''}
-    ${id&&(byMgr(t)||tg.length)?`<div class="f full"><div>${tagBd(t)}${byMgr(t)&&t.byName?`<small class="muted"> giao bởi ${esc(t.byName)}${t.byAt?' · '+fmtDate(t.byAt):''}</small>`:''}</div></div>`:''}
+    ${assign?`${empPick}${inp('ym','Tháng',`${y}-${mm}`,{type:'month',req:1,ph:'yyyy-mm'})}<p class="hint full">Việc được đánh dấu <b>By Manager</b>. Chọn nhiều người thì mỗi người có một bản việc riêng (tự chấm trọng số, duyệt riêng), Ngày hoàn thành do một người ghi áp dụng cho cả nhóm. Nhân viên không đổi được nội dung, deadline và không xoá được.</p>`:''}
+    ${id&&(byMgr(t)||tg.length||g)?`<div class="f full"><div>${tagBd(t)}${grpBd(t,empId)}${byMgr(t)&&t.byName?`<small class="muted"> giao bởi ${esc(t.byName)}${t.byAt?' · '+fmtDate(t.byAt):''}</small>`:''}</div></div>`:''}
     ${!mg&&c&&!c.done&&ap==='recheck'?`<p class="hint full mcn"><b>Comment by Manager:</b> ${esc(c.text)}<br><small>Cập nhật lại việc rồi bấm Lưu; việc sẽ quay về Chờ duyệt.</small></p>`:''}
+    ${glock?'<p class="hint full">Việc làm chung này đã được quản lý Duyệt cho một người trong nhóm nên nội dung, deadline và Ngày hoàn thành không đổi được nữa.</p>':''}
     <label class="f full"><span>Nội dung công việc / Đóng góp <i style="color:var(--bad);font-style:normal">*</i></span><textarea class="in" name="title" rows="3" ${lock?'readonly':''}>${esc(t.title)}</textarea></label>
     ${inp('weight',`Trọng số – nhân viên tự chấm (${W_MIN}–${W_MAX})`,t.weight,{type:'number',step:legacy?'any':'1',req:1,attrs:legacy?'':`min="${W_MIN}" max="${W_MAX}" inputmode="numeric"`})}${mg?sel('approval','Quản lý duyệt',[['','Chờ duyệt'],[AP_VAL.ok,'Duyệt – tính điểm vào KPI'],[AP_VAL.recheck,'Re-check – không tính điểm']],AP_VAL[ap]):`<div class="f"><span>Quản lý duyệt</span><div>${apBd(ap)}</div></div>`}
     ${mg?`<label class="f full" id="kt-mcw" hidden><span>Comment by Manager <small class="muted">(nhân viên sẽ thấy; chỉ nhập khi chọn Re-check)</small></span><textarea class="in" name="mc" rows="2" maxlength="500" placeholder="Cần sửa / bổ sung gì…">${esc(c&&!c.done?c.text:'')}</textarea></label>`:''}
     ${legacy?`<p class="hint full">Trọng số đang lưu là ${esc(t.weight)}, nằm ngoài thang ${W_MIN}–${W_MAX}. Có thể giữ nguyên; nếu sửa, hãy nhập số nguyên từ ${W_MIN} đến ${W_MAX}.</p>`:''}
-    ${inp('deadline','Deadline',t.deadline||'',{type:'date',attrs:lock?'readonly':''})}${inp('submitted','Ngày hoàn thành',t.submitted||'',{type:'date'})}
+    ${inp('deadline','Deadline',t.deadline||'',{type:'date',attrs:lock?'readonly':''})}${inp('submitted',g?'Ngày hoàn thành <small class="muted">(áp dụng cho cả nhóm)</small>':'Ngày hoàn thành',t.submitted||'',{type:'date',attrs:glock?'readonly':''})}
     ${mg?`<div class="f full"><span>Tag</span><div class="tgs">${Object.entries(TAGS).map(([k,l])=>`<label class="chk"><input type="checkbox" name="tag_${k}" ${tg.includes(k)?'checked':''}> <span class="pf tg ${k}">${l}</span></label>`).join('')}</div></div>`:''}
+    ${mateBlk}
     <div class="f full"><span>Điểm (tự động tính)</span><div class="hint scp" id="kt-prev" aria-live="polite">–</div></div>
     ${txa('note','Ghi chú / Link bằng chứng',t.note||'',{full:1,rows:3})}
-    <p class="note full" style="padding:0">${mv?`Việc chưa hoàn thành cần dời sang tháng sau: bấm <b>Chuyển sang ${nxL}</b> bên dưới.`:lock?'Việc do quản lý giao: nội dung và deadline do quản lý đặt.':'Điểm thành phần chỉ được tính vào KPI khi quản lý chọn Duyệt.'}</p></div></form>`,
-    {footer:(id&&canDelTask(empId,t)?`<button class="btn danger" data-act="kt-del" data-e="${empId}" data-y="${y}" data-mm="${mm}" data-id="${id}" style="margin-right:auto">Xoá việc</button>`:'')+(mv?`<button type="button" class="btn acc" id="kt-mv" data-act="kt-move-edit">Chuyển sang ${nxL}</button>`:'')+cancelBtn+`<button class="btn primary" form="mf">${assign?'Giao việc':'Lưu'}</button>`});
+    <p class="note full" style="padding:0">${mv?`Việc chưa hoàn thành cần dời sang tháng sau: bấm <b>Chuyển sang ${nxL}</b> bên dưới${g?' (chỉ chuyển phần của người này)':''}.`:lock?'Nội dung và deadline do quản lý đặt.':'Điểm thành phần chỉ được tính vào KPI khi quản lý chọn Duyệt.'}</p></div></form>`,
+    {footer:(id&&canDelTask(empId,t)?`<button class="btn danger" data-act="kt-del" data-e="${empId}" data-y="${y}" data-mm="${mm}" data-id="${id}" style="margin-right:auto">${g?'Rời việc làm chung':'Xoá việc'}</button>`:'')+(mv?`<button type="button" class="btn acc" id="kt-mv" data-act="kt-move-edit">Chuyển sang ${nxL}</button>`:'')+cancelBtn+`<button class="btn primary" form="mf">${assign?'Giao việc':'Lưu'}</button>`,size:assign||!g?'':''});
   ktPreview();
 }
+/* chọn người làm chung: chọn đúng một dòng gợi ý là thêm vào danh sách */
+function mateSync(){const h=$('#mf input[name=mates]'),box=$('#kt-mates-new');if(!h||!box)return;const ids=h.value?h.value.split(','):[];
+  box.innerHTML=ids.map(x=>{const k=Object.keys(MATE_OPTS).find(v=>MATE_OPTS[v]===x)||x;return `<span class="chip new">＋ ${esc(k)} <button type="button" class="x" data-act="mate-x" data-id="${x}" aria-label="Bỏ ${esc(k)}">✕</button></span>`}).join('')}
+document.addEventListener('input',e=>{
+  if(e.target.id==='kt-mate-in'){const id=MATE_OPTS[e.target.value.trim()];if(!id)return;const h=$('#mf input[name=mates]'),ids=h.value?h.value.split(','):[];if(!ids.includes(id))ids.push(id);h.value=ids.join(',');e.target.value='';mateSync()}
+  if(e.target.id==='as-q'){const q=norm(e.target.value);$$('#as-list label').forEach(l=>{l.hidden=!!q&&!l.dataset.k.includes(q)})}
+});
+ACT['mate-x']=el=>{const h=$('#mf input[name=mates]');if(!h)return;h.value=h.value.split(',').filter(x=>x&&x!==el.dataset.id).join(',');mateSync()};
 function ktRead(form){const d=fd(form),w=String(d.weight??'').trim().replace(',','.');return{title:(d.title||'').trim(),weight:w===''?NaN:Number(w),deadline:d.deadline||null,submitted:d.submitted||null,approval:d.approval||'',note:(d.note||'').trim(),
-  mc:(d.mc||'').trim(),tags:Object.keys(TAGS).filter(k=>d['tag_'+k]),emp:d.emp,ym:d.ym}}
+  mc:(d.mc||'').trim(),tags:Object.keys(TAGS).filter(k=>d['tag_'+k]),emps:Object.keys(d).filter(k=>k.startsWith('emp_')).map(k=>d[k]),ym:d.ym,mates:(d.mates||'').split(',').filter(Boolean)}}
 function ktPreview(){const form=$('form[data-submit="kt-save"]'),el=$('#kt-prev');if(!form||!el)return;const d=ktRead(form),sc=scoreTask(d),mg=can('manage');
   el.innerHTML=sc.comp==null?esc(sc.state==='overdue'?`Chưa hoàn thành · quá hạn ${sc.overdue} ngày`:'Nhập đủ Deadline và Ngày hoàn thành để tính điểm.')
     :`<span>Điểm cơ bản <b>${fmtK(sc.base)}</b></span><span>Điểm thưởng (tự động) <b>${fmtK(sc.bonus)}</b></span><span>Điểm thành phần <b>${fmtK2(sc.comp)}</b></span><small>${sc.late>0?'Trễ '+sc.late+' ngày':sc.late<0?'Sớm '+(-sc.late)+' ngày làm việc':'Đúng hạn'} · (${fmtK(sc.base)} × ${fmtK(sc.w)} + ${fmtK(sc.bonus)}) / 100${mg?' · '+CP_TIP[sc.ap]:''}</small>`;
@@ -201,38 +226,80 @@ ACT['kt-edit']=el=>taskForm(el.dataset.e,el.dataset.y,el.dataset.mm,el.dataset.i
 /* Giao việc: mở từ trang nhân viên (đã biết nhân viên, tháng) hoặc từ danh sách nhân viên (chọn trong hộp thoại) */
 ACT['kt-assign']=el=>{if(!can('manage'))return toast('Chỉ quản lý được giao việc.','error');const d=el.dataset;taskForm(d.e||'',d.y||curYear(),MM.includes(d.mm)?d.mm:curMonth(),null,{assign:true})};
 const mcNew=text=>({text,by:session?.name||'Quản lý',at:todayStr(),done:false});
-/* Lưu việc trong hộp Thêm / Sửa / Giao việc. Trả về {e,y,mm,id} của việc, hoặc null khi không lưu được. */
+/* Lưu việc trong hộp Thêm / Sửa / Giao việc. Trả về {e,y,mm,id,n} của việc, hoặc null khi không lưu được. */
 function ktSave(form){
   const ds=form.dataset,d=ktRead(form),mg=can('manage'),assign=!!ds.assign,fail=m=>{toast(m,'error');return null};
-  let e=ds.e,y=ds.y,mm=ds.mm;const id=ds.id;
+  let e=ds.e,y=ds.y,mm=ds.mm,targets=[];const id=ds.id;
   if(assign){
     if(!mg)return fail('Chỉ quản lý được giao việc.');
-    if(!d.emp||!empOf(d.emp))return fail('Chọn nhân viên được giao việc.');
+    targets=d.emps.filter(x=>empOf(x));if(!targets.length)return fail('Chọn ít nhất một nhân viên được giao việc.');
     const m=/^(\d{4})-(\d{2})$/.exec(d.ym||'');if(!m||!MM.includes(m[2]))return fail('Chọn tháng giao việc.');
-    e=d.emp;y=m[1];mm=m[2];
+    e=targets[0];y=m[1];mm=m[2];
   }
-  const cur=id?by((sheetOf(e,y)||{months:{[mm]:{tasks:[]}}}).months[mm].tasks,id):null;
+  const cur=id?by((sheetOf(e,y)||{months:{[mm]:{tasks:[]}}}).months[mm].tasks,id):null,g0=grpOfT(cur);
   if(id&&!cur)return fail('Việc này không còn tồn tại. Hãy đóng hộp thoại và thử lại.');
-  if(!canTask(e,cur))return fail('Bạn không có quyền sửa việc này.');
-  const lock=!mg&&byMgr(cur);if(lock){d.title=cur.title;d.deadline=cur.deadline||null}
+  if(!assign&&!canTask(e,cur))return fail('Bạn không có quyền sửa việc này.');
+  if(!mg&&byMgr(cur)){d.title=cur.title;d.deadline=cur.deadline||null}
+  if(!mg&&g0&&g0.locked){d.title=g0.title||cur.title;d.submitted=g0.submitted||null;if(!cur.carriedFrom)d.deadline=g0.deadline||null}
   if(!d.title)return fail('Nhập nội dung công việc.');
   if(!(cur&&d.weight===+cur.weight)&&!wOk(d.weight))return fail(`Trọng số là số nguyên từ ${W_MIN} đến ${W_MAX}.`);
   if(mg&&apOf(d)==='ok'&&!(d.deadline&&d.submitted))return fail('Việc chưa có Deadline và Ngày hoàn thành nên chưa có điểm để Duyệt.');
-  let tid=id;
-  const ok=transact(()=>{const sh=sheetOf(e,y,true),list=sh.months[mm].tasks;let t=id?by(list,id):null;if(!t){t={id:uid('t')};list.push(t);tid=t.id;if(assign)Object.assign(t,{by:'manager',byName:session?.name||'',byAt:todayStr()})}
-    Object.assign(t,{title:d.title,weight:d.weight,deadline:d.deadline,submitted:d.submitted,note:d.note});delete t.bonusManual;
-    if(mg){
-      t.approval=d.approval;if(d.tags.length)t.tags=d.tags;else delete t.tags;
-      /* Comment by Manager chỉ có hiệu lực khi Re-check; đổi sang Duyệt / Chờ duyệt thì comment cũ được coi là đã xử lý */
-      if(apOf(t)==='recheck'){const c=mcOf(t);if(d.mc){if(!c||c.done||c.text!==d.mc)t.mgrComment=mcNew(d.mc)}else if(c&&!c.done)delete t.mgrComment}
-      else if(t.mgrComment)t.mgrComment.done=true;
-    }else{t.approval='';if(t.mgrComment)t.mgrComment.done=true}   /* nhân viên cập nhật lại việc Re-check → về Chờ duyệt, comment của quản lý mờ và gạch đi */
-    sh.updatedAt=todayStr()});
-  return ok?{e,y,mm,id:tid}:null;
+  let tid=id,added=0;
+  const ok=transact(()=>{
+    const fill=t=>{Object.assign(t,{title:d.title,weight:d.weight,deadline:d.deadline,submitted:d.submitted,note:d.note});delete t.bonusManual;
+      if(mg){
+        t.approval=d.approval;if(d.tags.length)t.tags=d.tags;else delete t.tags;
+        /* Comment by Manager chỉ có hiệu lực khi Re-check; đổi sang Duyệt / Chờ duyệt thì comment cũ được coi là đã xử lý */
+        if(apOf(t)==='recheck'){const c=mcOf(t);if(d.mc){if(!c||c.done||c.text!==d.mc)t.mgrComment=mcNew(d.mc)}else if(c&&!c.done)delete t.mgrComment}
+        else if(t.mgrComment)t.mgrComment.done=true;
+      }else{t.approval='';if(t.mgrComment)t.mgrComment.done=true}};   /* nhân viên cập nhật lại việc Re-check → về Chờ duyệt, comment của quản lý mờ và gạch đi */
+    if(assign){
+      /* giao cho nhiều người: mỗi người một bản việc, cùng một nhóm làm chung */
+      const g=targets.length>1?newGroup({title:d.title,deadline:d.deadline,submitted:d.submitted,members:targets,y,mm,by:'manager'}):null;
+      targets.forEach((x,i)=>{const sh=sheetOf(x,y,true),t={id:uid('t'),by:'manager',byName:session?.name||'',byAt:todayStr()};fill(t);if(g)t.gid=g.id;sh.months[mm].tasks.push(t);sh.updatedAt=todayStr();if(!i)tid=t.id});
+    }else{
+      const sh=sheetOf(e,y,true),list=sh.months[mm].tasks;let t=id?by(list,id):null;if(!t){t={id:uid('t')};list.push(t);tid=t.id}
+      fill(t);
+      let g=grpOfT(t);
+      if(g){g.title=t.title;if(!t.carriedFrom)g.deadline=t.deadline||null;
+        if((g.submitted||null)!==(t.submitted||null)){g.submitted=t.submitted||null;g.doneBy=t.submitted?{empId:e,name:nameOf(e)||session?.name||'',at:todayStr()}:null}}
+      /* thêm người làm chung */
+      const add=d.mates.filter(x=>x!==e&&!(g&&(g.members.includes(x)||(g.invited||[]).includes(x))));
+      if(add.length){
+        if(!g){g=newGroup({title:t.title,deadline:t.deadline,submitted:t.submitted,members:[e],y,mm,by:byMgr(t)?'manager':''});t.gid=g.id;if(t.submitted)g.doneBy={empId:e,name:nameOf(e),at:todayStr()}}
+        add.forEach(x=>{g.names[x]=nameOf(x);g.declined=(g.declined||[]).filter(z=>z!==x);
+          if(mg){g.members.push(x);grpCopy(g,x,t)}                                                   /* quản lý thêm: vào việc ngay */
+          else{g.invited.push(x);g.invitedBy[x]={empId:e,name:nameOf(e)||session?.name||'',at:todayStr()}}});   /* nhân viên thêm: gửi lời mời */
+        added=add.length;
+      }
+      sh.updatedAt=todayStr();
+    }
+    relockGroups();hydrateGroups();
+  });
+  return ok?{e,y,mm,id:tid,n:targets.length,added}:null;
 }
-SUB['kt-save']=form=>{const id=form.dataset.id,assign=!!form.dataset.assign,r=ktSave(form);if(r)done(assign?`Đã giao việc cho ${empName(r.e)} · T${r.mm}/${r.y}`:id?'Đã lưu việc':'Đã thêm việc')};
-ACT['kt-del']=el=>{const {e,y,mm,id}=el.dataset;if(!canDelTask(e,by((sheetOf(e,y)||{months:{[mm]:{tasks:[]}}}).months[mm].tasks,id)))return toast('Việc đã có ngày hoàn thành hoặc đã được quản lý phản hồi, chỉ quản lý xoá được.','error');if(!confirm('Xoá việc này? Việc sẽ không còn tính vào KPI của tháng.'))return;
-  if(transact(()=>{const sh=sheetOf(e,y);sh.months[mm].tasks=sh.months[mm].tasks.filter(t=>t.id!==id);sh.updatedAt=todayStr()}))done('Đã xoá việc')};
+SUB['kt-save']=form=>{const id=form.dataset.id,assign=!!form.dataset.assign,mg=can('manage'),r=ktSave(form);if(!r)return;
+  done(assign?(r.n>1?`Đã giao việc làm chung cho ${r.n} nhân viên · T${r.mm}/${r.y}`:`Đã giao việc cho ${empName(r.e)} · T${r.mm}/${r.y}`)
+    :(id?'Đã lưu việc':'Đã thêm việc')+(r.added?(mg?` · đã thêm ${r.added} người làm chung`:` · đã gửi lời mời cho ${r.added} người`):''))};
+/* Lời mời làm chung: người được mời tự bấm Nhận (bản việc vào bảng KPI của mình) hoặc Từ chối */
+const myInvites=eid=>(db.groups||[]).filter(g=>(g.invited||[]).includes(eid));
+ACT['grp-accept']=el=>{
+  const g=grpOf(el.dataset.g),me=el.dataset.e;if(!g||!(g.invited||[]).includes(me))return toast('Lời mời này không còn hiệu lực.','warn');
+  if(!canSheet(me))return toast('Bạn không có quyền.','error');
+  let t=null;
+  if(!transact(()=>{g.invited=g.invited.filter(x=>x!==me);if(!g.members.includes(me))g.members.push(me);g.names[me]=nameOf(me)||g.names[me]||session?.name||'';t=grpCopy(g,me,null);hydrateGroups()}))return;
+  const k=location.hash.slice(2);(ui.f[k]??={}).year=String(g.year);ui.f[k].mm=g.mm;rerender();
+  toast('Đã nhận việc làm chung. Hãy tự chấm trọng số cho phần việc của bạn.');taskForm(me,g.year,g.mm,t.id);
+};
+ACT['grp-decline']=el=>{
+  const g=grpOf(el.dataset.g),me=el.dataset.e;if(!g||!(g.invited||[]).includes(me))return;
+  if(!confirm(`Từ chối làm chung việc “${String(g.title||'').split('\n')[0]}”?`))return;
+  if(transact(()=>{g.invited=g.invited.filter(x=>x!==me);(g.declined||(g.declined=[])).push(me)})){rerender();toast('Đã từ chối lời mời')}
+};
+ACT['kt-del']=el=>{const {e,y,mm,id}=el.dataset;if(!canDelTask(e,by((sheetOf(e,y)||{months:{[mm]:{tasks:[]}}}).months[mm].tasks,id)))return toast('Việc đã có ngày hoàn thành hoặc đã được quản lý phản hồi, chỉ quản lý xoá được.','error');if(!confirm(grpOfT(by(sheetOf(e,y).months[mm].tasks,id))?'Rời việc làm chung này? Phần việc của bạn sẽ bị xoá khỏi bảng KPI; những người khác vẫn giữ việc.':'Xoá việc này? Việc sẽ không còn tính vào KPI của tháng.'))return;
+  if(transact(()=>{const sh=sheetOf(e,y),t=by(sh.months[mm].tasks,id),g=grpOfT(t);sh.months[mm].tasks=sh.months[mm].tasks.filter(t=>t.id!==id);sh.updatedAt=todayStr();
+    /* rời việc làm chung khi không còn bản việc nào của người này trong nhóm */
+    if(g&&!db.sheets.some(s=>s.empId===e&&MM.some(m=>s.months[m].tasks.some(x=>x.gid===g.id&&!x.movedTo))))g.members=g.members.filter(x=>x!==e);relockGroups()}))done('Đã xoá việc')};
 SUB['cmt-save']=form=>{if(!can('manage'))return toast('Chỉ quản lý được nhận xét.','error');const {e,y,mm}=form.dataset,v=fd(form).comment.trim();
   if(transact(()=>{const sh=sheetOf(e,y,true);sh.months[mm].comment=v;sh.updatedAt=todayStr()})){rerender();toast('Đã lưu nhận xét')}};
 
@@ -245,7 +312,7 @@ function setApproval(e,y,mm,ids,val){
       if(val==='ok'&&scoreTask(t).comp==null)throw new Error('Việc chưa có Deadline và Ngày hoàn thành nên chưa có điểm để Duyệt.');
       t.approval=AP_VAL[val]||'';if(val!=='recheck'&&t.mgrComment)t.mgrComment.done=true;n++});
     if(!n)throw new Error('Việc này không còn tồn tại.');
-    sh.updatedAt=todayStr()});
+    sh.updatedAt=todayStr();relockGroups()});
   return ok?n:0;
 }
 document.addEventListener('change',ev=>{
@@ -278,7 +345,7 @@ ACT['ap-all']=el=>{
   if(!n)return toast('Không có việc nào đang chờ duyệt.','warn');
   const who=e?empName(e):`${new Set(plan.map(p=>p[0])).size} nhân viên${dept?' nhóm '+dept:''}`;
   if(!confirm(`Duyệt ${n} việc đang chờ duyệt của ${who}${mm?` trong tháng ${mm}/${y}`:` trong năm ${y}`}?\nĐiểm thành phần của các việc này sẽ được tính vào KPI. Việc Re-check không bị thay đổi.`))return;
-  if(transact(()=>{plan.forEach(([sid,m,ids])=>{const s=by(db.sheets,sid);s.months[m].tasks.forEach(t=>{if(ids.includes(t.id))t.approval=AP_VAL.ok});s.updatedAt=todayStr()})})){rerender();toast(`Đã duyệt ${n} việc`)}
+  if(transact(()=>{plan.forEach(([sid,m,ids])=>{const s=by(db.sheets,sid);s.months[m].tasks.forEach(t=>{if(ids.includes(t.id))t.approval=AP_VAL.ok});s.updatedAt=todayStr()});relockGroups()})){rerender();toast(`Đã duyệt ${n} việc`)}
 };
 
 /* ---------- chuyển việc chưa hoàn thành sang tháng sau (mở từ hộp Sửa việc) ---------- */
@@ -300,7 +367,7 @@ ACT['kt-move']=el=>{
       <label class="chk"><input type="radio" name="dl" value="keep" checked> Giữ deadline gốc. Ngày trễ tiếp tục được tính theo quy chế.</label>
       <label class="chk"><input type="radio" name="dl" value="new"> Dời deadline (quản lý phê duyệt): <input class="in" type="date" name="nd" value="${lastDay}" style="width:auto" aria-label="Deadline mới" onfocus="this.form.dl.value='new'"></label></div>`
       :'<input type="hidden" name="dl" value="keep"><p class="hint">Deadline gốc được giữ nguyên, ngày trễ tiếp tục được tính. Muốn dời deadline, hãy nhờ quản lý chuyển việc này.</p>'}
-    <p class="note">Việc đã được lưu. Khi chuyển, việc được ghi vào T${nx.mm}/${nx.year} và chấm điểm ở đó. Tháng ${mm} giữ lại một dòng “Đã chuyển”, không tính trọng số và điểm, có nút Hoàn tác. Nhãn By Manager và tag được giữ nguyên.</p></form>`,
+    <p class="note">Việc đã được lưu. Khi chuyển, việc được ghi vào T${nx.mm}/${nx.year} và chấm điểm ở đó. Tháng ${mm} giữ lại một dòng “Đã chuyển”, không tính trọng số và điểm, có nút Hoàn tác. Nhãn By Manager và tag được giữ nguyên.${list.some(t=>t.gid)?' Việc làm chung: chỉ chuyển phần của người này, những người khác giữ nguyên tháng.':''}</p></form>`,
     {footer:cancelBtn+`<button class="btn primary" form="mf">Chuyển sang T${nx.mm}/${nx.year}</button>`});
 };
 SUB['kt-move-do']=form=>{

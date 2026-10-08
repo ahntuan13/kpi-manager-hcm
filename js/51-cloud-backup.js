@@ -10,7 +10,7 @@ const BACKUP_KEEP=60, PART_SIZE=900000;
 const BK_KIND={auto:['mute','Tự động'],manual:['info','Thủ công'],pre:['warn','Trước khôi phục']};
 let bkList=null,bkBusy=false,bkAt=0;
 
-function bkPayload(){return{app:'kpi-hcm',version:db.version||1,at:new Date().toISOString(),company:db.company,seq:db.seq,employees:db.employees,sheets:db.sheets}}
+function bkPayload(){return{app:'kpi-hcm',version:db.version||1,at:new Date().toISOString(),company:db.company,seq:db.seq,employees:db.employees,sheets:db.sheets,groups:db.groups||[]}}
 
 async function cloudBackup(kind='manual'){
   if(!CLOUD||!cloudReady||!can('write'))throw new Error('Chỉ sao lưu đám mây được khi đã đăng nhập Firebase với quyền ghi.');
@@ -99,7 +99,7 @@ ACT['bk-restore']=async el=>{
     const {data}=await readBackup(b.id);
     await cloudBackup('pre');
     db.company={...db.company,...(data.company||{})};db.seq={...db.seq,...(data.seq||{})};
-    db.employees=data.employees;db.sheets=data.sheets;
+    db.employees=data.employees;db.sheets=data.sheets;db.groups=Array.isArray(data.groups)?data.groups:[];
     migrate();save();await pushQ;
     shell();render(true);toast('Đã khôi phục dữ liệu từ bản sao lưu');loadBackupList();
   }catch(e){toast('Khôi phục thất bại: '+authMsg(e),'error')}

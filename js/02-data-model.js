@@ -29,7 +29,7 @@ function defaultDB(){return{
   seq:{NV:0},
   company:{name:'TVE-HCM · KPI nhân viên',note:'',depts:[...DEFAULT_DEPTS],holidays:[...DEFAULT_HOLIDAYS]},
   users:[{id:'u_admin',username:'admin',name:'Quản trị',role:'admin',pass:pw('admin123'),active:true}],
-  employees:[],sheets:[]
+  employees:[],sheets:[],groups:[]
 }}
 function emptyCloudDB(){const d=defaultDB();d.users=[];return d}
 let db=null, session=null;
@@ -39,8 +39,9 @@ function migrate(){const d=defaultDB();for(const k in d){if(db[k]===undefined)db
   if(!Array.isArray(db.company.depts))db.company.depts=[...DEFAULT_DEPTS];
   if(!Array.isArray(db.company.holidays))db.company.holidays=[...DEFAULT_HOLIDAYS];
   db.employees.forEach(e=>{if(e.active===undefined)e.active=true});
+  if(!Array.isArray(db.groups))db.groups=[];
   db.sheets.forEach(s=>{if(!s.months)s.months={};MM.forEach(m=>{const x=s.months[m]||(s.months[m]={tasks:[],comment:''});if(!Array.isArray(x.tasks))x.tasks=[];if(x.comment==null)x.comment=''})});
-  _hol=null}
+  _hol=null;hydrateGroups()}
 function needsMigrate(){return db.sheets.some(s=>!s.months||MM.some(m=>!s.months[m]||!Array.isArray(s.months[m].tasks)))}
 function load(){if(CLOUD){db=emptyCloudDB();migrate();return}try{const raw=localStorage.getItem(LS_KEY);db=raw?JSON.parse(raw):defaultDB()}catch(e){db=defaultDB()}migrate()}
 function save(){_hol=null;if(CLOUD){cloudPush();return}try{localStorage.setItem(LS_KEY,JSON.stringify(db))}catch(e){toast('Không lưu được dữ liệu (bộ nhớ trình duyệt đầy?). Hãy xuất sao lưu ngay.','error')}}
@@ -173,6 +174,48 @@ const canDelTask=(empId,t)=>can('manage')||(canSheet(empId)&&t&&!t.submitted&&!t
 const empHref=e=>isStaff()?'#/dash/me':'#/emp/'+e.id;
 const homeHash=()=>isStaff()?'dash/me':'dash/overview';
 
+/* =====================================================================
+   VIỆC LÀM CHUNG
+   - Một nhóm (db.groups / Firestore groups/{id}) giữ phần dùng chung: nội dung, deadline, NGÀY HOÀN THÀNH
+     (một người ghi là áp dụng cho cả nhóm), danh sách người làm (members) và người được mời (invited).
+   - Mỗi thành viên có một bản việc riêng trong bảng KPI của mình (task.gid = id nhóm): tự chấm trọng số,
+     ghi chú, quản lý duyệt riêng từng người.
+   - Quản lý thêm người là vào nhóm ngay; nhân viên thêm người thì người đó nhận lời mời và tự bấm Nhận.
+   ===================================================================== */
+let DIR=[];   /* danh bạ (id, tên, mã NV, nhóm) cho tài khoản Nhân viên ở chế độ Firebase, để chọn người làm chung */
+const dirEmps=()=>(CLOUD&&isStaff()?DIR:db.employees).filter(e=>e.active!==false).sort((a,b)=>String(a.name).localeCompare(String(b.name),'vi'));
+const nameOf=id=>{const e=empOf(id)||DIR.find(x=>x.id===id);return e?e.name:''};
+const grpOf=id=>id?(db.groups||[]).find(g=>g.id===id)||null:null;
+const grpOfT=t=>t&&t.gid?grpOf(t.gid):null;
+const gName=(g,id)=>(g.names&&g.names[id])||nameOf(id)||'?';
+function newGroup(o){
+  const g={id:uid('g'),title:o.title,deadline:o.deadline||null,submitted:o.submitted||null,doneBy:null,members:[...o.members],invited:[],declined:[],names:{},invitedBy:{},
+    year:+o.y,mm:o.mm,by:o.by||'',byName:session?.name||'',createdAt:todayStr()};
+  g.members.forEach(x=>g.names[x]=nameOf(x));(db.groups||(db.groups=[])).push(g);return g;
+}
+/* Bản việc của một thành viên mới trong bảng KPI của họ (tháng gốc của nhóm) */
+function grpCopy(g,eid,src){
+  const sh=sheetOf(eid,g.year,true),t={id:uid('t'),gid:g.id,title:g.title,weight:src&&wOk(+src.weight)?+src.weight:1,deadline:g.deadline||null,submitted:g.submitted||null,approval:'',note:''};
+  if(src&&byMgr(src)){t.by='manager';t.byName=src.byName||'';t.byAt=src.byAt||todayStr()}else if(g.by==='manager'){t.by='manager';t.byName=g.byName||'';t.byAt=g.createdAt||todayStr()}
+  if(src&&tagsOf(src).length)t.tags=tagsOf(src);
+  sh.months[g.mm].tasks.push(t);sh.updatedAt=todayStr();return t;
+}
+/* Đưa phần dùng chung của nhóm (nội dung, deadline, ngày hoàn thành) vào bản việc của từng người */
+function hydrateGroups(){
+  if(!db||!Array.isArray(db.groups)||!db.groups.length)return;
+  const G=new Map(db.groups.map(g=>[g.id,g]));
+  db.sheets.forEach(s=>MM.forEach(mm=>((s.months[mm]&&s.months[mm].tasks)||[]).forEach(t=>{
+    const g=t.gid&&!t.movedTo&&G.get(t.gid);if(!g)return;
+    if(g.title)t.title=g.title;t.submitted=g.submitted||null;if(!t.carriedFrom)t.deadline=g.deadline||null;
+  })));
+}
+/* Nhóm bị khoá (nhân viên không đổi ngày hoàn thành / nội dung) khi quản lý đã Duyệt bản việc của bất kỳ ai trong nhóm. Chỉ quản lý tính được (thấy mọi bảng). */
+function relockGroups(){
+  if(!can('manage')||!db.groups||!db.groups.length)return;
+  const ok=new Set();db.sheets.forEach(s=>MM.forEach(m=>s.months[m].tasks.forEach(t=>{if(t.gid&&!t.movedTo&&apOf(t)==='ok')ok.add(t.gid)})));
+  db.groups.forEach(g=>{const v=ok.has(g.id);if(!!g.locked!==v){if(v)g.locked=true;else delete g.locked}});
+}
+
 /* ---------- chuyển việc chưa hoàn thành sang tháng sau ---------- */
 function moveTasks(empId,year,mm,ids,newDeadline){
   const nx=nextOf(year,mm);let n=0;
@@ -184,6 +227,7 @@ function moveTasks(empId,year,mm,ids,newDeadline){
       if(!canCarry(t,sc))throw new Error(`Việc “${t.title.split('\n')[0]}” đã hoàn thành hoặc đã được chuyển, không chuyển được.`);
       const c={id:uid('t'),title:t.title,weight:t.weight,deadline:newDeadline||t.deadline||null,submitted:null,approval:'',
         note:(t.note||'').replace(/\s*\bdelays?\b\s*/ig,' ').trim(),carriedFrom:{year:+year,month:mm,id:t.id,deadline:t.deadline||null}};
+      if(t.gid)c.gid=t.gid;   /* việc làm chung: chỉ chuyển phần của người này, vẫn thuộc nhóm */
       if(byMgr(t)){c.by='manager';c.byName=t.byName||'';c.byAt=t.byAt||''}
       if(tagsOf(t).length)c.tags=tagsOf(t);
       dst.months[nx.mm].tasks.push(c);t.movedTo={year:nx.year,month:nx.mm,id:c.id,at:todayStr()};n++;

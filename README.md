@@ -18,6 +18,7 @@ Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `a
 - **Trọng số** do nhân viên tự chấm cho từng việc theo thang **1–10** (số nguyên).
 - **Quản lý duyệt** ngay trên bảng: **Duyệt** → điểm thành phần được tính vào KPI; **Re-check** → không tính điểm, dòng việc báo đỏ (nhân viên sửa lại thì việc quay về Chờ duyệt); **Chờ duyệt** → chưa tính. Có nút duyệt hàng loạt theo tháng, theo năm của một nhân viên, hoặc tất cả ở Tổng quan.
 - **Giao việc (By Manager)**: Admin / Quản lý bấm **Giao việc** ở trang nhân viên hoặc danh sách nhân viên; việc được gắn nhãn **By Manager**, có thể gắn tag **Ưu tiên**, **Quan trọng**. Trọng số, deadline nhập như Thêm việc. Nhân viên cập nhật Ngày hoàn thành, Ghi chú, trọng số; không đổi được nội dung, deadline và không xoá được.
+- **Việc làm chung**: quản lý giao 1 việc cho nhiều nhân viên (tick nhiều người trong hộp Giao việc), hoặc ai cũng thêm được người làm chung ở ô **Người làm chung** trong hộp Thêm / Sửa việc (gõ tên hoặc mã NV rồi chọn trong danh sách gợi ý). Quản lý thêm là vào việc ngay; nhân viên thêm thì người kia nhận **lời mời** ở trang KPI của mình và tự bấm **Nhận** / **Từ chối**. Mỗi người có bản việc riêng (tự chấm trọng số, quản lý duyệt riêng); **Ngày hoàn thành** do một người ghi được áp dụng cho cả nhóm. Khi quản lý đã Duyệt bản việc của bất kỳ ai trong nhóm, nhân viên không đổi được ngày hoàn thành chung nữa.
 - **Comment by Manager**: khi chọn **Re-check**, ô comment hiện ở cột cuối bảng (và trong hộp Sửa việc) để quản lý ghi cần sửa gì. Nhân viên thấy comment; khi nhân viên cập nhật lại việc, việc quay về Chờ duyệt và comment hiện mờ, gạch đi.
 - **Chuyển việc sang tháng sau**: nút **Chuyển sang tháng…** nằm trong hộp **Sửa việc**, luôn bật với việc **chưa hoàn thành** (không cần ghi `delays`). Ghi `delays` vào Ghi chú chỉ để việc được liệt kê ở Tổng quan. Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Việc ghi `delays` được liệt kê ở Dashboard → Tổng quan; dải 12 tháng của mỗi nhân viên đánh dấu tháng còn việc quá hạn.
 - **Nhập Excel**: chọn một hoặc nhiều file theo mẫu `KPI_Individual_report` (sheet `Summary` + `M01…M12`); nhân viên chưa có sẽ được tạo theo Mã NV. Mặc định các việc đã có điểm trong file được coi là đã Duyệt (bỏ chọn được khi nhập). Cột Điểm thưởng của file không được đọc vì điểm thưởng luôn tính tự động.
@@ -71,6 +72,7 @@ Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổ
 | Xem danh sách nhân viên, xếp hạng, theo nhóm | ✔ | ✔ | — |
 | Thêm / sửa việc, tự chấm trọng số 1–10, chuyển việc chưa hoàn thành sang tháng sau | ✔ mọi người | ✔ mọi người | Việc của mình (chưa được Duyệt) |
 | Giao việc (By Manager), gắn tag Ưu tiên / Quan trọng | ✔ | ✔ | — |
+| Thêm người làm chung | ✔ thêm ngay | ✔ thêm ngay | Gửi lời mời, người được mời tự bấm Nhận |
 | Duyệt / Re-check, Comment by Manager, nhận xét, dời deadline khi chuyển việc | ✔ | ✔ | — |
 | Thêm / sửa / xoá nhân viên, nhập Excel KPI | ✔ | — | — |
 | Settings: nhóm, ngày lễ, người dùng, sao lưu / khôi phục | ✔ | — | — |

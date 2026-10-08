@@ -535,3 +535,17 @@ p.hint.mcn{background:var(--bad-s);color:#8f231c;border-left:3px solid var(--bad
   .mcard .mcf textarea.in{min-width:130px}
 }
 @media (max-width:700px){.mcard table.t td.mcc{flex:1 1 100%;max-width:none}.mcf{width:100%}.mcf textarea.in{width:100%}}
+
+/* ---------- việc làm chung ---------- */
+.pf.grp{background:#e0f2fe;color:#075985;font-weight:600;white-space:normal}
+.mates{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.mates:empty{display:none}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;padding:2px 9px;border-radius:99px;background:#e0f2fe;color:#075985}
+.chip.wait{background:var(--warn-s);color:#8a5a0b}
+.chip.new{background:var(--ok-s);color:#0a7566}
+.chip .x{border:0;background:none;color:inherit;cursor:pointer;padding:0 0 0 2px;font-size:12px;line-height:1}
+.empck{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;max-height:190px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px}
+.empck label[hidden]{display:none}
+.invc{border-left:4px solid var(--info)}
+.invc .lst>div{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.invc .lst small{display:block;color:var(--muted)}

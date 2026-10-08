@@ -51,6 +51,12 @@ function loadSample(){
       if(m<cm&&rnd()<.5)sh.months[mm].comment=['Hoàn thành tốt, chủ động báo cáo tiến độ.','Cần chú ý hạn nộp các báo cáo định kỳ.','Tinh thần trách nhiệm tốt, hỗ trợ đồng nghiệp tích cực.','Một số việc còn trễ, cần lập kế hoạch tuần rõ hơn.'][ri(0,3)];
     }
   });
+  /* Việc làm chung mẫu: Lê Thị Hạnh + Đặng Ngọc Mai (tháng trước, đã hoàn thành) và một lời mời gửi tới nhân viên MAU-01 (tháng này) */
+  {const E2=i=>db.employees[i],pm=cm>1?cm-1:1,mk=(eIdx,m,title,dl,sub,ap)=>{const sh=db.sheets.find(s=>s.empId===E2(eIdx).id),t={id:uid('t')+'g'+eIdx+m,title,weight:6,deadline:dl,submitted:sub,approval:ap,note:''};sh.months[pad(m)].tasks.push(t);return t};
+    const g1={id:uid('g')+'1',title:'Tổ chức ngày hội tuyển dụng tại trường đại học',deadline:iso(pm,22),submitted:iso(pm,20),doneBy:{empId:E2(1).id,name:E2(1).name,at:iso(pm,20)},members:[E2(1).id,E2(5).id],invited:[],declined:[],names:{[E2(1).id]:E2(1).name,[E2(5).id]:E2(5).name},invitedBy:{},year:y,mm:pad(pm),by:'',byName:E2(1).name,createdAt:iso(pm,2)};
+    mk(1,pm,g1.title,g1.deadline,g1.submitted,AP_VAL.ok).gid=g1.id;mk(5,pm,g1.title,g1.deadline,g1.submitted,'').gid=g1.id;
+    const g2={id:uid('g')+'2',title:'Kiểm kê thiết bị IT cuối quý',deadline:iso(cm,25),submitted:null,doneBy:null,members:[E2(6).id],invited:[E2(0).id],declined:[],names:{[E2(6).id]:E2(6).name,[E2(0).id]:E2(0).name},invitedBy:{[E2(0).id]:{empId:E2(6).id,name:E2(6).name,at:today}},year:y,mm:pad(cm),by:'',byName:E2(6).name,createdAt:today};
+    mk(6,cm,g2.title,g2.deadline,null,'').gid=g2.id;db.groups=[g1,g2]}
   /* Chế độ cục bộ: thêm 2 tài khoản dùng thử để xem màn hình của Quản lý và Nhân viên (không tạo khi dùng Firebase) */
   if(!CLOUD){
     const add=(username,name,role,empId)=>{if(!db.users.some(x=>x.username===username))db.users.push({id:uid('u'),username,name,role,empId:empId||'',pass:pw(username+'123'),active:true});else{const x=db.users.find(x=>x.username===username);x.empId=empId||''}};

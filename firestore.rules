@@ -15,10 +15,10 @@ service cloud.firestore {
     function isStaff()       { return active() && me().role == 'staff' && me().empId is string && me().empId != ''; }
     function initialized()   { return exists(/databases/$(database)/documents/meta/init); }
 
-    // Dấu phiên bản Rules (v3). App đọc thử đường dẫn này sau khi đăng nhập: đọc được nghĩa là Rules trên Firebase
+    // Dấu phiên bản Rules (v4). App đọc thử đường dẫn này sau khi đăng nhập: đọc được nghĩa là Rules trên Firebase
     // đúng là bản này; bị từ chối nghĩa là Firebase đang chạy bản Rules cũ và app sẽ hiện cảnh báo cho Admin.
-    // Mỗi lần sửa Rules: đổi 'v3' ở đây và RULES_VER trong js/50-firebase-sync.js thành số mới.
-    match /rulesCheck/{v} { allow get: if signedIn() && v == 'v3'; }
+    // Mỗi lần sửa Rules: đổi 'v4' ở đây và RULES_VER trong js/50-firebase-sync.js thành số mới.
+    match /rulesCheck/{v} { allow get: if signedIn() && v == 'v4'; }
 
     // Hồ sơ người dùng (vai trò, nhân viên được gắn): mỗi người đọc hồ sơ của mình, Admin đọc / ghi tất cả.
     // Admin chỉ tạo được Quản lý và Nhân viên; vai trò admin chỉ dành cho adminEmail() ở lần thiết lập đầu tiên.
@@ -41,6 +41,8 @@ service cloud.firestore {
     // Settings (tên đơn vị, nhóm, ngày lễ): mọi người đang hoạt động đọc được để tính điểm, chỉ Admin sửa.
     match /config/company { allow read: if active(); allow write: if isAdmin(); }
     match /config/seq     { allow read: if active(); allow write: if isManager(); }
+    // Danh bạ trong phòng (chỉ tên, mã NV, nhóm) để nhân viên chọn người làm chung. Admin cập nhật tự động.
+    match /config/directory { allow read: if active(); allow write: if isAdmin(); }
 
     // Sao lưu đám mây: Admin + Quản lý được TẠO bản sao lưu; chỉ Admin xem / khôi phục / xoá.
     // Không ai sửa được bản sao lưu đã tạo (không có quyền update).
@@ -69,6 +71,17 @@ service cloud.firestore {
       allow update: if isManager()
         || (isStaff() && resource.data.empId == me().empId && request.resource.data.empId == me().empId);
       allow delete: if isAdmin();
+    }
+
+    // Việc làm chung (mỗi nhóm có members = người đang làm, invited = người được mời):
+    //  - Admin + Quản lý đọc / ghi tất cả.
+    //  - Nhân viên đọc / sửa nhóm mình đang làm hoặc được mời (nhận / từ chối lời mời, ghi ngày hoàn thành chung);
+    //    tạo nhóm mới phải có chính mình trong members. Chỉ quản lý xoá được nhóm.
+    match /groups/{gid} {
+      allow read:   if isManager() || (isStaff() && (me().empId in resource.data.members || me().empId in resource.data.invited));
+      allow create: if isManager() || (isStaff() && me().empId in request.resource.data.members);
+      allow update: if isManager() || (isStaff() && (me().empId in resource.data.members || me().empId in resource.data.invited));
+      allow delete: if isManager();
     }
   }
 }

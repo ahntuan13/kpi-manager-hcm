@@ -11,9 +11,9 @@
      ở users/{uid}; Firestore Security Rules (file firestore.rules) chặn
      truy cập trái phép ở phía máy chủ.
    ===================================================================== */
-const SYNC=['employees','sheets'];
+const SYNC=['employees','sheets','groups'];
 /* Phiên bản Rules mà app này cần. Phải trùng dấu phiên bản trong firestore.rules (match /rulesCheck/{v}). */
-const RULES_VER='v3';
+const RULES_VER='v4';
 let rulesOld=false;
 /* Rules trên Firebase có phải bản mới nhất không? Bản cũ từ chối đường dẫn rulesCheck/<phiên bản>. */
 async function checkRules(){
@@ -80,6 +80,8 @@ function startSync(){
   const total=SYNC.length+3,seen=new Set();
   const mark=k=>{seen.add(k);if(!cloudReady&&seen.size===total){cloudReady=true;afterReady()}};
   const fail=e=>{console.error(e);toast('Lỗi đồng bộ: '+authMsg(e),'error')};
+  /* phần mới (việc làm chung, danh bạ): Rules cũ chưa cho đọc thì app vẫn chạy, chỉ báo Admin cập nhật Rules */
+  const softFail=e=>{console.warn(e);if(e&&e.code==='permission-denied'&&!rulesOld){rulesOld=true;scheduleRender()}};
   if(isStaff()){
     /* Nhân viên chỉ tải đúng hồ sơ và bảng KPI của chính mình (Rules ở máy chủ cũng chỉ cho đọc phần này) */
     const eid=session.empId;
@@ -87,8 +89,15 @@ function startSync(){
     else{
       unsubs.push(fbStore.doc('employees/'+eid).onSnapshot(s=>{applyRemote('employees',[{type:s.exists?'modified':'removed',doc:s}]);mark('employees')},fail));
       unsubs.push(fbStore.collection('sheets').where('empId','==',eid).onSnapshot(s=>{applyRemote('sheets',s.docChanges());mark('sheets')},fail));
+      /* việc làm chung: nhóm mình đang tham gia + nhóm mình được mời (gộp 2 truy vấn) */
+      const gp={m:null,i:null},gUpd=()=>{if(!gp.m||!gp.i)return;const all={...gp.i,...gp.m},ch=Object.values(all).map(doc=>({type:'modified',doc}));
+        db.groups.forEach(g=>{if(!all[g.id])ch.push({type:'removed',doc:{id:g.id}})});applyRemote('groups',ch);mark('groups')};
+      [['m','members'],['i','invited']].forEach(([k,f])=>unsubs.push(fbStore.collection('groups').where(f,'array-contains',eid).onSnapshot(s=>{gp[k]={};s.docs.forEach(d=>gp[k][d.id]=d);gUpd()},e=>{softFail(e);gp[k]={};gUpd()})));
     }
-  }else SYNC.forEach(col=>unsubs.push(fbStore.collection(col).onSnapshot(s=>{applyRemote(col,s.docChanges());mark(col)},fail)));
+    if(!eid)mark('groups');
+    /* danh bạ trong phòng (tên, mã NV, nhóm) để chọn người làm chung */
+    unsubs.push(fbStore.doc('config/directory').onSnapshot(s=>{DIR=s.exists&&Array.isArray(s.data().list)?s.data().list:[]},softFail));
+  }else SYNC.forEach(col=>unsubs.push(fbStore.collection(col).onSnapshot(s=>{applyRemote(col,s.docChanges());mark(col)},col==='groups'?e=>{softFail(e);mark(col)}:fail)));
   unsubs.push(fbStore.doc('config/company').onSnapshot(s=>{if(s.exists){const d=s.data();remoteCfg.company=canon(d);db.company={...db.company,...d};scheduleRender()}mark('company')},fail));
   unsubs.push(fbStore.doc('config/seq').onSnapshot(s=>{if(s.exists){const d=s.data();remoteCfg.seq=canon(d);for(const k in d)db.seq[k]=Math.max(db.seq[k]||0,+d[k]||0)}mark('seq')},fail));
   const uMap=(id,d)=>({id,username:d.email||'',name:d.name||'',role:d.role,empId:d.empId||'',active:d.active!==false});
@@ -99,6 +108,7 @@ function afterReady(){
   const need=needsMigrate();migrate();
   if(need&&can('write'))save();
   render(false);checkRules();
+  if(session.role==='admin')setTimeout(syncDirectory,1500);
   if(typeof autoBackup==='function')setTimeout(autoBackup,3000);
 }
 function applyRemote(col,changes){
@@ -135,9 +145,17 @@ function cloudPush(){
     remote[col]=cur;
   });
   const sq=canon(db.seq);if(!staff&&remoteCfg.seq!==sq){ops.push({path:'config/seq',data:JSON.parse(sq)});remoteCfg.seq=sq}
-  if(session.role==='admin'){const cc=canon(db.company);if(remoteCfg.company!==cc){ops.push({path:'config/company',data:JSON.parse(cc)});remoteCfg.company=cc}}
+  if(session.role==='admin'){const cc=canon(db.company);if(remoteCfg.company!==cc){ops.push({path:'config/company',data:JSON.parse(cc)});remoteCfg.company=cc}
+    const dd=dirCanon();if(remoteCfg.dir!==dd){ops.push({path:'config/directory',data:{list:JSON.parse(dd)}});remoteCfg.dir=dd}}
   if(!ops.length)return;
   pushQ=pushQ.then(()=>commitOps(ops)).catch(e=>{console.error(e);const denied=e&&e.code==='permission-denied';toast('Chưa lưu được lên Firebase: '+authMsg(e)+(denied?(can('admin')?' Hãy dán lại file firestore.rules mới nhất vào Firebase.':' Hãy báo Admin cập nhật Firestore Rules.'):'')+' Trang sẽ tải lại để đồng bộ.','error');setTimeout(()=>location.reload(),denied?6000:3000)});
+}
+/* Danh bạ cho tài khoản Nhân viên: chỉ tên, mã NV, nhóm của nhân viên đang theo dõi (không có email, ghi chú). Admin tự cập nhật. */
+const dirCanon=()=>canon(db.employees.filter(e=>e.active!==false).map(e=>({id:e.id,name:e.name||'',code:e.code||'',dept:e.dept||''})).sort((a,b)=>a.id<b.id?-1:1));
+async function syncDirectory(){
+  if(!cloudReady||session?.role!=='admin')return;
+  try{const s=await fbStore.doc('config/directory').get(),cur=s.exists&&Array.isArray(s.data().list)?canon([...s.data().list].sort((a,b)=>a.id<b.id?-1:1)):null,dd=dirCanon();remoteCfg.dir=cur;
+    if(cur!==dd){await fbStore.doc('config/directory').set({list:JSON.parse(dd)});remoteCfg.dir=dd}}catch(e){console.warn('directory',e)}
 }
 async function commitOps(ops){
   for(let i=0;i<ops.length;i+=400){
