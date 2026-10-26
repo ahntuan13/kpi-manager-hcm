@@ -165,6 +165,56 @@ function yearStats(sheet){
 const gradeOf=v=>v==null?null:GRADES.find(g=>v>=g[0]);
 const mVal=m=>m.kpi??m.kpiProv??null;   /* điểm tháng, kể cả tạm tính */
 
+/* =====================================================================
+   CHỈ TIÊU KPI (Khung 2) – danh mục theo mục I của file Excel "Individual KPIs – <tên>"
+   - sheet.kpi = {sec, rows:[{id,no,text,w,rule}]} lưu trong bảng KPI (nhân viên × năm).
+     Mỗi dòng giống một dòng Excel: no = số nhóm (dòng có no bắt đầu một nhóm), text = cột C,
+     w = trọng số chỉ tiêu (cột G × 100; để trống = dòng tiêu đề), rule = Quy ước đánh giá (cột H).
+   - task.kpi = id của dòng chỉ tiêu. Chỉ để xếp việc theo nhóm, KHÔNG đổi cách tính điểm.
+   - id = 'k' + hash(nội dung đã chuẩn hoá): nhập lại cùng file Excel ra cùng id nên việc tự gắn lại.
+   ===================================================================== */
+const kpiTrim=s=>String(s??'').replace(/^[\s'"‘’“”\-–—•·]+|[\s'"‘’“”:]+$/g,'');
+const kpiKey=s=>norm(kpiTrim(s));
+/* nhãn gọn: dòng đầu, bỏ dấu nháy / gạch đầu dòng / số thứ tự riêng của ô Excel, tối đa 90 ký tự */
+function kpiLabel(s){const l=String(s??'').split('\n').map(kpiTrim).find(Boolean)||'',t=kpiTrim(l.replace(/^\d+\s*[.)]\s*/,'')).replace(/\s+/g,' ');return t.length>90?t.slice(0,89)+'…':t}
+/* id cố định theo nội dung; trùng nội dung trong cùng danh mục thì thêm -2, -3 */
+const kpiId=(text,taken)=>{const b='k'+hash(kpiKey(text));let id=b,n=1;while(taken&&taken.has(id))id=`${b}-${++n}`;return id};
+/* danh mục của nhân viên trong năm; năm chưa có thì dùng tạm danh mục năm trước (chỉ đọc, không tự chép) */
+const kpiOf=(empId,y)=>{const a=sheetOf(empId,y),b=sheetOf(empId,+y-1);return(a&&a.kpi)||(b&&b.kpi)||null};
+const kpiRows=k=>((k&&k.rows)||[]).filter(r=>r.w!=null);   /* các dòng gắn việc được */
+const kpiHas=(k,id)=>!!id&&kpiRows(k).some(r=>r.id===id);
+/* đếm việc (chưa chuyển tháng) trong năm có chỉ tiêu thoả hit(id) → {n, by:'T10: 5, T11: 2'}; báo trước khi xoá / nhập lại danh mục */
+function kpiUse(empId,y,hit){const sh=sheetOf(empId,y),m={};let n=0;
+  if(sh)MM.forEach(mm=>((sh.months[mm]&&sh.months[mm].tasks)||[]).forEach(t=>{if(t.kpi&&!t.movedTo&&hit(t.kpi)){n++;m[mm]=(m[mm]||0)+1}}));
+  return{n,by:Object.entries(m).map(([k,c])=>`T${k}: ${c}`).join(', ')}}
+/* Nhập lại danh mục: file là chuẩn. Dòng trùng nội dung với dòng đang có giữ id cũ để việc vẫn gắn đúng;
+   dòng đang có mà file không còn thì bị bỏ (dropped) – các việc gắn với nó về "Chưa phân loại". */
+function kpiMerge(old,rows){const o=(old&&old.rows)||[],q=new Map(),taken=new Set();
+  o.forEach(r=>{const k=kpiKey(r.text);(q.get(k)||q.set(k,[]).get(k)).push(r.id)});   /* nhiều dòng cùng nội dung: giữ id cũ theo thứ tự */
+  const hit=rows.map(r=>{const a=q.get(kpiKey(r.text)),id=a&&a.shift();if(id)taken.add(id);return id});   /* lượt 1: dòng trùng nội dung nhận id cũ */
+  const out=rows.map((r,i)=>{let id=hit[i];if(!id){id=taken.has(r.id)?kpiId(r.text,taken):r.id;taken.add(id)}return{...r,id}}),keep=new Set(out.map(r=>r.id));   /* lượt 2: dòng còn lại dùng id theo nội dung của file */
+  return{rows:out,dropped:o.filter(r=>r.w!=null&&!keep.has(r.id))}}
+/* Khung 2 theo danh mục: các dòng hiển thị theo đúng thứ tự file Excel.
+   lv: 'sec' (mục I) · 'cat' (nhóm có số) · 'hdr' (tiêu đề trong nhóm) · 'line' (chỉ tiêu có trọng số) · 'none' (Chưa phân loại) · 'task' (việc).
+   Dòng sec / cat / line / none có wUsed (tổng trọng số việc, không tính việc đã chuyển), wStd (trọng số chỉ tiêu), pts (điểm thành phần việc đã Duyệt).
+   Dòng sec cộng cả việc Chưa phân loại nên luôn bằng tổng Khung 2. Việc được đánh số lại (i) theo thứ tự trên màn hình. */
+function kpiGroups(kpi,rows){
+  const ids=new Set(kpiRows(kpi).map(r=>r.id)),out=[],z=()=>({wUsed:0,wStd:0,pts:0});
+  const sec={lv:'sec',text:(kpi&&kpi.sec)||'KPI Công ty và hoạt động của phòng (KRI)',...z()};out.push(sec);
+  /* cấp (d) để tô màu theo cấp: nhóm có số = 1 · tiêu đề và chỉ tiêu ngay trong nhóm = 2 · chỉ tiêu nằm dưới một tiêu đề = 3 */
+  let cat=null,i=0,sub=false;
+  const put=(id,heads)=>sortRows(rows.filter(r=>(ids.has(r.t.kpi)?r.t.kpi:'')===id)).forEach(r=>{
+    if(r.sc.state!=='moved')heads.forEach(h=>{h.wUsed+=r.sc.w;if(r.sc.counted)h.pts+=r.sc.comp});out.push({lv:'task',r:{...r,i:i++}})});
+  for(const k of (kpi&&kpi.rows)||[]){
+    if(k.no){sub=false;cat={lv:'cat',id:k.id,no:k.no,text:k.text,row:k.w!=null?k:null,d:1,...z()};out.push(cat);if(k.w!=null){cat.wStd=k.w;sec.wStd+=k.w;put(k.id,[sec,cat])}continue}
+    if(k.w==null){out.push({lv:'hdr',id:k.id,text:k.text,d:2});sub=true;continue}
+    const ln={lv:'line',row:k,d:sub?3:2,...z(),wStd:k.w};out.push(ln);sec.wStd+=k.w;if(cat)cat.wStd+=k.w;put(k.id,[sec,...(cat?[cat]:[]),ln]);
+  }
+  if(rows.some(r=>!ids.has(r.t.kpi))){const nb={lv:'none',...z()};out.push(nb);put('',[sec,nb])}
+  out.forEach(h=>{if('pts' in h){h.wUsed=r2(h.wUsed);h.wStd=r2(h.wStd);h.pts=r2(h.pts)}});
+  return out;
+}
+
 /* ---------- truy vấn nhanh ---------- */
 const by=(a,id)=>a.find(x=>x.id===id);
 const empOf=id=>by(db.employees,id);
@@ -235,6 +285,7 @@ function grpCopy(g,eid,src){
   const sh=sheetOf(eid,g.year,true),t={id:uid('t'),gid:g.id,title:g.title,weight:src&&wOk(+src.weight)?+src.weight:1,deadline:g.deadline||null,submitted:g.submitted||null,approval:'',note:''};
   if(src&&byMgr(src)){t.by='manager';t.byName=src.byName||'';t.byAt=src.byAt||todayStr()}else if(g.by==='manager'){t.by='manager';t.byName=g.byName||'';t.byAt=g.createdAt||todayStr()}
   if(src&&tagsOf(src).length)t.tags=tagsOf(src);
+  if(src&&src.kpi&&kpiHas(kpiOf(eid,g.year),src.kpi))t.kpi=src.kpi;   /* cùng nội dung chỉ tiêu → cùng id trong danh mục của người kia */
   sh.months[g.mm].tasks.push(t);sh.updatedAt=todayStr();return t;
 }
 /* Đưa phần dùng chung của nhóm (nội dung, deadline, ngày hoàn thành) vào bản việc của từng người */
@@ -267,6 +318,7 @@ function moveTasks(empId,year,mm,ids,newDeadline){
       if(t.gid)c.gid=t.gid;   /* việc làm chung: chỉ chuyển phần của người này, vẫn thuộc nhóm */
       if(byMgr(t)){c.by='manager';c.byName=t.byName||'';c.byAt=t.byAt||''}
       if(tagsOf(t).length)c.tags=tagsOf(t);
+      if(t.kpi)c.kpi=t.kpi;   /* giữ chỉ tiêu KPI (Khung 2) */
       dst.months[nx.mm].tasks.push(c);t.movedTo={year:nx.year,month:nx.mm,id:c.id,at:todayStr()};n++;
     });
     if(!n)throw new Error('Không có việc nào để chuyển.');

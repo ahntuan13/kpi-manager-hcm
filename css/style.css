@@ -845,3 +845,43 @@ details.ppeh{margin-bottom:12px}details.ppeh summary{cursor:pointer}
 .evup{cursor:pointer}
 .ntb{position:relative}
 .ntb .ntn{position:absolute;top:-6px;right:-6px;background:var(--acc,#2f6fde);color:#fff;font-style:normal;font-size:10.5px;min-width:16px;height:16px;line-height:16px;border-radius:8px;padding:0 3px}
+
+/* ---------- Khung 2 theo danh mục chỉ tiêu KPI (giống mục I của file Excel) ---------- */
+table.t tr.kh td,table.t tbody tr.kh:hover td,table.t tr.kh td.act{background:var(--mute-s);font-weight:600}
+table.t tr.kh-sec td,table.t tbody tr.kh-sec:hover td,table.t tr.kh-sec td.act{background:#fbe3d4}   /* màu cam nhạt của dòng I trong Excel */
+table.t tr.kh-line td,table.t tbody tr.kh-line:hover td,table.t tr.kh-line td.act,table.t tr.kh-hdr td,table.t tbody tr.kh-hdr:hover td,table.t tr.kh-hdr td.act{background:var(--panel);font-weight:500}
+table.t tr.kh td.ttl .tt{font-weight:inherit}
+table.t tr.kh td small.kpx{white-space:pre-line;font-weight:400}
+table.t tr.kh td.num small{white-space:normal}   /* "chỉ tiêu 40%" xuống dòng để không ép cột Nội dung */
+table.t tr.kh-line td.ttl,table.t tr.kh-hdr td.ttl{padding-left:18px}
+table.t tr.kt td.ttl{padding-left:30px}
+table.t td.ttl select[data-kpi]{display:block;margin-top:6px;max-width:100%;font-size:12.5px;padding:3px 6px;border-color:#f0d49a;background-color:var(--warn-s)}
+table.t td.ttl .kpw{display:flex;gap:6px;align-items:center;margin-top:6px}table.t td.ttl .kpw select[data-kpi]{margin-top:0;flex:1 1 auto;min-width:0}   /* ô chọn + nút Gắn cùng một hàng */
+/* màu theo cấp (giống nhau cho mọi nhóm cùng cấp): cấp 1 nhóm chính · cấp 2 chỉ tiêu / tiêu đề trong nhóm · cấp 3 chỉ tiêu dưới tiêu đề; việc giữ nền trắng */
+tr.kd1{--kb:hsl(212 62% 91%);--ks:hsl(212 48% 50%)}tr.kd2{--kb:hsl(152 50% 94%);--ks:hsl(152 40% 45%)}tr.kd3{--kb:hsl(36 80% 94%);--ks:hsl(36 70% 50%)}
+table.t tr.kh[class*=" kd"] td,table.t tbody tr.kh[class*=" kd"]:hover td,table.t tr.kh[class*=" kd"] td.act{background:var(--kb)}
+table.t tr.kh[class*=" kd"] td:first-child{box-shadow:inset 4px 0 0 var(--ks)}
+table.t.kce td{vertical-align:top}
+table.t.kce input[name=no]{width:58px}
+table.t.kce input[name=w]{width:84px}
+table.t.kce textarea{min-width:220px;font-size:13px}
+/* bảng sửa danh mục: dòng có Nhóm số mở nhóm mới (vạch trên), dòng con thụt vào, dòng không có trọng số là tiêu đề (chữ đậm) */
+table.t.kce tr:has(input[name=no]:not(:placeholder-shown)) td{border-top:2px solid var(--line)}
+table.t.kce tr:has(input[name=no]:placeholder-shown) td:nth-child(2){padding-left:24px}
+table.t.kce tr:has(input[name=w]:placeholder-shown) textarea[name=text]{font-weight:600}
+.kico{vertical-align:-2px;margin-right:5px}
+/* việc vừa gắn chỉ tiêu: hiện dần từ trên xuống (chỉ transform / opacity), vạch xanh bên trái đến lần vẽ lại sau */
+@keyframes kjust{from{opacity:.35;transform:translateY(-6px)}to{opacity:1;transform:none}}
+table.t tr.kj td{animation:kjust .55s cubic-bezier(.16,1,.3,1)}
+table.t tr.kj td.ttl{box-shadow:inset 3px 0 0 var(--ok)}
+@media (prefers-reduced-motion: reduce){table.t tr.kj td{animation:none}}
+@media (max-width:700px){
+  .mcard table.t tr.kh{background:var(--mute-s);padding:8px 4px}
+  .mcard table.t tr.kh-sec{background:#fbe3d4}
+  .mcard table.t tr.kh-line,.mcard table.t tr.kh-hdr{background:none}
+  .mcard table.t tr.kh td:first-child{display:block;font-weight:700}
+  .mcard table.t tr.kh td:first-child:empty{display:none}
+  .mcard table.t tr.kh td[data-l]::before{content:none}
+  .mcard table.t tr.kt td.ttl,.mcard table.t tr.kh-line td.ttl,.mcard table.t tr.kh-hdr td.ttl{padding-left:0}
+  .mcard table.t tr.kh[class*=" kd"]{background:var(--kb);box-shadow:inset 4px 0 0 var(--ks);padding-left:10px}
+}

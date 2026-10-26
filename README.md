@@ -44,6 +44,15 @@ KPI tháng = **Khung 1 · Quản lý giao & Tuân thủ (20)** + **Khung 2 · C�
 
 Các tháng trước tháng áp dụng giữ cách tính cũ (100% công việc, chuẩn trọng số 100).
 
+### Chỉ tiêu KPI (Khung 2) – xếp việc theo nhóm giống file Excel
+- Mỗi nhân viên có **danh mục chỉ tiêu KPI** cho từng năm, giống mục **I · KPI Công ty và hoạt động của phòng** trong sheet `Individual KPIs – <tên>` của file Excel KPI cá nhân: nhóm 1, 2, 3… và các chỉ tiêu con có trọng số (ví dụ *Các phòng họp… 40%*).
+- **Nhập**: Admin / Quản lý bấm **Nhập danh mục chỉ tiêu KPI** (trang Tất cả nhân viên) hoặc **Chỉ tiêu KPI → Nhập từ file Excel** (Khung 2). App đọc mọi sheet `Individual KPIs…` và ghép nhân viên theo **Mã NV (ô F4)**. Nhập lại thì danh mục theo đúng file; bảng xem trước báo chỉ tiêu bị bỏ và số việc sẽ về “Chưa phân loại”. Chỉ tiêu cùng nội dung luôn có cùng id, nên nhập lại cùng file thì việc tự gắn lại.
+- **Sửa**: mỗi dòng mục I / nhóm / chỉ tiêu trên bảng Khung 2 có nút **Sửa** (quản lý) để sửa ngay dòng đó (giữ nguyên các việc đã gắn). Nút **Chỉ tiêu KPI** ở Khung 2 mở bảng sửa cả danh mục (Nhóm số · Chỉ tiêu · Trọng số chỉ tiêu % · Quy ước đánh giá; **＋** thêm dòng ngay dưới, cùng nhóm). Năm chưa có danh mục thì dùng tạm danh mục năm trước.
+- **Gắn việc**: khi Thêm / Sửa việc By User, chọn **Chỉ tiêu KPI** (bắt buộc với việc mới và khi nhân viên lưu). Việc chưa gắn nằm ở **Chưa phân loại**; chọn chỉ tiêu ngay trên bảng rồi bấm **Gắn** (làm được cả với việc đã Duyệt vì không đổi điểm).
+- **Điểm không đổi**: chỉ tiêu KPI chỉ để xếp việc theo nhóm. Dòng chỉ tiêu hiện tổng trọng số các việc so với trọng số chỉ tiêu năm trong Excel (để đối chiếu) và điểm thành phần các việc đã Duyệt; dòng **I** so tổng trọng số với chuẩn Khung 2.
+- Lưu ở trường `kpi` của bảng KPI (`sheets/{nhân viên}_{năm}`) và trường `kpi` của từng việc; không đổi Firestore Rules. Giống ô Quản lý duyệt, việc chỉ quản lý được sửa danh mục được khoá ở giao diện.
+- Kiểm tra tự động: `node --test tests/kpi.test.js` (Node 22).
+
 ## Quản lý PPE
 
 Menu **🦺 Quản lý PPE** (Admin + Quản lý), theo mẫu sổ theo dõi cấp phát phương tiện bảo vệ cá nhân có chữ ký người nhận:
@@ -92,6 +101,8 @@ js/
   50-firebase-sync.js      Firebase: đăng nhập, đồng bộ realtime, quản lý người dùng
   51-cloud-backup.js       Sao lưu đám mây: tự sao lưu mỗi ngày lên Firestore, khôi phục / tải về
   99-main.js               Khởi động, kiểm tra đủ file
+tests/
+  kpi.test.js              Kiểm tra Chỉ tiêu KPI (Khung 2): node --test tests/kpi.test.js
 ```
 Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổi số phiên bản `?v=` trong `index.html` để trình duyệt tải bản mới.
 
@@ -104,6 +115,7 @@ Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổ
 | Giao việc (By Manager), gắn tag Ưu tiên / Quan trọng | ✔ | ✔ | — |
 | Thêm người làm chung | ✔ thêm ngay | ✔ thêm ngay | Gửi lời mời, người được mời tự bấm Nhận |
 | Duyệt / Re-check, Comment by Manager, nhận xét, dời deadline khi chuyển việc | ✔ | ✔ | — |
+| Danh mục chỉ tiêu KPI (Khung 2): nhập Excel, sửa | ✔ | ✔ | Xem; chọn chỉ tiêu cho việc của mình |
 | Quản lý PPE: dự án, cấp phát, biên bản giao nhận | ✔ | ✔ | — |
 | Nhập Excel KPI | ✔ mọi file, tạo nhân viên mới | ✔ nhân viên đã có | File của chính mình, việc ở trạng thái Chờ duyệt |
 | Thêm / sửa / xoá nhân viên | ✔ | — | — |

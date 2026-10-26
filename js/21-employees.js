@@ -7,7 +7,7 @@ ACT.setf=el=>{const k=el.dataset.k,v=el.dataset.v;if(F()[k]===v)return;F()[k]=v;
 
 /* ---------- danh sách nhân viên ---------- */
 PAGES['emp/list']={t:'Tất cả nhân viên',
-  head(){return `<div class="bar">${fSearch('Tìm tên, mã NV, chức danh…')}${scopeBar(fSel('st','Trạng thái',[['','Đang theo dõi'],['all','Tất cả'],['off','Ngừng theo dõi']]))}<div class="sp"></div><button class="btn" data-act="export" data-name="nhan-vien-kpi">⬇ Excel</button>${can('manage')?'<button class="btn" data-act="kt-assign">📌 Giao việc</button>':''}${addBtns()}</div>`},
+  head(){return `<div class="bar">${fSearch('Tìm tên, mã NV, chức danh…')}${scopeBar(fSel('st','Trạng thái',[['','Đang theo dõi'],['all','Tất cả'],['off','Ngừng theo dõi']]))}<div class="sp"></div><button class="btn" data-act="export" data-name="nhan-vien-kpi">⬇ Excel</button>${can('manage')?'<button class="btn" data-act="kt-assign">📌 Giao việc</button>':''}${can('manage')?`<button class="btn" data-act="kc-imp" data-y="${esc(F().year||curYear())}">${KPI_ICO}Nhập danh mục chỉ tiêu KPI</button>`:''}${addBtns()}</div>`},
   tbl(){
     const f=F(),y=f.year||curYear(),q=norm(f.q),st=f.st||'';
     const rows=sortedEmps().filter(e=>(!f.dept||e.dept===f.dept)&&(st==='all'||(st==='off'?e.active===false:e.active!==false))&&(!q||norm(`${e.code} ${e.name} ${e.title||''} ${e.email||''} ${e.dept||''}`).includes(q))).map(e=>({e,ys:empStats(e,y)}));
@@ -135,6 +135,18 @@ const tagText=t=>{const g=grpOfT(t);return [byMgr(t)?'By Manager':'',...tagsOf(t
 function grpBd(t,eid){const g=grpOfT(t);if(!g)return'';const o=g.members.filter(x=>x!==eid).map(x=>gName(g,x)),inv=(g.invited||[]).map(x=>gName(g,x)),dec=(g.declined||[]).filter(x=>!g.members.includes(x)).map(x=>gName(g,x));
   if(!o.length&&!inv.length&&!dec.length)return'';
   return `<span class="pf grp" title="Việc làm chung: Ngày hoàn thành áp dụng cho cả nhóm${g.locked?' · đã được quản lý duyệt':''}">👥 ${o.length?'Làm chung: '+esc(o.join(', ')):'Làm chung'}${inv.length?` · chờ nhận: ${esc(inv.join(', '))}`:''}${dec.length?` · từ chối: ${esc(dec.join(', '))}`:''}</span>`}
+/* biểu tượng danh mục chỉ tiêu: 3 vạch, vạch cuối thụt vào như chỉ tiêu con (SVG nét theo màu chữ; phần giao diện mới không dùng emoji) */
+const KPI_ICO='<svg class="kico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M2.5 3.5h.5M6 3.5h7.5M2.5 8h.5M6 8h7.5M5 12.5h.5M8.5 12.5h5"/></svg>';
+/* Chỉ tiêu KPI (Khung 2): tiêu đề dòng nhóm / chỉ tiêu = nhãn gọn + phần còn lại của ô Excel; rê chuột xem Quy ước đánh giá */
+const kpiTtl=(text,pre='',rule='')=>{const s=String(text||''),rest=s.split('\n').slice(1).join('\n').trim();return `<span class="tt"${rule?` title="${esc('Quy ước đánh giá (file Excel): '+rule)}"`:''}>${pre}${esc(kpiLabel(s))}</span>${rest?`<small class="kpx">${esc(rest)}</small>`:''}`};
+/* ô chọn chỉ tiêu KPI: nhóm có tiêu đề → optgroup, nhóm một dòng → option; luôn có dòng trống đầu để không tự chọn thay người dùng */
+function kpiSel(k,cur,attrs=''){let h='',open=false;const opt=(r,lb)=>`<option value="${esc(r.id)}" ${r.id===cur?'selected':''}>${esc(lb)}</option>`,close=()=>{if(open){h+='</optgroup>';open=false}};
+  for(const r of (k&&k.rows)||[]){
+    if(r.no&&r.w==null){close();h+=`<optgroup label="${esc(r.no+'. '+kpiLabel(r.text))}">`;open=true}
+    else if(r.no){close();h+=opt(r,r.no+'. '+kpiLabel(r.text))}
+    else if(r.w!=null)h+=opt(r,kpiLabel(r.text));
+  }
+  close();return `<select class="in" name="kpi" ${attrs}><option value="" ${kpiHas(k,cur)?'':'selected'}>— Chọn chỉ tiêu KPI —</option>${h}</select>`}
 /* Ô Quản lý duyệt: quản lý chọn ngay trên bảng; nhân viên chỉ thấy kết quả */
 function apCell(e,y,mm,r){
   const sc=r.sc;if(sc.state==='moved')return '';
@@ -153,15 +165,22 @@ function mcCell(e,y,mm,r){
 const focusHit=(f,r)=>f==='open'?canCarry(r.t,r.sc):f==='pending'?(r.sc.comp!=null&&r.sc.ap===''&&r.sc.state!=='moved'):false;
 function monthTable(e,y,mm,st,opt={}){
   const w=canSheet(e.id),mg=can('manage'),kind=opt.kind||'',bm=kind==='bm',P=kpi2(),fc=F().focus||'';
-  const rows=sortRows(opt.rows||st.rows).map((r,i)=>({...r,i})),scd=r=>r.sc.state!=='moved'&&(r.sc.comp!=null||r.sc.ap);
+  /* Khung 2 có danh mục chỉ tiêu KPI: xếp việc theo nhóm giống mục I của file Excel; dòng nhóm là dòng giả {hdr} */
+  const kc=kind==='user'?kpiOf(e.id,y):null,grp=kpiRows(kc).length>0;
+  const rows=grp?kpiGroups(kc,opt.rows||st.rows).map(x=>x.lv==='task'?x.r:{hdr:x}):sortRows(opt.rows||st.rows).map((r,i)=>({...r,i})),tk=rows.filter(r=>!r.hdr),scd=r=>r.sc.state!=='moved'&&(r.sc.comp!=null||r.sc.ap);
+  /* ô của dòng nhóm: STT (I / số nhóm / —); Trọng số: mục I so với chuẩn Khung 2 (báo màu khi lệch), chỉ tiêu = tổng việc / trọng số chỉ tiêu năm trong Excel (chỉ để đối chiếu) */
+  const kpiNo=h=>h.lv==='sec'?'I':h.lv==='cat'?h.no:h.lv==='none'?'—':'',kpiW=h=>h.lv==='sec'?`<b class="${Math.abs(h.wUsed-P.userStd)>=0.01?'tag-warn':''}">${fmtK(h.wUsed)}</b><small>chuẩn ${P.userStd}</small>`:h.lv==='none'?fmtK(h.wUsed):h.wStd?`<span title="Tổng trọng số các việc của chỉ tiêu này trong tháng / trọng số chỉ tiêu năm trong file Excel (để đối chiếu, không phải điểm)">${fmtK(h.wUsed)}<small>chỉ tiêu ${fmtK(h.wStd)}%</small></span>`:'';
   /* Cột Comment by Manager chỉ hiện khi khung có việc Re-check (quản lý) hoặc đã có comment */
   const mcX=r=>{const c=mcOf(r.t);return c?c.text+(c.done?' (nhân viên đã cập nhật)':''):''};
   const per=fmtK2(st.bmPer||0),bmPts=r=>r.sc.comp==null?'–':r.sc.ap==='ok'?`<b class="cp ok">+${per}</b>`:r.sc.ap==='recheck'?'<b class="cp recheck">0</b><small class="tag-bad">không tính</small>':`<b class="cp pend">${per}</b><small>chờ duyệt</small>`;
   const cols=[
-    {h:'STT',c:'num',f:r=>r.i+1,x:r=>r.i+1},
-    {h:'Nội dung công việc / Đóng góp',c:'ttl',f:r=>`${r.t.carriedFrom?`<span class="pf">Chuyển từ ${mLbl(r.t.carriedFrom.month,r.t.carriedFrom.year,y)}</span>`:''}${tagBd(r.t)}${grpBd(r.t,e.id)}<span class="tt">${esc(r.t.title)}</span>`,x:r=>r.t.title},
+    {h:'STT',c:'num',f:r=>grp?'':r.i+1,x:r=>grp?'':r.i+1,hf:h=>esc(kpiNo(h)),hx:kpiNo},
+    grp?{h:'Trọng số nhóm',c:'num',f:()=>'',x:()=>'',hf:h=>h.lv==='sec'?P.userStd+'%':'',hx:h=>h.lv==='sec'?P.userStd+'%':''}:null,
+    {h:'Nội dung công việc / Đóng góp',c:'ttl',f:r=>`${r.t.carriedFrom?`<span class="pf">Chuyển từ ${mLbl(r.t.carriedFrom.month,r.t.carriedFrom.year,y)}</span>`:''}${tagBd(r.t)}${grpBd(r.t,e.id)}<span class="tt">${esc(r.t.title)}</span>${grp&&w&&r.sc.state!=='moved'&&!kpiHas(kc,r.t.kpi)?`<span class="kpw">${kpiSel(kc,'',`data-kpi aria-label="Chỉ tiêu KPI cho việc ${r.i+1}"`)}<button type="button" class="btn sm" data-act="kpi-set" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" disabled aria-label="Gắn chỉ tiêu KPI cho việc ${r.i+1}">Gắn</button></span>`:''}`,x:r=>r.t.title,
+      hf:h=>h.lv==='none'?`<span class="tt">Chưa phân loại</span><small>${w?'Chọn chỉ tiêu KPI cho từng việc ở ô bên dưới.':'Các việc chưa được gắn chỉ tiêu KPI.'}</small>`:kpiTtl(h.lv==='line'?h.row.text:h.text,h.lv==='line'?'▸ ':'',h.row&&h.row.rule),
+      hx:h=>h.lv==='none'?'Chưa phân loại':h.lv==='line'?h.row.text:h.text},
     {h:'Giao bởi / Tag / Làm chung',xonly:1,x:r=>tagText(r.t)},
-    bm?null:{h:'Trọng số',c:'num',f:r=>fmtK(r.sc.w),x:r=>r.sc.w},
+    bm?null:{h:'Trọng số',c:'num',f:r=>fmtK(r.sc.w),x:r=>r.sc.w,hf:kpiW,hx:h=>h.wUsed??''},
     {h:'Deadline',f:r=>`<span style="white-space:nowrap">${fmtDM(r.t.deadline,y)}</span>${r.t.carriedFrom&&r.t.carriedFrom.deadline&&r.t.carriedFrom.deadline!==r.t.deadline?`<small>gốc ${fmtDM(r.t.carriedFrom.deadline,y)}</small>`:''}`,x:r=>fmtDate(r.t.deadline)},
     {h:'Ngày hoàn thành',f:r=>{const g=grpOfT(r.t);return `<span style="white-space:nowrap">${fmtDM(r.t.submitted,y)}</span>${g&&r.t.submitted&&g.doneBy&&g.doneBy.empId!==e.id?`<small title="Việc làm chung: ngày hoàn thành do ${esc(g.doneBy.name)} ghi">ghi bởi ${esc(String(g.doneBy.name).split(' ').pop())}</small>`:''}`},x:r=>fmtDate(r.t.submitted)},
     {h:'Số ngày trễ',xonly:1,x:r=>r.sc.late??''},
@@ -169,27 +188,30 @@ function monthTable(e,y,mm,st,opt={}){
     bm?null:{h:'Điểm cơ bản',c:'num',f:r=>r.sc.base==null?'–':fmtK(r.sc.base),x:r=>r.sc.base??''},
     bm?null:{h:'Điểm thưởng (tự động)',c:'num',f:r=>r.sc.bonus==null?'–':r.sc.bonus?`<span class="pos">+${fmtK(r.sc.bonus)}</span>`:'0',x:r=>r.sc.bonus??''},
     bm?{h:'Điểm giao việc',c:'num',f:bmPts,x:r=>r.sc.comp==null?'':r.sc.ap==='ok'?r2(st.bmPer||0):0}
-      :{h:'Điểm thành phần',c:'num',f:r=>r.sc.comp==null?'–':`<b class="cp ${r.sc.ap||'pend'}" title="${CP_TIP[r.sc.ap]}">${fmtK2(r.sc.comp)}</b>${r.sc.ap==='recheck'?'<small class="tag-bad">không tính</small>':r.sc.ap===''?'<small>chờ duyệt</small>':''}`,x:r=>r.sc.comp==null?'':r2(r.sc.comp)},
+      :{h:'Điểm thành phần',c:'num',f:r=>r.sc.comp==null?'–':`<b class="cp ${r.sc.ap||'pend'}" title="${CP_TIP[r.sc.ap]}">${fmtK2(r.sc.comp)}</b>${r.sc.ap==='recheck'?'<small class="tag-bad">không tính</small>':r.sc.ap===''?'<small>chờ duyệt</small>':''}`,x:r=>r.sc.comp==null?'':r2(r.sc.comp),hf:h=>h.wStd||h.wUsed?`<b>${fmtK2(h.pts)}</b>`:'',hx:h=>h.pts??''},
     {h:'Quản lý duyệt',c:'apc',f:r=>apCell(e,y,mm,r),x:r=>scd(r)?AP[r.sc.ap][1]:''},
     {h:'Tính vào KPI',xonly:1,x:r=>r.sc.comp==null?'':r.sc.counted?'Có':'Không'},
     /* Ghi chú / Link bằng chứng: chỉ hiện icon 📄, bấm vào xem nội dung (bản In / PDF vẫn in đủ chữ) */
     {h:'Ghi chú / Link',c:'ntc',f:r=>{const fs=filesOf(r.t);return r.t.note||fs.length?`<button type="button" class="ntb" data-act="note-view" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" title="Xem ghi chú / file bằng chứng${fs.length?' ('+fs.length+' file)':''}" aria-label="Xem ghi chú việc ${r.i+1}">${fs.length?'📎':'📄'}${fs.length?`<em class="ntn">${fs.length}</em>`:''}</button><span class="ntp" hidden>${linkify(r.t.note||'')}${fs.length?`${r.t.note?'\n':''}📎 ${fs.map(f=>esc(f.name)).join(', ')}`:''}</span>`:''},x:r=>[r.t.note||'',...filesOf(r.t).map(f=>f.url)].filter(Boolean).join('\n')},
     {h:'Comment by Manager',c:'mcc',f:r=>mcCell(e,y,mm,r),x:mcX},
-    actCol(r=>!w?'':r.sc.state==='moved'?`<button class="btn sm" data-act="kt-undo" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" aria-label="Hoàn tác chuyển việc ${r.i+1}">Hoàn tác</button>`
-      :canTask(e.id,r.t)?`<button class="btn sm" data-act="kt-edit" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" aria-label="Sửa việc ${r.i+1}">Sửa</button>`:'<span class="muted" title="Việc đã được quản lý Duyệt, chỉ quản lý sửa được">Đã duyệt</span>')
+    Object.assign(actCol(r=>!w?'':r.sc.state==='moved'?`<button class="btn sm" data-act="kt-undo" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" aria-label="Hoàn tác chuyển việc ${r.i+1}">Hoàn tác</button>`
+      :canTask(e.id,r.t)?`<button class="btn sm" data-act="kt-edit" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" aria-label="Sửa việc ${r.i+1}">Sửa</button>`:'<span class="muted" title="Việc đã được quản lý Duyệt, chỉ quản lý sửa được">Đã duyệt</span>'),
+      /* dòng mục I / nhóm / tiêu đề / chỉ tiêu: quản lý sửa ngay dòng đó */
+      {hf:h=>!mg||h.lv==='none'?'':`<button class="btn sm" data-act="kc-row" data-e="${e.id}" data-y="${y}" data-id="${esc(h.lv==='sec'?'':h.lv==='line'?h.row.id:h.id)}" aria-label="${esc('Sửa '+(h.lv==='sec'?'mục I':kpiLabel(h.lv==='line'?h.row.text:h.text)))}">Sửa</button>`})
   ].filter(Boolean);
-  const nVis=cols.filter(c=>!c.xonly).length,live=rows.filter(r=>r.sc.state!=='moved').length;
+  if(grp)cols.forEach(c=>{const f=c.f,x=c.x;if(f)c.f=r=>r.hdr?(c.hf?c.hf(r.hdr):''):f(r);if(x)c.x=r=>r.hdr?(c.hx?c.hx(r.hdr):''):x(r)});   /* dòng nhóm dùng hf / hx của từng cột */
+  const nVis=cols.filter(c=>!c.xonly).length,live=tk.filter(r=>r.sc.state!=='moved').length,c0=grp?3:2;
   const foot=!live?'':bm
     ?`<tr><td colspan="2">Điểm giao việc</td><td colspan="3"></td><td class="num">${fmtK(st.pMgr)}/${P.mgrMax}</td><td colspan="${nVis-6}">${st.bmOk}/${st.bmN} việc được Duyệt × ${fmtK2(st.bmPer||0)} điểm (${P.mgrMax} ÷ ${st.bmN} việc)${st.bmPend?` · ${st.bmPend} việc chờ duyệt`:''}</td></tr>`
-    :`<tr><td colspan="2">${kind==='user'?'Khung 2 · By User':'KPI tổng tháng'}</td><td class="num">${fmtK(st.weight)}</td><td colspan="5"></td><td class="num">${kind==='user'?fmtK2(st.p80):fmtK2(mVal(st))+(st.prov?'*':'')}</td><td colspan="${nVis-9}">${kind==='user'?`${rows.filter(r=>r.sc.counted).length}/${rows.filter(r=>r.sc.comp!=null).length} việc đã duyệt`:st.scored?`${st.counted}/${st.scored} việc đã duyệt`:''}</td></tr>`;
-  return table(cols,rows,{meta:false,rc:r=>[r.sc.state==='moved'?'moved':r.sc.ap==='recheck'?'recheck':'',focusHit(fc,r)?'hl':''].join(' ').trim(),
+    :`<tr><td colspan="${c0}">${kind==='user'?'Khung 2 · By User':'KPI tổng tháng'}</td><td class="num">${fmtK(st.weight)}</td><td colspan="5"></td><td class="num">${kind==='user'?fmtK2(st.p80):fmtK2(mVal(st))+(st.prov?'*':'')}</td><td colspan="${nVis-c0-7}">${kind==='user'?`${tk.filter(r=>r.sc.counted).length}/${tk.filter(r=>r.sc.comp!=null).length} việc đã duyệt`:st.scored?`${st.counted}/${st.scored} việc đã duyệt`:''}</td></tr>`;
+  return table(cols,rows,{meta:false,rc:r=>r.hdr?'kh kh-'+r.hdr.lv+(r.hdr.d?' kd'+r.hdr.d:''):[r.sc.state==='moved'?'moved':r.sc.ap==='recheck'?'recheck':'',focusHit(fc,r)?'hl':'',grp?(ui.kjust===r.t.id?'kt kj':'kt'):''].join(' ').trim(),   /* kd1 / kd2 / kd3: màu theo cấp */
     empty:bm?`Tháng ${mm} chưa có việc nào do quản lý giao.${mg?' Bấm “Giao việc” để giao việc cho nhân viên.':''}`:`Tháng ${mm} chưa có việc nào.${w?' Bấm “Thêm việc” để nhập việc của tháng.':''}`,foot});
 }
 /* ---------- Khung 1 (Quản lý giao & Tuân thủ, 20) · Khung 2 (By User, 80) · Khung 3 (KPI tháng) ---------- */
 const lateChip=(x,mg,dA)=>`<span class="chip late" title="${x.t?'Giờ vào '+esc(x.t):''}">${fmtDate(x.d).slice(0,5)}${x.t?` <small>${esc(x.t)}</small>`:''}${mg?` <button type="button" class="x" data-act="late-x" ${dA} data-id="${x.id}" aria-label="Bỏ ngày đi trễ ${fmtDate(x.d)}">✕</button>`:''}</span>`;
 function kpiFrames(e,y,mm,st){
   const P=kpi2(),mg=can('manage'),dA=`data-e="${e.id}" data-y="${y}" data-mm="${mm}"`,dmin=`${y}-${mm}-01`,dmax=isoOf(dayNum(`${nextOf(y,mm).year}-${nextOf(y,mm).mm}-01`)-1);
-  const bmRows=st.rows.filter(r=>byMgr(r.t)),usRows=st.rows.filter(r=>!byMgr(r.t)),k=mVal(st);
+  const bmRows=st.rows.filter(r=>byMgr(r.t)),usRows=st.rows.filter(r=>!byMgr(r.t)),k=mVal(st),hasKc=kpiRows(kpiOf(e.id,y)).length>0;
   const lateBox=`<div class="cmpc"><div class="cmph"><span>Đi trễ <small class="muted">(giờ vào sau ${esc(P.lateAfter)})</small></span><b class="${st.lateList.length?'tag-bad':''}">${st.lateList.length} lần</b></div>
       <div class="chips">${st.lateList.length?st.lateList.map(x=>lateChip(x,mg,dA)).join(''):'<span class="muted">Không đi trễ ngày nào.</span>'}</div>
       ${mg?`<form class="cmpf" data-submit="late-add" ${dA}><input class="in" type="date" name="d" required min="${dmin}" max="${dmax}" aria-label="Ngày đi trễ"><input class="in" type="time" name="t" value="08:15" aria-label="Giờ vào"><button class="btn sm">＋ Thêm ngày trễ</button></form>`:''}</div>`;
@@ -200,8 +222,8 @@ function kpiFrames(e,y,mm,st){
     <div class="kfsub"><div class="kfsh"><b>Việc quản lý giao</b><span class="muted">${P.mgrMax} điểm chia đều cho ${st.bmN||'các'} việc giao${st.bmN?` = ${fmtK2(st.bmPer)} điểm/việc`:''}; cộng khi việc được Duyệt, không trừ khi trễ</span><span class="kfs sm">${fmtK(st.pMgr)} / ${P.mgrMax}</span></div>${monthTable(e,y,mm,st,{rows:bmRows,kind:'bm'})}</div>
     <div class="kfsub"><div class="kfsh"><b>Tuân thủ</b><span class="muted">${P.compMax} điểm, trừ ${fmtK(P.latePen)} mỗi lần đi trễ và ${fmtK(P.ncPen)} mỗi lỗi NC; không vi phạm thì giữ nguyên</span><span class="kfs sm">${fmtK(st.pComp)} / ${P.compMax}</span></div><div class="cmp">${lateBox}${ncBox}</div></div>
   </section>
-  <section class="kf kf80"><div class="kfh"><h4>Khung 2 · Công việc By User</h4><span class="kfs"><b>${fmtK2(st.p80)}</b> / ${P.userStd}</span></div>
-    ${usRows.some(r=>r.sc.state!=='moved')&&Math.abs(st.weight-P.userStd)>=0.01?`<p class="hint">Tổng trọng số đang là <b>${fmtK(st.weight)}</b>, chuẩn là ${P.userStd}.</p>`:''}${monthTable(e,y,mm,st,{rows:usRows,kind:'user'})}
+  <section class="kf kf80"><div class="kfh"><h4>Khung 2 · Công việc By User${mg?` <button class="btn sm" data-act="kc-edit" data-e="${e.id}" data-y="${y}">${KPI_ICO}Chỉ tiêu KPI</button>`:''}</h4><span class="kfs"><b>${fmtK2(st.p80)}</b> / ${P.userStd}</span></div>
+    ${mg&&!hasKc?`<p class="hint">Chưa có danh mục chỉ tiêu KPI năm ${y} của ${esc(e.name)}. Bấm <b>Chỉ tiêu KPI</b> để nhập từ file Excel hoặc tự tạo; khi có danh mục, việc By User được xếp theo nhóm giống mục I của file Excel.</p>`:''}${!hasKc&&usRows.some(r=>r.sc.state!=='moved')&&Math.abs(st.weight-P.userStd)>=0.01?`<p class="hint">Tổng trọng số đang là <b>${fmtK(st.weight)}</b>, chuẩn là ${P.userStd}.</p>`:''}${monthTable(e,y,mm,st,{rows:usRows,kind:'user'})}
   </section>
   <section class="kf kftot"><div class="kfh"><h4>Khung 3 · KPI tháng ${mm}/${y}</h4><span class="kfs big"><b>${fmtK2(k)}</b>${st.prov?'*':''}</span></div>
     <div class="kfeq"><span>${fmtK2(st.p80)} <small>Khung 2 · By User</small></span><i>+</i><span>${fmtK(st.p20)} <small>Khung 1 · Quản lý giao &amp; Tuân thủ</small></span><i>=</i><span><b>${k==null?'–':fmtK2(k)}</b> <small>KPI tháng${st.prov?' (tạm tính)':''}</small></span>${k!=null?gradeBd(st.kpi??st.kpiProv):''}</div>
@@ -218,6 +240,98 @@ SUB['nc-add']=form=>{const d=fd(form);if(!String(d.note||'').trim())return toast
   cmpEdit(form,m=>{(m.nc=m.nc||[]).push({id:uid('n'),d:d.d,note:d.note.trim(),by:session?.name||'',at:todayStr()})})&&(toast('Đã ghi lỗi NC'),notifyEmp(form.dataset.e,{ic:'⚠️',title:'Lỗi NC khi Audit',body:`Ngày ${fmtDate(d.d)}: ${d.note.trim()} · trừ ${fmtK(kpi2().ncPen)} điểm Tuân thủ`,e:form.dataset.e,y:form.dataset.y,mm:form.dataset.mm}))};
 ACT['late-x']=el=>{if(confirm('Bỏ ngày đi trễ này?'))cmpEdit(el,m=>{m.late=(m.late||[]).filter(x=>x.id!==el.dataset.id)})};
 ACT['nc-x']=el=>{if(confirm('Bỏ lỗi NC này?'))cmpEdit(el,m=>{m.nc=(m.nc||[]).filter(x=>x.id!==el.dataset.id)})};
+/* ---------- danh mục chỉ tiêu KPI (Khung 2) của một nhân viên trong năm – Admin / Quản lý ----------
+   Bảng giống mục I của file Excel: Nhóm số · Chỉ tiêu · Trọng số chỉ tiêu (%) · Quy ước đánh giá.
+   Mỗi dòng giữ id ở data-id; khi lưu đọc từng dòng theo thứ tự trên màn hình (không dùng fd() vì các ô trùng tên). */
+const kcRowHTML=r=>`<tr data-kr data-id="${esc(r.id||'')}"><td><input class="in" name="no" value="${esc(r.no||'')}" placeholder="—" aria-label="Nhóm số (để trống = chỉ tiêu con của nhóm trên)"></td><td><textarea class="in" name="text" rows="2" aria-label="Chỉ tiêu">${esc(r.text||'')}</textarea></td><td><input class="in" name="w" type="number" min="0" max="100" step="any" value="${r.w!=null&&r.w!==''&&Number.isFinite(+r.w)?+r.w:''}" placeholder="tiêu đề" aria-label="Trọng số chỉ tiêu (%), để trống = dòng tiêu đề"></td><td><textarea class="in" name="rule" rows="2" aria-label="Quy ước đánh giá">${esc(r.rule||'')}</textarea></td><td class="act"><button type="button" class="btn sm" data-act="kc-ins" title="Thêm một dòng ngay dưới, cùng nhóm" aria-label="Thêm dòng dưới">＋</button> <button type="button" class="btn sm danger" data-act="kc-del" title="Xoá dòng" aria-label="Xoá dòng">✕</button></td></tr>`;
+function kcTot(){const el=$('#kc-tot');if(!el)return;const P=kpi2(),t=r2($$('#kc-rows input[name=w]').reduce((a,x)=>a+(+x.value||0),0));
+  el.innerHTML=`Tổng trọng số chỉ tiêu: <b class="${Math.abs(t-P.userStd)>=0.01?'tag-warn':''}">${fmtK(t)}</b> / chuẩn ${P.userStd} của Khung 2.`}
+ACT['kc-edit']=el=>{
+  if(!can('manage'))return toast('Chỉ quản lý được sửa danh mục chỉ tiêu KPI.','error');
+  const {e,y}=el.dataset,k=kpiOf(e,y)||{sec:'KPI Công ty và hoạt động của phòng (KRI)',rows:[]},own=!!(sheetOf(e,y)&&sheetOf(e,y).kpi);
+  modal(`Chỉ tiêu KPI · ${empName(e)} · ${y}`,`<form id="mf" data-submit="kc-save" data-e="${esc(e)}" data-y="${esc(y)}">
+    <p class="note" style="padding-top:0">Giống mục <b>I</b> của file Excel KPI cá nhân. Dòng có <b>Nhóm số</b> bắt đầu một nhóm; dòng có <b>Trọng số chỉ tiêu</b> là chỉ tiêu để gắn việc; để trống trọng số là dòng tiêu đề. Bấm <b>＋</b> để thêm dòng ngay dưới (cùng nhóm). Điểm của việc không đổi.${!own&&k.rows.length?` Đang dùng tạm danh mục năm ${+y-1}; bấm Lưu để dùng cho năm ${esc(y)}.`:''}</p>
+    ${inp('sec','Tên mục I',k.sec||'',{full:1})}
+    <div class="tw"><table class="t kce"><thead><tr><th>Nhóm số</th><th>Chỉ tiêu</th><th>Trọng số chỉ tiêu (%)</th><th>Quy ước đánh giá</th><th class="act"></th></tr></thead><tbody id="kc-rows">${(k.rows.length?k.rows:[{}]).map(kcRowHTML).join('')}</tbody></table></div>
+    <p class="note" id="kc-tot" aria-live="polite"></p></form>`,
+    {footer:`<button type="button" class="btn" data-act="kc-imp" data-y="${esc(y)}" style="margin-right:auto">${KPI_ICO}Nhập từ file Excel</button>${cancelBtn}<button class="btn primary" form="mf">Lưu</button>`,size:'wide'});
+  kcTot();
+};
+document.addEventListener('input',ev=>{if(ev.target.closest&&ev.target.closest('#kc-rows')){ev.target.classList.remove('bad');ev.target.removeAttribute('aria-invalid');kcTot()}});
+ACT['kc-ins']=el=>{const tr=el.closest('tr');tr.insertAdjacentHTML('afterend',kcRowHTML({}));tr.nextElementSibling.querySelector('textarea').focus()};
+ACT['kc-del']=el=>{
+  const tr=el.closest('tr'),f=el.closest('form'),id=tr.dataset.id,u=id?kpiUse(f.dataset.e,f.dataset.y,x=>x===id):{n:0};
+  if(u.n&&!confirm(`Chỉ tiêu này đang gắn ${u.n} việc (${u.by}). Xoá dòng thì các việc đó về “Chưa phân loại”. Xoá?`))return;
+  tr.remove();if(!$('#kc-rows tr'))$('#kc-rows').insertAdjacentHTML('beforeend',kcRowHTML({}));kcTot();
+};
+SUB['kc-save']=form=>{
+  if(!can('manage'))return toast('Chỉ quản lý được sửa danh mục chỉ tiêu KPI.','error');
+  const {e,y}=form.dataset,trs=$$('tr[data-kr]',form),taken=new Set(trs.map(tr=>tr.dataset.id).filter(Boolean)),rows=[];
+  const bad=(el,msg)=>{el.classList.add('bad');el.setAttribute('aria-invalid','true');el.focus();toast(msg,'error')};   /* báo lỗi ngay tại ô sai */
+  for(const tr of trs){
+    const v=n=>tr.querySelector(`[name=${n}]`).value.trim(),text=v('text'),no=v('no').replace(/\.$/,''),ws=v('w');
+    if(!text&&!no&&ws==='')continue;   /* dòng trống: bỏ */
+    if(!text)return bad(tr.querySelector('[name=text]'),'Mỗi dòng cần có nội dung Chỉ tiêu.');
+    const w=ws===''?null:Number(ws.replace(',','.'));if(w!=null&&!(w>=0&&w<=100))return bad(tr.querySelector('[name=w]'),`Trọng số của “${kpiLabel(text)}” phải từ 0 đến 100.`);
+    let id=tr.dataset.id;if(!id){id=kpiId(text,taken);taken.add(id)}
+    rows.push({id,no,text,w,rule:v('rule')});
+  }
+  const sh0=sheetOf(e,y),next={sec:(fd(form).sec||'').trim(),rows},sig=k=>JSON.stringify([k.sec||'',k.rows.map(r=>[r.id,r.no||'',r.text,r.w??null,r.rule||''])]);   /* so theo nội dung, không theo thứ tự khoá */
+  if(sh0&&sh0.kpi&&sig(sh0.kpi)===sig(next)){closeModal();return toast('Không có thay đổi.')}
+  if(transact(()=>{const sh=sheetOf(e,y,true);sh.kpi=next;sh.updatedAt=todayStr()}))done('Đã lưu danh mục chỉ tiêu KPI');
+};
+/* Sửa một dòng của danh mục ngay trên bảng Khung 2 (nút Sửa ở dòng mục I / nhóm / tiêu đề / chỉ tiêu) – Admin / Quản lý.
+   Giữ nguyên id của dòng nên các việc đã gắn vẫn gắn; thêm / xoá dòng vẫn ở nút "Chỉ tiêu KPI". data-id trống = tên mục I. */
+ACT['kc-row']=el=>{
+  if(!can('manage'))return toast('Chỉ quản lý được sửa danh mục chỉ tiêu KPI.','error');
+  const {e,y,id}=el.dataset,k=kpiOf(e,y);if(!k)return toast('Chưa có danh mục chỉ tiêu KPI.','warn');
+  const own=!!(sheetOf(e,y)&&sheetOf(e,y).kpi),tmp=own?'':`Đang dùng tạm danh mục năm ${+y-1}; Lưu sẽ tạo danh mục riêng cho năm ${esc(y)} (năm ${+y-1} giữ nguyên). `;
+  const form=(body,note)=>`<form id="mf" data-submit="kc-row-save" data-e="${esc(e)}" data-y="${esc(y)}" data-id="${esc(id||'')}" novalidate><div class="fg">${body}<p class="note full" style="padding:0">${note}</p></div></form>`,ft={footer:cancelBtn+'<button class="btn primary" form="mf">Lưu</button>'};
+  if(!id)return modal(`Sửa mục I · ${empName(e)} · ${y}`,form(inp('sec','Tên mục I',k.sec||'',{full:1}),tmp+'Tên mục I hiện ở dòng đầu của Khung 2.'),ft);
+  const r=k.rows.find(x=>x.id===id);if(!r)return toast('Dòng này không còn trong danh mục.','error');
+  const u=kpiUse(e,y,x=>x===id);
+  modal(`Sửa ${r.no?'nhóm '+r.no:r.w==null?'dòng tiêu đề':'chỉ tiêu'} · ${empName(e)} · ${y}`,form(
+    `${inp('no','Nhóm số <small class="muted">(để trống = thuộc nhóm phía trên)</small>',r.no||'')}${inp('w','Trọng số chỉ tiêu (%) <small class="muted">(để trống = dòng tiêu đề)</small>',r.w!=null&&Number.isFinite(+r.w)?+r.w:'',{type:'number',step:'any',attrs:'min="0" max="100" inputmode="decimal"'})}
+    ${txa('text','Chỉ tiêu <i style="color:var(--bad);font-style:normal">*</i>',r.text||'',{full:1,rows:3})}${txa('rule','Quy ước đánh giá',r.rule||'',{full:1,rows:3})}`,
+    `${tmp}${u.n?`Đang gắn ${u.n} việc (${esc(u.by)}); sửa nội dung không làm mất các việc đã gắn. `:''}Điểm của việc không đổi. Thêm / xoá dòng: nút <b>Chỉ tiêu KPI</b> ở đầu Khung 2.`),ft);
+};
+document.addEventListener('input',ev=>{const f=ev.target.closest&&ev.target.closest('form[data-submit="kc-row-save"]');if(f){ev.target.classList.remove('bad');ev.target.removeAttribute('aria-invalid')}});
+SUB['kc-row-save']=form=>{
+  if(!can('manage'))return toast('Chỉ quản lý được sửa danh mục chỉ tiêu KPI.','error');
+  const {e,y,id}=form.dataset,k=kpiOf(e,y),f=fd(form);if(!k)return closeModal();
+  const bad=(n,msg)=>{const el=form.querySelector(`[name=${n}]`);el.classList.add('bad');el.setAttribute('aria-invalid','true');el.focus();toast(msg,'error')};   /* báo lỗi ngay tại ô sai */
+  let next,same;
+  if(!id){next={sec:String(f.sec||'').trim()};same=(k.sec||'')===next.sec}
+  else{const r=k.rows.find(x=>x.id===id);if(!r)return toast('Dòng này không còn trong danh mục.','error');
+    const text=String(f.text||'').trim(),ws=String(f.w??'').trim(),w=ws===''?null:Number(ws.replace(',','.')),wEl=form.querySelector('[name=w]');
+    if(wEl&&wEl.validity&&wEl.validity.badInput)return bad('w','Trọng số chỉ tiêu phải là số, ví dụ 40 hoặc 12.5.');   /* novalidate: ô số gõ sai trả về '' – không coi là để trống */
+    if(!text)return bad('text','Cần có nội dung Chỉ tiêu.');
+    if(w!=null&&!(w>=0&&w<=100))return bad('w','Trọng số chỉ tiêu phải từ 0 đến 100.');
+    next={no:String(f.no||'').trim().replace(/\.$/,''),text,w,rule:String(f.rule||'').trim()};
+    same=['no','text','rule'].every(p=>(r[p]||'')===next[p])&&(r.w??null)===next.w;
+    if(!same&&r.w!=null&&w==null){const u=kpiUse(e,y,x=>x===id);if(u.n&&!confirm(`Để trống trọng số thì dòng này thành dòng tiêu đề và ${u.n} việc đang gắn (${u.by}) về “Chưa phân loại”. Tiếp tục?`))return}}
+  const back=()=>{const b=[...document.querySelectorAll('[data-act="kc-row"]')].find(x=>x.dataset.id===(id||''));if(b)b.focus()};   /* con trỏ về lại nút Sửa của dòng */
+  if(same){closeModal();back();return toast('Không có thay đổi.')}
+  if(transact(()=>{const sh=sheetOf(e,y,true);if(!sh.kpi)sh.kpi=JSON.parse(JSON.stringify(k));   /* năm đang dùng tạm danh mục năm trước: chép sang năm này */
+    if(id)Object.assign(sh.kpi.rows.find(x=>x.id===id),next);else sh.kpi.sec=next.sec;sh.updatedAt=todayStr()})){
+    done('Đã lưu chỉ tiêu KPI');back()}
+};
+/* Gắn chỉ tiêu KPI ngay trên bảng cho việc ở "Chưa phân loại": chọn trong ô rồi bấm Gắn. Đổi lựa chọn chưa lưu, vì Chrome / Edge trên Windows
+   phát change ngay khi bấm phím mũi tên. Chỉ ghi task.kpi (không đổi điểm, không đụng trạng thái duyệt) nên nhân viên gắn được cả việc đã Duyệt;
+   việc đã Duyệt mà đã có chỉ tiêu thì chỉ quản lý đổi (trong hộp Sửa việc). */
+document.addEventListener('change',ev=>{const el=ev.target.closest&&ev.target.closest('select[data-kpi]');if(!el)return;const b=el.parentElement.querySelector('[data-act="kpi-set"]');if(b)b.disabled=!el.value});
+ACT['kpi-set']=el=>{
+  const s=el.parentElement.querySelector('select[data-kpi]'),v=s&&s.value;if(!v)return toast('Chọn chỉ tiêu KPI trước.','warn');
+  const {e,y,mm,id}=el.dataset;if(!canSheet(e))return toast('Bạn không có quyền.','error');
+  if(transact(()=>{const sh=sheetOf(e,y),t=sh&&by(sh.months[mm].tasks,id),k=kpiOf(e,y);
+    if(!t||byMgr(t))throw new Error('Việc này không còn tồn tại.');
+    if(!kpiHas(k,v))throw new Error('Chỉ tiêu này không còn trong danh mục.');
+    if(kpiHas(k,t.kpi)&&!canTask(e,t))throw new Error('Việc đã được Duyệt và đã có chỉ tiêu KPI; nhờ quản lý đổi nếu cần.');
+    t.kpi=v;sh.updatedAt=todayStr()})){ui.kjust=id;refreshTbl();toast('Đã gắn chỉ tiêu KPI');kpiJust()}else refreshTbl();
+};
+/* việc vừa gắn chỉ tiêu chuyển lên dòng chỉ tiêu của nó: cuộn tới, giữ con trỏ bàn phím ở dòng đó, hiện dấu "vừa chuyển" một lần */
+function kpiJust(){const tr=$('tr.kj');ui.kjust='';if(!tr)return;const rm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  tr.scrollIntoView({block:'center',behavior:rm?'auto':'smooth'});const b=tr.querySelector('td.act button');if(b)b.focus({preventScroll:true});else{tr.tabIndex=-1;tr.focus({preventScroll:true})}}
 /* bấm ô "Việc chưa hoàn thành" / "Chờ quản lý duyệt": mở danh sách các việc đó trong năm và tô sáng trên bảng */
 ACT.focus=el=>{const f=F(),v=el.dataset.v;f.focus=f.focus===v?'':v;refreshTbl();if(f.focus)setTimeout(()=>{const c=$('#focus-card');if(c){c.scrollIntoView({behavior:'smooth',block:'start'});c.focus({preventScroll:true})}},60)};
 function focusCard(e,y,ys){
@@ -240,6 +354,8 @@ function taskForm(empId,y,mm,id,opt={}){
   if(!assign&&!canTask(empId,id?t:null))return toast(canSheet(empId)?'Việc đã được quản lý Duyệt, chỉ quản lý sửa được.':'Bạn không có quyền sửa việc này.','error');
   const g=grpOfT(t),glock=!mg&&!!(g&&g.locked),lock=!mg&&byMgr(t)||glock,c=mcOf(t),tg=tagsOf(t);
   const dlock=lock||(!mg&&!!id&&!!t.deadline);
+  /* Khung 2: việc By User chọn chỉ tiêu KPI theo danh mục; bắt buộc với việc mới và khi nhân viên lưu (quản lý sửa việc cũ thì không bắt buộc) */
+  const kc=!assign&&!byMgr(t)&&isV2(`${y}-${mm}`)&&empId?kpiOf(empId,y):null,kreq=kpiRows(kc).length>0&&(!mg||!id);
   const bmV2=(assign||byMgr(t))&&isV2(`${y}-${mm}`);   /* quy chế 80/20: việc quản lý giao tính điểm cố định, không cần trọng số */   /* deadline đã nhập thì nhân viên không đổi được nữa; cần dời thì nhờ quản lý */   /* việc By Manager / nhóm đã được duyệt: nhân viên không đổi nội dung, deadline */
   /* người làm chung: thành viên hiện có, người đang được mời, và danh sách để chọn thêm */
   const inGrp=g?[...g.members,...(g.invited||[])]:[],opts=assign?[]:dirEmps().filter(x=>x.id!==empId&&!inGrp.includes(x.id));
@@ -255,6 +371,7 @@ function taskForm(empId,y,mm,id,opt={}){
     ${glock?'<p class="hint full">Việc làm chung này đã được quản lý Duyệt cho một người trong nhóm nên nội dung, deadline và Ngày hoàn thành không đổi được nữa.</p>':''}
     ${mg?`<div class="f full"><span>Tag ${assign?'cho việc giao':''} <small class="muted">(nhân viên sẽ thấy trên việc của mình)</small></span><div class="tgs" role="group" aria-label="Tag">${Object.entries(TAGS).map(([k,l])=>`<label class="tgck ${k}"><input type="checkbox" name="tag_${k}" ${tg.includes(k)?'checked':''}> ${l}</label>`).join('')}</div></div>`:''}
     <label class="f full"><span>Nội dung công việc / Đóng góp <i style="color:var(--bad);font-style:normal">*</i></span><textarea class="in" name="title" rows="3" ${lock?'readonly':''}>${esc(t.title)}</textarea></label>
+    ${kpiRows(kc).length?`<label class="f full"><span>Chỉ tiêu KPI (Khung 2)${kreq?' <i style="color:var(--bad);font-style:normal">*</i>':''} <small class="muted">(theo mục I của file Excel)</small></span>${kpiSel(kc,t.kpi,kreq?'required':'')}<small class="muted" id="kt-rule"></small></label>`:''}
     ${bmV2?`<div class="f"><span>Điểm</span><div class="hint">Việc quản lý giao: ${kpi2().mgrMax} điểm chia đều cho số việc giao trong tháng (Khung 1), cộng khi được Duyệt; không dùng trọng số, không trừ khi trễ.</div><input type="hidden" name="weight" value="${esc(wOk(+t.weight)?t.weight:(t.weight||1))}"></div>`:inp('weight',`Trọng số – nhân viên tự chấm (${W_MIN}–${W_MAX})`,t.weight,{type:'number',step:legacy?'any':'1',req:1,attrs:legacy?'':`min="${W_MIN}" max="${W_MAX}" inputmode="numeric"`})}${mg?sel('approval','Quản lý duyệt',[['','Chờ duyệt'],[AP_VAL.ok,'Duyệt – tính điểm vào KPI'],[AP_VAL.recheck,'Re-check – không tính điểm']],AP_VAL[ap]):`<div class="f"><span>Quản lý duyệt</span><div>${apBd(ap)}</div></div>`}
     ${legacy?`<p class="hint full">Trọng số đang lưu là ${esc(t.weight)}, nằm ngoài thang ${W_MIN}–${W_MAX}. Có thể giữ nguyên; nếu sửa, hãy nhập số nguyên từ ${W_MIN} đến ${W_MAX}.</p>`:''}
     ${inp('deadline',dlock?'Deadline <small class="muted">🔒 đã khoá, cần dời thì nhờ quản lý</small>':`Deadline${!mg?' <small class="muted">(lưu xong sẽ khoá, không sửa được)</small>':''}`,t.deadline||'',{type:'date',attrs:dlock?'readonly aria-readonly="true"':''})}${inp('submitted',g?'Ngày hoàn thành <small class="muted">(áp dụng cho cả nhóm)</small>':'Ngày hoàn thành',t.submitted||'',{type:'date',attrs:glock?'readonly':''})}
@@ -277,11 +394,12 @@ document.addEventListener('input',e=>{
 });
 ACT['mate-x']=el=>{const h=$('#mf input[name=mates]');if(!h)return;h.value=h.value.split(',').filter(x=>x&&x!==el.dataset.id).join(',');mateSync()};
 function ktRead(form){const d=fd(form),w=String(d.weight??'').trim().replace(',','.');return{title:(d.title||'').trim(),weight:w===''?NaN:Number(w),deadline:d.deadline||null,submitted:d.submitted||null,approval:d.approval||'',note:(d.note||'').trim(),
-  mc:(d.mc||'').trim(),tags:Object.keys(TAGS).filter(k=>d['tag_'+k]),emps:Object.keys(d).filter(k=>k.startsWith('emp_')).map(k=>d[k]),ym:d.ym,mates:(d.mates||'').split(',').filter(Boolean)}}
+  mc:(d.mc||'').trim(),tags:Object.keys(TAGS).filter(k=>d['tag_'+k]),emps:Object.keys(d).filter(k=>k.startsWith('emp_')).map(k=>d[k]),ym:d.ym,mates:(d.mates||'').split(',').filter(Boolean),kpi:d.kpi||''}}
 function ktPreview(){const form=$('form[data-submit="kt-save"]'),el=$('#kt-prev');if(!form||!el)return;const d=ktRead(form),sc=scoreTask(d),mg=can('manage');
   el.innerHTML=sc.comp==null?esc(sc.state==='overdue'?`Chưa hoàn thành · quá hạn ${sc.overdue} ngày`:'Nhập đủ Deadline và Ngày hoàn thành để tính điểm.')
     :`<span>Điểm cơ bản <b>${fmtK(sc.base)}</b></span><span>Điểm thưởng (tự động) <b>${fmtK(sc.bonus)}</b></span><span>Điểm thành phần <b>${fmtK2(sc.comp)}</b></span><small>${sc.late>0?'Trễ '+sc.late+' ngày':sc.late<0?'Sớm '+(-sc.late)+' ngày làm việc':'Đúng hạn'+(d.submitted<d.deadline&&offDay(d.deadline)?` (deadline ${fmtDM(d.deadline,d.deadline.slice(0,4))} là ${offDay(d.deadline)}, ngày nghỉ: chỉ tính sớm theo ngày làm việc nên chưa có điểm thưởng)`:'')} · (${fmtK(sc.base)} × ${fmtK(sc.w)} + ${fmtK(sc.bonus)}) / 100${mg?' · '+CP_TIP[sc.ap]:''}</small>`;
-  const b=$('#kt-mv');if(b){b.disabled=!!d.submitted;b.title=d.submitted?'Việc đã có Ngày hoàn thành nên không chuyển tháng':'Lưu việc rồi chuyển sang tháng sau'}}
+  const b=$('#kt-mv');if(b){b.disabled=!!d.submitted;b.title=d.submitted?'Việc đã có Ngày hoàn thành nên không chuyển tháng':'Lưu việc rồi chuyển sang tháng sau'}
+  const ks=form.querySelector('select[name=kpi]'),kr=$('#kt-rule');if(ks&&kr){const row=kpiRows(kpiOf(form.dataset.e,form.dataset.y)).find(x=>x.id===ks.value);kr.textContent=row&&row.rule?'Quy ước đánh giá trong file Excel (để tham khảo, không đổi cách tính điểm của việc): '+row.rule:''}}
 document.addEventListener('input',e=>{if(e.target.closest&&e.target.closest('form[data-submit="kt-save"]'))ktPreview()});
 document.addEventListener('change',e=>{if(e.target.closest&&e.target.closest('form[data-submit="kt-save"]'))ktPreview()});
 /* xem Ghi chú / Link bằng chứng của một việc (cột chỉ hiện icon 📄) */
@@ -309,11 +427,15 @@ function ktSave(form){
   if(!mg&&cur&&cur.deadline)d.deadline=cur.deadline;   /* deadline đã khoá với nhân viên */
   if(!mg&&g0&&g0.locked){d.title=g0.title||cur.title;d.submitted=g0.submitted||null;if(!cur.carriedFrom)d.deadline=g0.deadline||null}
   if(!d.title)return fail('Nhập nội dung công việc.');
+  /* Khung 2: chỉ tiêu KPI bắt buộc với việc mới và khi nhân viên lưu; để trống thì giữ nguyên chỉ tiêu đang gắn (không xoá id cũ) */
+  const kc=!assign&&!byMgr(cur)&&isV2(`${y}-${mm}`)?kpiOf(e,y):null;
+  if(!kpiHas(kc,d.kpi))d.kpi='';
+  if(kpiRows(kc).length&&!d.kpi&&(!mg||!id))return fail('Chọn chỉ tiêu KPI cho việc này (ô Chỉ tiêu KPI).');
   if(!(cur&&d.weight===+cur.weight)&&!wOk(d.weight))return fail(`Trọng số là số nguyên từ ${W_MIN} đến ${W_MAX}.`);
   if(mg&&apOf(d)==='ok'&&!(d.deadline&&d.submitted))return fail('Việc chưa có Deadline và Ngày hoàn thành nên chưa có điểm để Duyệt.');
   let tid=id,added=0,addedIds=[],gRef=null;const prevAp=cur?apOf(cur):'',prevMc=mcOf(cur)?mcOf(cur).text:'';
   const ok=transact(()=>{
-    const fill=t=>{Object.assign(t,{title:d.title,weight:d.weight,deadline:d.deadline,submitted:d.submitted,note:d.note});delete t.bonusManual;
+    const fill=t=>{Object.assign(t,{title:d.title,weight:d.weight,deadline:d.deadline,submitted:d.submitted,note:d.note});delete t.bonusManual;if(d.kpi)t.kpi=d.kpi;
       if(mg){
         t.approval=d.approval;if(d.tags.length)t.tags=d.tags;else delete t.tags;
         /* Comment by Manager: quản lý ghi bất cứ lúc nào; sửa nội dung = comment mới; xoá trống = bỏ comment */
