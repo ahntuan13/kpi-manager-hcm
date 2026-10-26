@@ -16,7 +16,7 @@ Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `a
 ## Chức năng chính
 - **Dashboard**: KPI trung bình, KPI tháng gần nhất, tỷ lệ hoàn thành đúng hạn, xếp loại; biểu đồ KPI theo tháng; bảng việc quá hạn, việc chờ chuyển tháng, việc **chờ quản lý duyệt** và việc **Re-check**; ma trận nhân viên × 12 tháng.
 - **Xếp hạng nhân viên** theo **tháng / quý / năm**: biểu đồ cột xếp từ cao xuống thấp, biểu đồ thứ hạng qua các tháng hoặc các quý, cột “so với kỳ trước” (▲ ▼).
-- **Nhân viên**: danh sách, lọc theo nhóm / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–130, vạch xếp loại 80 / 100 / 120, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI: Trọng số · Deadline · Ngày hoàn thành · Điểm cơ bản · Điểm thưởng (tự động) · Điểm thành phần · Quản lý duyệt · Ghi chú.
+- **Nhân viên**: danh sách, lọc theo nhóm / năm; trang riêng từng người có **biểu đồ Tháng / Quý / Năm** (trục 0–120, vạch xếp loại 75 / 86 / 100, tooltip, nhãn giá trị) và **bảng việc từng tháng** đúng các cột của file Excel KPI: Trọng số · Deadline · Ngày hoàn thành · Điểm cơ bản · Điểm thưởng (tự động) · Điểm thành phần · Quản lý duyệt · Ghi chú.
 - **Deadline** do nhân viên nhập khi thêm việc; lưu xong là khoá với nhân viên (chỉ Admin / Quản lý sửa được).
 - **Trọng số** do nhân viên tự chấm cho từng việc theo thang **1–10** (số nguyên).
 - **Quản lý duyệt** ngay trên bảng: **Duyệt** → điểm thành phần được tính vào KPI; **Re-check** → không tính điểm, dòng việc báo đỏ (nhân viên sửa lại thì việc quay về Chờ duyệt); **Chờ duyệt** → chưa tính. Có nút duyệt hàng loạt theo tháng, theo năm của một nhân viên, hoặc tất cả ở Tổng quan.
@@ -33,25 +33,22 @@ Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `a
 - **Giao diện “sổ tay”** (nút 🎨 trên thanh trên cùng, mỗi người tự chọn, lưu theo trình duyệt): **Sổ kẻ ô** (mặc định: bìa xanh than có lỗ gáy, giấy kẻ ô, đường lề đỏ ở bảng việc), **Bullet journal** (lưới chấm, xanh lá xô thơm, menu sáng), **Sổ kế hoạch** (giấy dòng kẻ ngang, thẻ chỉ mục màu nghệ, tiêu đề viết tay) và **Cổ điển** (giao diện cũ). Biểu đồ đổi màu theo giao diện.
 - **Settings** (chỉ Admin): nhóm, ngày nghỉ lễ, người dùng / phân quyền, sao lưu / khôi phục JSON, sao lưu đám mây. Mục **Quy chế KPI** ai cũng xem được.
 
-## Quy chế 80 / 20 (từ T10/2026, đổi được ở Settings → Nhóm & ngày lễ)
-KPI tháng = **Khung 1 · Quản lý giao & Tuân thủ (20)** + **Khung 2 · Công việc By User (80)**, khống chế 0–130. Trang nhân viên hiện 3 khung: Khung 1, Khung 2 và Khung 3 (KPI tháng = Khung 1 + Khung 2).
+## Quy chế KPI theo file Excel "Individual KPIs" (từ T10/2026, đổi tham số ở Settings → Nhóm & ngày lễ)
 
-| Phần | Tối đa | Cách tính |
-|---|---|---|
-| Việc quản lý giao (Khung 1) | 10 | 10 điểm chia đều cho số việc By Manager trong tháng (10 việc → 1 điểm/việc, 5 việc → 2, 8 việc → 1,25); việc được Duyệt mới cộng, không trừ khi trễ; không dùng trọng số |
-| Tuân thủ (Khung 1) | 10 | 10 điểm, trừ 1 mỗi lần đi trễ (giờ vào sau 08:05) và 1 mỗi lỗi NC khi Audit; quản lý nhập ngày đi trễ và lỗi NC |
-| Công việc By User (Khung 2) | 80 | Tổng điểm thành phần các việc nhân viên tự thêm đã Duyệt; tổng trọng số chuẩn 80 |
+KPI tháng = **Khung 1 · Quản lý giao & Tuân thủ (20)** + **Khung 2 · KRI (~80)** + **Khung 3 · Điểm thưởng (20)**, khống chế 0–120.
 
-Các tháng trước tháng áp dụng giữ cách tính cũ (100% công việc, chuẩn trọng số 100).
+| Khung | Cách tính |
+|---|---|
+| Khung 1 · Thái độ công việc · Việc quản lý giao (10) | 10 điểm chia đều cho số việc By Manager trong tháng, cộng khi việc được Duyệt. Tháng không có việc giao: giữ đủ 10 |
+| Khung 1 · Tuân thủ (10) | Trừ 1 mỗi lần đi trễ (sau 08:05) và 1 mỗi lỗi NC (TVE Safety, Audit định kỳ, ISO / OHSAS); thấp nhất 0 |
+| Khung 2 · KRI | Danh mục chỉ tiêu riêng của từng người (mục I trong sheet `Individual KPIs – tên`). Mỗi dòng: **Điểm = % đạt × trọng số**. Dòng *Kết quả tháng*: quản lý nhập kết quả, % đạt theo **Quy ước tính** (công thức kiểu Excel, biến `x`, ví dụ `IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))`); để trống tính như Excel. Dòng *Công việc hằng ngày*: % đạt = điểm thành phần các việc đã Duyệt ÷ tổng trọng số các việc gắn vào dòng, tối đa 110% |
+| Khung 3 · Điểm thưởng | Hỗ trợ việc phát sinh ngoài việc thường ngày: 1 lần = 5, từ 2 lần = 10. Sáng kiến MOC được chấp nhận = 10 |
+| Xếp loại | A+ ≥100 · A ≥86 · B ≥75 · C ≥61 · D >41 · E. Quý = trung bình các tháng có điểm |
 
-### Chỉ tiêu KPI (Khung 2) – xếp việc theo nhóm giống file Excel
-- Mỗi nhân viên có **danh mục chỉ tiêu KPI** cho từng năm, giống mục **I · KPI Công ty và hoạt động của phòng** trong sheet `Individual KPIs – <tên>` của file Excel KPI cá nhân: nhóm 1, 2, 3… và các chỉ tiêu con có trọng số (ví dụ *Các phòng họp… 40%*).
-- **Nhập**: Admin / Quản lý bấm **Nhập danh mục chỉ tiêu KPI** (trang Tất cả nhân viên) hoặc **Chỉ tiêu KPI → Nhập từ file Excel** (Khung 2). App đọc mọi sheet `Individual KPIs…` và ghép nhân viên theo **Mã NV (ô F4)**. Nhập lại thì danh mục theo đúng file; bảng xem trước báo chỉ tiêu bị bỏ và số việc sẽ về “Chưa phân loại”. Chỉ tiêu cùng nội dung luôn có cùng id, nên nhập lại cùng file thì việc tự gắn lại.
-- **Sửa**: mỗi dòng mục I / nhóm / chỉ tiêu trên bảng Khung 2 có nút **Sửa** (quản lý) để sửa ngay dòng đó (giữ nguyên các việc đã gắn). Nút **Chỉ tiêu KPI** ở Khung 2 mở bảng sửa cả danh mục (Nhóm số · Chỉ tiêu · Trọng số chỉ tiêu % · Quy ước đánh giá; **＋** thêm dòng ngay dưới, cùng nhóm). Năm chưa có danh mục thì dùng tạm danh mục năm trước.
-- **Gắn việc**: khi Thêm / Sửa việc By User, chọn **Chỉ tiêu KPI** (bắt buộc với việc mới và khi nhân viên lưu). Việc chưa gắn nằm ở **Chưa phân loại**; chọn chỉ tiêu ngay trên bảng rồi bấm **Gắn** (làm được cả với việc đã Duyệt vì không đổi điểm).
-- **Điểm không đổi**: chỉ tiêu KPI chỉ để xếp việc theo nhóm. Dòng chỉ tiêu hiện tổng trọng số các việc so với trọng số chỉ tiêu năm trong Excel (để đối chiếu) và điểm thành phần các việc đã Duyệt; dòng **I** so tổng trọng số với chuẩn Khung 2.
-- Lưu ở trường `kpi` của bảng KPI (`sheets/{nhân viên}_{năm}`) và trường `kpi` của từng việc; không đổi Firestore Rules. Giống ô Quản lý duyệt, việc chỉ quản lý được sửa danh mục được khoá ở giao diện.
-- Kiểm tra tự động: `node --test tests/kpi.test.js` (Node 22).
+- **Nhập từ Excel** (Admin / Quản lý, nút *Nhập KPI Individual (Excel)* ở trang Tất cả nhân viên): đọc mọi sheet `Individual KPIs…`, ghép nhân viên theo Mã NV / họ tên / tên trên sheet (chọn lại được). Mỗi người chọn: cập nhật **danh mục KRI** (kèm quy ước tính lấy từ công thức cột % của Excel), lấy **điểm tháng** (Tổng điểm đánh giá các tháng chọn → *điểm chốt*), và có **xoá việc trên app** của các tháng đó không. Chế độ Firebase tự sao lưu trước khi ghi.
+- Tháng có **điểm chốt** dùng đúng điểm Excel; bỏ được bằng nút *Bỏ điểm chốt*.
+- Bộ tính công thức (`js/03-kri.js`) được kiểm tra khớp 100% các ô % của file Excel mẫu.
+- Kiểm tra tự động: `node --test tests/kpi.test.js`.
 
 ## Quản lý PPE
 
@@ -63,7 +60,7 @@ Menu **🦺 Quản lý PPE** (Admin + Quản lý), theo mẫu sổ theo dõi c�
 - **Đến hạn thay**: danh sách cần cấp lại, bấm **Cấp thay**.
 - Hạn thay = ngày cấp + thời hạn sử dụng của loại PPE. Dữ liệu lưu ở collection `ppe` (Firestore Rules v6).
 
-## Công thức KPI (giữ theo file Excel)
+## Điểm của từng việc (công việc hằng ngày)
 | Mục | Quy tắc |
 |---|---|
 | Trọng số | Nhân viên tự chấm, số nguyên 1–10. Tổng trọng số chuẩn của một tháng là 100 |
@@ -72,9 +69,9 @@ Menu **🦺 Quản lý PPE** (Admin + Quản lý), theo mẫu sổ theo dõi c�
 | Điểm thưởng (H, tự động) | `=IF(F<0, MIN(30, ABS(F)*3), 0)`. Không nhập tay |
 | Điểm thành phần (I) | `=(G × Trọng số + H) / 100`. Đây là điểm KPI của từng việc |
 | Quản lý duyệt | Duyệt: tính điểm. Re-check: không tính điểm, báo đỏ. Chờ duyệt: chưa tính |
-| KPI tháng | Tổng điểm thành phần của các việc **đã Duyệt**, khống chế 0–130 |
+| KPI tháng (các tháng cũ không có điểm chốt) | Tổng điểm thành phần của các việc **đã Duyệt**, khống chế 0–120 |
 | KPI quý / năm | Trung bình các tháng **đã có điểm và đã kết thúc**. Tháng chưa có điểm không tính là 0; tháng đang diễn ra chỉ là điểm tạm tính |
-| Xếp loại | Xuất sắc ≥ 120 · Tốt 100–119 · Đạt 80–99 · Cần cải thiện < 80 |
+| Xếp loại | A+ ≥100 · A ≥86 · B ≥75 · C ≥61 · D >41 · E |
 
 Ba điểm khác file Excel gốc (cố ý):
 1. Sheet `Summary` của Excel lấy trung bình cả 12 tháng, tháng chưa có điểm tính là 0. App chỉ tính tháng đã có điểm.
@@ -90,6 +87,7 @@ firestore.rules            Rules bảo mật dán vào Firebase Console
 js/
   01-core-utils.js         Tiện ích chung (định dạng số, ngày, tìm kiếm không dấu)
   02-data-model.js         Mô hình dữ liệu, CÔNG THỨC KPI, chuyển việc sang tháng sau; tải/lưu
+  03-kri.js                Bộ tính Quy ước KRI (công thức kiểu Excel, biến x)
   10-ui-core.js            Menu, toast, modal, form, bảng, biểu đồ, xuất Excel / PDF / in
   11-router-auth.js        Thanh menu trái, điều hướng, đăng nhập
   20-dashboard.js          Dashboard: Tổng quan, KPI theo tháng, Xếp hạng (tháng / quý / năm)

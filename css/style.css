@@ -885,3 +885,19 @@ table.t tr.kj td.ttl{box-shadow:inset 3px 0 0 var(--ok)}
   .mcard table.t tr.kt td.ttl,.mcard table.t tr.kh-line td.ttl,.mcard table.t tr.kh-hdr td.ttl{padding-left:0}
   .mcard table.t tr.kh[class*=" kd"]{background:var(--kb);box-shadow:inset 4px 0 0 var(--ks);padding-left:10px}
 }
+
+/* ---------- Khung 2 · KRI (bảng chỉ tiêu theo file Excel) · Khung 3 · Điểm thưởng ---------- */
+.kf3{border-top:3px solid #1e8a6e}
+.kf3 .kfh h4{color:#1e8a6e}
+table.t.kri td{vertical-align:middle}
+table.t.kri tr.kh td{background:var(--th);font-weight:600}
+table.t.kri tr.kline.ktask td{background:var(--acc-s,#e6edf9)}
+table.t.kri td.kres-c{min-width:150px}
+table.t.kri input.kres{width:120px;padding:4px 8px;text-align:right}
+table.t.kri small{display:block;color:var(--muted)}
+.pf.kri-src{margin-left:6px;background:var(--acc-s,#e6edf9);color:var(--acc,#2f57a6)}
+.kri-t{font-weight:600}
+@media (max-width:700px){table.t.kri input.kres{width:100%}}
+.kri-l{display:inline-block;font-size:12.5px;padding:1px 7px;border-radius:7px;background:var(--mute-s);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.kri-l.on{background:var(--acc-s,#e6edf9);color:var(--acc,#2f57a6)}
+table.t td.kric small{display:block}

@@ -11,16 +11,17 @@ const DEFAULT_DEPTS=['AD','HR'];
 const DEFAULT_HOLIDAYS='2024-01-01,2024-02-10,2024-02-11,2024-02-12,2024-02-13,2024-02-14,2024-04-30,2024-05-01,2024-05-07,2024-06-01,2024-09-02,2024-09-17,2025-01-01,2025-01-29,2025-01-30,2025-01-31,2025-02-01,2025-02-02,2025-04-30,2025-05-01,2025-06-01,2025-09-02,2025-10-06,2026-01-01,2026-02-14,2026-02-16,2026-02-17,2026-02-18,2026-02-19,2026-02-20,2026-02-21,2026-04-25,2026-04-27,2026-04-30,2026-05-01,2026-06-01,2026-09-01,2026-09-02,2026-09-24,2027-01-01,2027-02-06,2027-02-07,2027-02-08,2027-02-09,2027-02-10,2027-04-30,2027-05-01,2027-06-01,2027-09-02,2027-09-14,2028-01-01,2028-01-25,2028-01-26,2028-01-27,2028-01-28,2028-01-29,2028-04-30,2028-05-01,2028-06-01,2028-09-02,2028-10-02,2029-01-01,2029-02-13,2029-02-14,2029-02-15,2029-02-16,2029-02-17,2029-04-30,2029-05-01,2029-06-01,2029-09-02,2029-09-22,2030-01-01,2030-02-02,2030-02-03,2030-02-04,2030-02-05,2030-02-06,2030-04-30,2030-05-01,2030-06-01,2030-09-02,2030-09-11'.split(',');
 const MM=['01','02','03','04','05','06','07','08','09','10','11','12'];
 const QN=['Quý I','Quý II','Quý III','Quý IV'], QR=['T01–T03','T04–T06','T07–T09','T10–T12'];
-/* Quy chế KPI (theo file Excel): trễ 1 ngày −3 điểm, sớm 1 ngày làm việc +3 điểm thưởng (tối đa 30), KPI tháng khống chế 0–130.
+/* Quy chế KPI (theo file Excel): trễ 1 ngày −3 điểm, sớm 1 ngày làm việc +3 điểm thưởng (tối đa 30), KPI tháng khống chế 0–120.
    Trọng số do nhân viên tự chấm theo thang 1–10. */
-const KPI_CAP=130, LATE_PENALTY=3, BONUS_PER_DAY=3, BONUS_CAP=30, W_MIN=1, W_MAX=10;
+const KPI_CAP=120, LATE_PENALTY=3, BONUS_PER_DAY=3, BONUS_CAP=30, W_MIN=1, W_MAX=10;
 /* Quản lý duyệt: 'ok' = Duyệt → điểm thành phần được tính vào KPI · 'recheck' = Re-check → không tính điểm, báo đỏ · '' = chờ duyệt → chưa tính.
    Dữ liệu cũ / file Excel ghi "Đạt", "Reject" vẫn được hiểu đúng. */
 const apOf=t=>{const a=String((t&&t.approval)||'').normalize('NFC').trim();return /^(duyệt|đạt|approved?)/i.test(a)?'ok':/^(re-?check|reject)/i.test(a)?'recheck':''};
 const AP={'':['mute','Chờ duyệt'],ok:['ok','Duyệt'],recheck:['bad','Re-check']};
 const AP_VAL={'':'',ok:'Duyệt',recheck:'Re-check'};
 /* Xếp loại: [ngưỡng, màu badge, nhãn] */
-const GRADES=[[120,'ok','Xuất sắc'],[100,'info','Tốt'],[80,'mute','Đạt'],[-1e9,'bad','Cần cải thiện']];
+/* Xếp loại giống file Excel KPI cá nhân: A+ ≥100 · A ≥86 · B ≥75 · C ≥61 · D >41 · E */
+const GRADES=[[100,'ok','A+'],[86,'info','A'],[75,'mute','B'],[61,'warn','C'],[41.0000001,'bad','D'],[-1e9,'bad','E']];
 const EMP_COLORS=['#2f7de1','#0e9f8b','#ec6a5e','#6c5ce7','#e29a2d','#d6447a','#22b8c9','#64748b'];
 
 function defaultDB(){return{
@@ -57,7 +58,7 @@ const nextCode=(k,len=3)=>{db.seq[k]=(db.seq[k]||0)+1;return `${k}-${String(db.s
    - Điểm cơ bản (G) = 100 − 3 × ngày trễ (không âm).
    - Điểm thưởng (H, tự động) = IF(F<0, MIN(30, ABS(F)*3), 0). Không còn điểm thưởng nhập tay.
    - Điểm thành phần (I) = (G × Trọng số + H) / 100. Đây là điểm KPI của việc; chỉ được tính khi quản lý chọn Duyệt.
-   - KPI tháng = tổng điểm thành phần của các việc đã Duyệt, khống chế 0–130.
+   - KPI tháng = tổng điểm thành phần của các việc đã Duyệt, khống chế 0–120.
    ===================================================================== */
 const dayNum=iso=>{const [y,m,d]=iso.split('-').map(Number);return Math.round(Date.UTC(y,m-1,d)/864e5)};
 const isoOf=n=>new Date(n*864e5).toISOString().slice(0,10);
@@ -97,23 +98,28 @@ const tagsOf=t=>((t&&t.tags)||[]).filter(k=>TAGS[k]);
 const mcOf=t=>t&&t.mgrComment&&String(t.mgrComment.text||'').trim()?t.mgrComment:null;
 /* =====================================================================
    QUY CHẾ 80 / 20 (áp dụng từ tháng kpi2().since; các tháng trước giữ cách tính cũ 100% công việc)
-   - Khung 2 · Công việc By User (chuẩn 80): tổng điểm thành phần các việc nhân viên tự thêm, đã Duyệt.
+   KPI tháng = Khung 1 (20) + Khung 2 · KRI (~80) + Khung 3 · Điểm thưởng (20), khống chế 0–120 (giống file Excel "Individual KPIs").
    - Khung 1 · Quản lý giao & Tuân thủ (20):
-       + Việc quản lý giao: mỗi việc By Manager được Duyệt = 2 điểm (không trừ khi trễ), tối đa 10.
-       + Tuân thủ: 10 điểm, trừ 1 mỗi lần đi trễ (giờ vào sau 08:05) và 1 mỗi lỗi NC khi Audit; thấp nhất 0.
-   - Khung 3 · KPI tháng = Khung 1 + Khung 2 (khống chế 0–130).
+       + Việc quản lý giao: 10 điểm chia đều cho số việc By Manager trong tháng, cộng khi việc được Duyệt.
+       + Tuân thủ: 10 điểm, trừ 1 mỗi lần đi trễ (giờ vào sau 08:05) và 1 mỗi lỗi NC (TVE Safety / Audit); thấp nhất 0.
+   - Khung 2 · KRI: danh mục chỉ tiêu riêng của từng nhân viên (sheet.kpi, nhập từ file Excel). Mỗi dòng: Điểm = % đạt × trọng số.
+       + Dòng "Kết quả tháng": % đạt = Quy ước tính (công thức kiểu Excel, 03-kri.js) áp lên Kết quả tháng (m.kri[id].r); để trống như Excel.
+       + Dòng "Công việc hằng ngày": % đạt = điểm thành phần các việc đã Duyệt / tổng trọng số các việc gắn vào dòng (tối đa taskCap %).
+       + Chưa có danh mục: Khung 2 = tổng điểm thành phần việc By User đã Duyệt (cách cũ).
+   - Khung 3 · Điểm thưởng (20): Hỗ trợ việc phát sinh (1 lần = 50%, từ 2 lần = 100% của gaMax) + Sáng kiến MOC được chấp nhận (mocMax).
+   - Tháng có điểm chốt (m.fixed, nhập từ file Excel) dùng đúng điểm đó.
    Tham số sửa được ở Settings → Nhóm & ngày lễ (db.company.kpi2).
    ===================================================================== */
-const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05'};
+const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110};
 const kpi2=()=>({...KPI2_DEF,...((db&&db.company&&db.company.kpi2)||{})});
 const isV2=ym=>!!ym&&ym>=kpi2().since;
-function monthStats(m,ym){
+function monthStats(m,ym,kc){
   const v2=isV2(ym),P=kpi2(),rows=((m&&m.tasks)||[]).map(t=>({t,sc:scoreTask(t)}));
   /* scored = việc đã hoàn thành (có deadline + ngày hoàn thành) · counted = đã Duyệt · pending = chờ duyệt · recheck = Re-check
      kpi = điểm chính thức (chỉ việc đã Duyệt) · self = điểm tự chấm (đã Duyệt + chờ duyệt, không gồm Re-check)
      Quy chế 80/20: raw / weight chỉ gồm việc By User; việc By Manager đếm ở bm*; lateList / ncList = tuân thủ */
   const st={rows,v2,n:0,weight:0,raw:0,rawSelf:0,bonus:0,scored:0,counted:0,pending:0,recheck:0,ontime:0,early:0,late:0,open:0,nodate:0,overdue:0,moved:0,kpi:null,self:null,
-    bmN:0,bmOk:0,bmPend:0,bmRe:0,bmPer:0,lateList:[],ncList:[],p80:null,p20:null,pMgr:null,pComp:null};
+    bmN:0,bmOk:0,bmPend:0,bmRe:0,bmPer:0,lateList:[],ncList:[],p80:null,p20:null,p3:null,pMgr:null,pComp:null,pGa:0,pMoc:0,gaList:[],mocList:[],kri:null,fixed:null};
   for(const {t,sc} of rows){
     if(sc.state==='moved'){st.moved++;continue}
     st.n++;st[sc.state]++;
@@ -126,16 +132,39 @@ function monthStats(m,ym){
   }
   st.weight=r2(st.weight);
   const cap=v=>Math.min(KPI_CAP,Math.max(0,v));
+  if(m&&m.fixed&&m.fixed.total!=null&&Number.isFinite(+m.fixed.total)){   /* điểm chốt từ file Excel: dùng đúng điểm đó */
+    st.fixed=m.fixed;st.v2=false;st.kpi=cap(+m.fixed.total);st.self=st.kpi;return st;
+  }
   if(v2){
     st.lateList=[...((m&&m.late)||[])].sort((a,b)=>a.d<b.d?-1:1);st.ncList=[...((m&&m.nc)||[])].sort((a,b)=>a.d<b.d?-1:1);
-    /* việc quản lý giao: ${mgrMax} điểm chia đều cho số việc giao trong tháng (10 việc → 1 điểm/việc, 5 việc → 2, 8 việc → 1,25) */
+    /* Khung 1 – việc quản lý giao: ${mgrMax} điểm chia đều cho số việc giao trong tháng (10 việc → 1 điểm/việc, 5 việc → 2, 8 việc → 1,25) */
     st.bmPer=st.bmN?P.mgrMax/st.bmN:0;
-    st.pMgr=r2(Math.min(P.mgrMax,st.bmPer*st.bmOk));
+    st.pMgr=st.bmN?r2(Math.min(P.mgrMax,st.bmPer*st.bmOk)):P.mgrMax;   /* tháng không có việc quản lý giao: giữ đủ điểm (giống ô Kết quả để trống trong Excel) */
     st.pComp=Math.max(0,P.compMax-P.latePen*st.lateList.length-P.ncPen*st.ncList.length);
-    st.p20=st.pMgr+st.pComp;st.p80=st.raw;
-    const mgrSelf=Math.min(P.mgrMax,st.bmPer*(st.bmOk+st.bmPend));
-    if(st.counted)st.kpi=cap(st.raw+st.p20);
-    if(st.counted+st.pending)st.self=cap(st.rawSelf+mgrSelf+st.pComp);
+    st.p20=st.pMgr+st.pComp;
+    const mgrSelf=st.bmN?Math.min(P.mgrMax,st.bmPer*(st.bmOk+st.bmPend)):P.mgrMax;
+    /* Khung 2 – KRI theo danh mục chỉ tiêu */
+    const lines=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[];let k2Self=st.rawSelf;
+    if(lines.length){
+      const ids=new Set(lines.map(r=>r.id)),tl=lines.filter(r=>r.src==='tasks'),only=tl.length===1?tl[0].id:null,res=(m&&m.kri)||{},capT=(+P.taskCap||110)/100;
+      let a=0,b=0;
+      st.kri=lines.map(r=>{
+        const w=+r.w,o={row:r,w,src:r.src==='tasks'?'tasks':'res',pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
+        if(o.src==='tasks'){   /* việc By User gắn vào dòng (việc chưa gắn chỉ tiêu nào thuộc về dòng "việc hằng ngày" duy nhất) */
+          const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
+          let num=0,numS=0;mine.forEach(x=>{o.n++;o.den+=x.sc.w;if(x.sc.comp!=null){o.done++;if(x.sc.ap==='ok'){o.ok++;num+=x.sc.comp}if(x.sc.ap!=='recheck')numS+=x.sc.comp}});
+          o.den=r2(o.den);if(o.den>0){o.pct=Math.min(capT,num/o.den);o.pSelf=Math.min(capT,numS/o.den)}
+        }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
+        o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
+        o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});
+      st.p80=r2(a);k2Self=b;
+    }else st.p80=r2(st.raw);
+    /* Khung 3 – điểm thưởng */
+    st.gaList=[...((m&&m.ga)||[])].sort((x,y)=>x.d<y.d?-1:1);st.mocList=[...((m&&m.moc)||[])].sort((x,y)=>x.d<y.d?-1:1);
+    st.pGa=st.gaList.length>=2?P.gaMax:st.gaList.length===1?P.gaMax/2:0;st.pMoc=st.mocList.length?P.mocMax:0;st.p3=st.pGa+st.pMoc;
+    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
+    if(live||st.counted)st.kpi=cap(st.p80+st.p20+st.p3);
+    if(live||st.counted+st.pending)st.self=cap(k2Self+mgrSelf+st.pComp+st.p3);
   }else{
     if(st.counted)st.kpi=cap(st.raw);
     if(st.counted+st.pending)st.self=cap(st.rawSelf);
@@ -151,7 +180,8 @@ const avgOf=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
 /* Trung bình chỉ tính các tháng đã có điểm (tháng chưa chấm không bị coi là 0).
    Tháng đang diễn ra (chưa kết thúc) chỉ là điểm TẠM TÍNH: giữ ở kpiProv, không tính vào quý / năm / xếp hạng. */
 function yearStats(sheet){
-  const months=MM.map(mm=>monthStats(sheet&&sheet.months&&sheet.months[mm],sheet&&sheet.year?`${sheet.year}-${mm}`:null));
+  const kc=sheet?(sheet.kpi||(sheet.empId&&typeof kpiOf==='function'?kpiOf(sheet.empId,sheet.year):null)):null;   /* danh mục chỉ tiêu KRI của năm (năm chưa có: dùng tạm năm trước) */
+  const months=MM.map(mm=>monthStats(sheet&&sheet.months&&sheet.months[mm],sheet&&sheet.year?`${sheet.year}-${mm}`:null,kc));
   if(sheet){const cy=+curYear(),ci=new Date().getMonth();months.forEach((m,i)=>{if(m.kpi!=null&&(+sheet.year>cy||(+sheet.year===cy&&i>=ci))){m.prov=true;m.kpiProv=m.kpi;m.kpi=null}})}
   const ev=months.map((m,i)=>m.kpi==null?null:i).filter(i=>i!=null),vals=ev.map(i=>months[i].kpi);
   const quarters=[0,1,2,3].map(q=>{const v=[0,1,2].map(k=>months[q*3+k].kpi).filter(x=>x!=null);return{avg:avgOf(v),n:v.length}});

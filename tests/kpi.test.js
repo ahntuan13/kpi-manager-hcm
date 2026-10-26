@@ -3,8 +3,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 /* nạp các file js/ của app vào một vm, giả lập phần trình duyệt mà các file này cần lúc nạp */
-const ctx=vm.createContext({FIREBASE_CONFIG:null,localStorage:{getItem:()=>null,setItem(){}},self:{},ACT:{},SUB:{},console});
-for(const f of['01-core-utils.js','02-data-model.js','23-import.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..','js',f),'utf8'),ctx,{filename:f});
+const ctx=vm.createContext({FIREBASE_CONFIG:null,localStorage:{getItem:()=>null,setItem(){}},self:{},ACT:{},SUB:{},console,document:{addEventListener(){},querySelector:()=>null},CLOUD:false});
+for(const f of['01-core-utils.js','02-data-model.js','03-kri.js','23-import.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..','js',f),'utf8'),ctx,{filename:f});
 const run=code=>{const v=vm.runInContext(code,ctx);return v&&typeof v==='object'?JSON.parse(JSON.stringify(v)):v};   /* đưa kết quả về realm của test để so sánh deepEqual */
 run('db=defaultDB()');
 /* sheet giả theo kiểu SheetJS: {A10:'I', G11:0.1, …} → {A10:{v:'I'}, …} */
@@ -79,10 +79,10 @@ test('Nhập Excel việc tháng (ghi đè bảng KPI) vẫn giữ danh mục ch
   assert.deepEqual(run("(sheetOf('e9',2026).kpi||{rows:[]}).rows.map(r=>r.id)"),['k1']);
 });
 
-test('Nhập danh mục chỉ tiêu: ghi theo file, giữ id cũ khi trùng nội dung, bỏ dòng file không còn, bỏ qua người không khớp Mã NV',()=>{
+test('Nhập danh mục chỉ tiêu: ghi theo file, giữ id cũ khi trùng nội dung, bỏ dòng file không còn, bỏ qua sheet chưa chọn nhân viên',()=>{
   Object.assign(ctx,{done(){},closeModal(){},toast(){},rerender(){}});
   run(`db=defaultDB();session={role:'member'};db.employees.push({id:'e7',code:'S7',name:'C',active:true});sheetOf('e7',2026,true).kpi={sec:'I',rows:[{id:'k_cu',no:'1',text:'Corporate compliance',w:10},{id:'k_bo',no:'',text:'Chỉ tiêu cũ',w:5}]};
-    IMP={kc:1,items:[{sheet:'S',code:'S7',name:'C',year:2026,sec:'KPI',rows:[{id:'k_new1',no:'1',text:'corporate  compliance',w:10},{id:'k_new2',no:'',text:'Mới',w:70}],e:empOf('e7')},{sheet:'X',code:'S0',name:'Z',year:2026,sec:'',rows:[],e:null}]};SUB['kc-imp-save']()`);
+    IMP={kc:1,items:[{sheet:'S',code:'S7',name:'C',year:2026,sec:'KPI',rows:[{id:'k_new1',no:'1',text:'corporate  compliance',w:10},{id:'k_new2',no:'',text:'Mới',w:70}],months:{},eid:'e7',on:true,cat:true,from:'',to:'',del:false,i:0},{sheet:'X',code:'S0',name:'Z',year:2026,sec:'',rows:[],months:{},eid:'',on:true,cat:true,i:1}]};SUB['kc-imp-save']()`);
   assert.deepEqual(run("sheetOf('e7',2026).kpi.rows.map(r=>r.id)"),['k_cu','k_new2']);
   assert.equal(run("sheetOf('e7',2026).kpi.sec"),'KPI');
   assert.equal(run("db.sheets.length"),1);   /* người không khớp Mã NV không tạo bảng */
@@ -249,4 +249,29 @@ test('Màu theo cấp trên bảng: lớp kd1 / kd2 / kd3 ở dòng nhóm, chỉ
   assert.match(g,/<tr class="kt">/);assert.match(g,/class="kh kh-sec"/);
   run("db.employees.push({id:'e9b',code:'S9B',name:'H',active:true});sheetOf('e9b',2026,true).months['10'].tasks.push({id:'z1',title:'Việc',weight:5,deadline:'2026-10-10',submitted:'2026-10-10',approval:'Duyệt',note:''})");
   assert.ok(!/ kd\d/.test(html('e9b')));   /* không có danh mục: không có lớp màu */
+});
+
+/* ---------- Quy ước tính KRI (03-kri.js): công thức kiểu Excel, x = Kết quả tháng ---------- */
+test('kxPct: bậc theo số lỗi, trừ dần, tỷ lệ, ô trống như Excel',()=>{
+  const P=(f,x)=>run(`kxPct(${JSON.stringify(f)},${JSON.stringify(x)})`);
+  const cnt='IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))';
+  assert.deepEqual([0,1,2,3,''].map(x=>P(cnt,x)),[1,0.8,0.6,0,1]);   /* để trống = 0 lỗi */
+  assert.equal(P('MAX(0, 100% - (x * 10%))',3),0.7);
+  const ge='IF(ISBLANK(x),100%,IF(x>=90,110%,IF(x>=85,100%,IF(x>=80,90%,80%))))';
+  assert.deepEqual([95,86,81,50,'','-'].map(x=>P(ge,x)),[1.1,1,0.9,0.8,1,1.1]);   /* chữ lớn hơn số như Excel */
+  assert.equal(P('IF(x=0,100%,IF(x<8,110%,IF(x<=10,100%,90%)))',7.5),1.1);
+  assert.equal(P('IF(x=1,',1),null);   /* công thức lỗi → không có điểm */
+});
+test('kxFromExcel: ô Kết quả thành x, ô khác thành giá trị',()=>{
+  assert.equal(run(`kxFromExcel('IF(I12=0,100%,IF(I12=1,80%,0))','I12')`),'IF(x=0,100%,IF(x=1,80%,0))');
+  ctx.V={D16:100};assert.equal(run(`kxFromExcel('AG26/$D$16*100','AG26',r=>V[r])`),'x/100*100');
+});
+test('monthStats: Khung 1 + KRI + Thưởng, dòng công việc hằng ngày',()=>{
+  run(`db.company.kpi2={since:'2026-10'}`);
+  ctx.KC={rows:[{id:'a',no:'1',text:'Compliance',w:10,f:'MAX(0,100%-x*10%)'},{id:'b',no:'2',text:'L&D',w:40,src:'tasks'},{id:'c',no:'3',text:'Lương',w:30,f:'IF(x=0,100%,IF(x=1,50%,0))'}]};
+  ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'',{approval:''})],kri:{a:{r:2},c:{r:1}},late:[{id:'l',d:'2026-10-02'}],ga:[{id:'g',d:'2026-10-03'}]};
+  const st=run('monthStats(M,"2026-10",KC)');
+  /* KRI: 0.8*10 + (5/10)*40 + 0.5*30 = 8+20+15 = 43; Khung 1: không có việc giao → 10, tuân thủ 10-1 = 9; Thưởng: 1 lần hỗ trợ = 5 */
+  assert.equal(st.p80,43);assert.equal(st.p20,19);assert.equal(st.p3,5);assert.equal(st.kpi,67);
+  ctx.M.fixed={total:101,k1:20,k2:81,k3:0};assert.equal(run('monthStats(M,"2026-10",KC)').kpi,101);   /* điểm chốt từ Excel */
 });
