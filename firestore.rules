@@ -15,10 +15,10 @@ service cloud.firestore {
     function isStaff()       { return active() && me().role == 'staff' && me().empId is string && me().empId != ''; }
     function initialized()   { return exists(/databases/$(database)/documents/meta/init); }
 
-    // Dấu phiên bản Rules (v6). App đọc thử đường dẫn này sau khi đăng nhập: đọc được nghĩa là Rules trên Firebase
+    // Dấu phiên bản Rules (v7). App đọc thử đường dẫn này sau khi đăng nhập: đọc được nghĩa là Rules trên Firebase
     // đúng là bản này; bị từ chối nghĩa là Firebase đang chạy bản Rules cũ và app sẽ hiện cảnh báo cho Admin.
-    // Mỗi lần sửa Rules: đổi 'v6' ở đây và RULES_VER trong js/50-firebase-sync.js thành số mới.
-    match /rulesCheck/{v} { allow get: if signedIn() && v == 'v6'; }
+    // Mỗi lần sửa Rules: đổi 'v7' ở đây và RULES_VER trong js/50-firebase-sync.js thành số mới.
+    match /rulesCheck/{v} { allow get: if signedIn() && v == 'v7'; }
 
     // Hồ sơ người dùng (vai trò, nhân viên được gắn): mỗi người đọc hồ sơ của mình, Admin đọc / ghi tất cả.
     // Admin chỉ tạo được Quản lý và Nhân viên; vai trò admin chỉ dành cho adminEmail() ở lần thiết lập đầu tiên.
@@ -84,8 +84,8 @@ service cloud.firestore {
       allow delete: if isManager();
     }
 
-    // Quản lý PPE (danh mục, dự án, các lần cấp phát): chỉ Admin + Quản lý đọc / ghi / xoá.
-    match /ppe/{id} { allow read, write: if isManager(); }
+    // Quản lý PPE (danh mục, dự án, các lần cấp phát): mọi người dùng đang hoạt động đọc / ghi / xoá.
+    match /ppe/{id} { allow read, write: if active(); }
 
     // Thông báo: to = 'mgr' (mọi Admin / Quản lý) hoặc 'emp:<id nhân viên>' (tài khoản gắn với nhân viên đó).
     //  - Mỗi người chỉ đọc thông báo gửi cho mình; ai đang hoạt động cũng gửi được (đứng tên chính mình).

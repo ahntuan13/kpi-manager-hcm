@@ -11,9 +11,9 @@
      ở users/{uid}; Firestore Security Rules (file firestore.rules) chặn
      truy cập trái phép ở phía máy chủ.
    ===================================================================== */
-const SYNC=['employees','sheets','groups','ppe'];   /* ppe: chỉ Admin + Quản lý */
+const SYNC=['employees','sheets','groups','ppe'];   /* ppe: mọi người dùng xem và nhập */
 /* Phiên bản Rules mà app này cần. Phải trùng dấu phiên bản trong firestore.rules (match /rulesCheck/{v}). */
-const RULES_VER='v6';
+const RULES_VER='v7';
 let rulesOld=false;
 /* Rules trên Firebase có phải bản mới nhất không? Bản cũ từ chối đường dẫn rulesCheck/<phiên bản>. */
 async function checkRules(){
@@ -97,7 +97,7 @@ function startSync(){
       [['m','members'],['i','invited']].forEach(([k,f])=>unsubs.push(fbStore.collection('groups').where(f,'array-contains',eid).onSnapshot(s=>{gp[k]={};s.docs.forEach(d=>gp[k][d.id]=d);gUpd()},e=>{softFail(e);gp[k]={};gUpd()})));
     }
     if(!eid)mark('groups');
-    mark('ppe');   /* nhân viên không tải dữ liệu PPE */
+    unsubs.push(fbStore.collection('ppe').onSnapshot(s=>{applyRemote('ppe',s.docChanges());mark('ppe')},e=>{softFail(e);mark('ppe')}));   /* PPE: dùng chung cho mọi người */
     /* danh bạ trong phòng (tên, mã NV, nhóm) để chọn người làm chung */
     unsubs.push(fbStore.doc('config/directory').onSnapshot(s=>{DIR=s.exists&&Array.isArray(s.data().list)?s.data().list:[]},softFail));
   }else SYNC.forEach(col=>unsubs.push(fbStore.collection(col).onSnapshot(s=>{applyRemote(col,s.docChanges());mark(col)},col==='groups'||col==='ppe'?e=>{softFail(e);mark(col)}:fail)));
@@ -142,10 +142,9 @@ function cloudPush(){
   const ops=[];
   SYNC.forEach(col=>{
     if(col==='employees'&&session.role!=='admin')return;   /* danh sách nhân viên: chỉ Admin ghi */
-    if(col==='ppe'&&staff)return;                           /* PPE: chỉ Admin + Quản lý */
     const cur={};db[col].forEach(r=>{cur[r.id]=canon(r)});const old=remote[col];
     for(const id in cur)if(old[id]!==cur[id])ops.push({col,id,data:JSON.parse(cur[id])});
-    if(session.role==='admin'||col==='ppe')for(const id in old)if(!(id in cur))ops.push({col,id,del:true});   /* xoá: chỉ Admin (PPE: cả Quản lý) */
+    if(session.role==='admin'||col==='ppe')for(const id in old)if(!(id in cur))ops.push({col,id,del:true});   /* xoá: chỉ Admin (PPE: mọi người dùng) */
     remote[col]=cur;
   });
   const sq=canon(db.seq);if(!staff&&remoteCfg.seq!==sq){ops.push({path:'config/seq',data:JSON.parse(sq)});remoteCfg.seq=sq}

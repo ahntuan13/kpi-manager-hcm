@@ -46,7 +46,7 @@ function ppeCurrent(list){
 }
 function ppeStateOf(x,cur){const k=`${x.proj}|${pKey(x)}|${x.item}`;return cur.get(k)===x?ppeState(x):'old'}
 const stBadge=s=>badge(PPE_ST[s][0],PPE_ST[s][1]);
-const canPPE=()=>{if(!can('manage')){toast('Chỉ Admin và Quản lý được nhập PPE.','error');return false}return true};
+const canPPE=()=>{if(!session){toast('Cần đăng nhập.','error');return false}return true};   /* mọi người dùng đều xem và nhập PPE */
 const ppeSave=fn=>transact(()=>{if(!Array.isArray(db.ppe))db.ppe=[];fn()});
 const ppeTiles=list=>{const cur=ppeCurrent(list),live=[...cur.values()].filter(x=>!x.returned),c=s=>live.filter(x=>ppeState(x)===s).length,ppl=new Set(list.map(pKey)).size;
   return `<div class="kpis sm">${kpi('Lượt cấp phát',fmtNum(list.length),`${fmtNum(list.reduce((a,x)=>a+(+x.qty||0),0))} món`,'acc')}${kpi('Người đã nhận',fmtNum(ppl),`${new Set(list.map(x=>x.proj)).size} dự án`,'info')}${kpi('Sắp đến hạn thay',fmtNum(c('soon')),`trong ${PPE_SOON} ngày tới`,c('soon')?'warn':'ok')}${kpi('Quá hạn thay',fmtNum(c('over')),'cần cấp lại',c('over')?'bad':'ok')}${kpi('Chưa ký nhận',fmtNum(list.filter(x=>!x.signed&&!x.returned).length),'lượt cấp','mute')}</div>`};
@@ -160,8 +160,12 @@ SUB['ppe-new']=(form,ev)=>{if(!canPPE())return;const d=fd(form),items=ppeItems()
   if(!String(d.name||'').trim())return toast('Nhập họ tên người nhận.','error');
   if(!items.length)return toast('Đánh dấu ít nhất một món PPE được giao.','error');
   const rc=uid('r'),now=new Date().toISOString(),print=!!(SUBMITTER&&SUBMITTER.value==='print');SUBMITTER=null;
-  if(ppeSave(()=>items.forEach(it=>db.ppe.push({id:uid('pp'),kind:'issue',rcpt:rc,proj:d.proj,date:d.date,code:String(d.code||'').trim(),name:d.name.trim(),dept:String(d.dept||'').trim(),item:it.id,size:String(d['sz_'+it.id]||'').trim(),qty:Math.max(1,+d['qt_'+it.id]||1),reason:d.reason||'new',signed:!!d.signed,returned:null,note:String(d.note||'').trim(),by:session?.name||'',at:now})))){
-    done(`Đã ghi cấp phát ${items.length} món PPE cho ${d.name.trim()}`);if(print)printHTML(rcptHTML(rc))}};
+  const ppeTask=()=>{   /* Work B: mỗi lần cấp phát thành một việc (đã hoàn thành, chờ quản lý duyệt) ở mục "Theo dõi cấp phát PPE" của người nhập */
+    const me=session&&session.empId;if(!me||!empOf(me)||!/^\d{4}-\d{2}-\d{2}$/.test(d.date||''))return;const y=d.date.slice(0,4),mm=d.date.slice(5,7),sh=sheetOf(me,y,true),k=kpiOf(me,y);
+    const line=kpiRows(k).find(r=>r.ppe)||kpiRows(k).find(r=>+r.w>0&&/ppe/i.test(r.text)),p=ppeProj(d.proj);
+    sh.months[mm].tasks.push({id:uid('t'),title:`Cấp phát PPE: ${items.map(it=>it.name).join(', ')} – ${d.name.trim()}${p?' ('+(p.code||p.name)+')':''}`,weight:1,deadline:d.date,submitted:d.date,approval:'',note:'Tự tạo từ mục Quản lý PPE',src:'ppe',ppeRc:rc,...(line?{kpi:line.id}:{})});sh.updatedAt=todayStr()};
+  if(ppeSave(()=>{ppeTask();items.forEach(it=>db.ppe.push({id:uid('pp'),kind:'issue',rcpt:rc,proj:d.proj,date:d.date,code:String(d.code||'').trim(),name:d.name.trim(),dept:String(d.dept||'').trim(),item:it.id,size:String(d['sz_'+it.id]||'').trim(),qty:Math.max(1,+d['qt_'+it.id]||1),reason:d.reason||'new',signed:!!d.signed,returned:null,note:String(d.note||'').trim(),by:session?.name||'',at:now}))})){
+    done(`Đã ghi cấp phát ${items.length} món PPE cho ${d.name.trim()}${session&&session.empId?' · đã thêm việc vào Work B':''}`);if(print)printHTML(rcptHTML(rc))}};
 /* nhớ nút submit nào được bấm (Lưu / Lưu & in) */
 let SUBMITTER=null;document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button[form="mf"]');SUBMITTER=b||null},true);
 ACT['ppe-edit']=el=>{if(!canPPE())return;const x=(db.ppe||[]).find(v=>v.id===el.dataset.id);if(!x)return toast('Dòng này không còn tồn tại.','error');const it=ppeItem(x.item)||{name:'',sizes:''};

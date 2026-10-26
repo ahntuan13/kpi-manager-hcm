@@ -901,3 +901,22 @@ table.t.kri small{display:block;color:var(--muted)}
 .kri-l{display:inline-block;font-size:12.5px;padding:1px 7px;border-radius:7px;background:var(--mute-s);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
 .kri-l.on{background:var(--acc-s,#e6edf9);color:var(--acc,#2f57a6)}
 table.t td.kric small{display:block}
+
+/* ---------- Work B: mỗi mục một khối (B.1, B.2…) ---------- */
+.wb{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 12px;background:var(--panel,#fff)}
+.wb.wbx{border-style:dashed}
+.wbh{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.wbc{flex:0 0 auto;min-width:42px;height:32px;padding:0 8px;border-radius:8px;background:var(--acc,#2f57a6);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center}
+.wbx .wbc{background:var(--muted)}
+.wbt{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:3px}
+.wbt .tt{font-weight:600}
+.wbt .pf{align-self:flex-start;margin:2px 0 0}
+.wbs{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px;color:var(--ink2)}
+.wbs .wbp{font-size:18px;color:var(--ink);min-width:44px;text-align:right}
+.wbs input.kres{width:110px;padding:4px 8px;text-align:right}
+.wb .tw{margin-top:10px}
+.wbe{margin:8px 0 0;padding:0}
+.cmp.cmp3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:900px){.cmp.cmp3{grid-template-columns:1fr}}
+.kpw{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.kpw select.in{min-width:170px;max-width:260px}

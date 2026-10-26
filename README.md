@@ -29,20 +29,24 @@ Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `a
 - **Chuyển việc sang tháng sau**: nút **Chuyển sang tháng…** nằm trong hộp **Sửa việc**, luôn bật với việc **chưa hoàn thành** (không cần ghi gì vào Ghi chú). Khi chuyển, chọn giữ deadline gốc (tiếp tục tính trễ) hoặc dời deadline. Tháng cũ giữ lại dòng “Đã chuyển” (không tính trọng số, điểm) và có nút **Hoàn tác**. Việc của tháng đã kết thúc mà chưa hoàn thành được liệt kê ở Dashboard → Tổng quan.
 - **Nhập Excel**: chọn một hoặc nhiều file theo mẫu `KPI_Individual_report` (sheet `Summary` + `M01…M12`); Admin nhập mọi file, nhân viên chưa có sẽ được tạo theo Mã NV; Quản lý nhập cho nhân viên đã có; Nhân viên nhập file của chính mình (Mã NV trùng), mọi việc ở trạng thái Chờ duyệt và không ghi đè năm đã có việc được Duyệt. Với Admin / Quản lý, mặc định các việc đã có điểm trong file được coi là đã Duyệt (bỏ chọn được khi nhập). Cột Điểm thưởng của file không được đọc vì điểm thưởng luôn tính tự động.
 - **Báo cáo**: theo nhân viên (năm), theo tháng, theo quý, theo nhóm. Mọi báo cáo xuất **Excel**, **PDF**, **In**. Mỗi tháng của nhân viên in được **Phiếu đánh giá KPI** có chỗ ký. Bản In / PDF của trang nhân viên có nhận xét của quản lý và 2 ô chữ ký (Nhân viên tự đánh giá · Quản lý duyệt); PDF không cắt ngang dòng, tiêu đề cột lặp lại ở đầu mỗi trang, khổ A4 ngang.
-- **Thông báo** (chuông 🔔 trên thanh trên cùng): nhân viên nhận thông báo khi quản lý giao việc, Duyệt, Re-check, ghi Comment by Manager, nhận xét tháng, ghi đi trễ / lỗi NC, khi được mời hay được thêm vào việc làm chung; quản lý nhận thông báo khi nhân viên cập nhật lại việc Re-check. Thông báo mới nhảy ra ở góc phải trên; bật “thông báo trên máy tính” trong khung chuông thì Chrome / Windows hiện thông báo cả khi đang ở tab khác. Cần trang app đang mở (kể cả ở tab khác); đóng hẳn trình duyệt thì lần mở sau sẽ thấy “Bạn có n thông báo chưa đọc”. Firestore Rules bản v6.
+- **Thông báo** (chuông 🔔 trên thanh trên cùng): nhân viên nhận thông báo khi quản lý giao việc, Duyệt, Re-check, ghi Comment by Manager, nhận xét tháng, ghi đi trễ / lỗi NC, khi được mời hay được thêm vào việc làm chung; quản lý nhận thông báo khi nhân viên cập nhật lại việc Re-check. Thông báo mới nhảy ra ở góc phải trên; bật “thông báo trên máy tính” trong khung chuông thì Chrome / Windows hiện thông báo cả khi đang ở tab khác. Cần trang app đang mở (kể cả ở tab khác); đóng hẳn trình duyệt thì lần mở sau sẽ thấy “Bạn có n thông báo chưa đọc”. Firestore Rules bản v7.
 - **Giao diện “sổ tay”** (nút 🎨 trên thanh trên cùng, mỗi người tự chọn, lưu theo trình duyệt): **Sổ kẻ ô** (mặc định: bìa xanh than có lỗ gáy, giấy kẻ ô, đường lề đỏ ở bảng việc), **Bullet journal** (lưới chấm, xanh lá xô thơm, menu sáng), **Sổ kế hoạch** (giấy dòng kẻ ngang, thẻ chỉ mục màu nghệ, tiêu đề viết tay) và **Cổ điển** (giao diện cũ). Biểu đồ đổi màu theo giao diện.
 - **Settings** (chỉ Admin): nhóm, ngày nghỉ lễ, người dùng / phân quyền, sao lưu / khôi phục JSON, sao lưu đám mây. Mục **Quy chế KPI** ai cũng xem được.
 
 ## Quy chế KPI theo file Excel "Individual KPIs" (từ T10/2026, đổi tham số ở Settings → Nhóm & ngày lễ)
 
-KPI tháng = **Khung 1 · Quản lý giao & Tuân thủ (20)** + **Khung 2 · KRI (~80)** + **Khung 3 · Điểm thưởng (20)**, khống chế 0–120.
+KPI tháng = **Work A · Quản lý giao & Tuân thủ (20)** + **Work B · Công việc By User (KRI, ~80)** + **Work C · Điểm thưởng (20)**, khống chế 0–120.
 
-| Khung | Cách tính |
+- **Work A**: A.1 Quản lý giao việc (việc By Manager) · A.2 Thái độ & Tuân thủ nội quy: TVE Safety hàng tháng, No NC Audit định kỳ, Đi trễ.
+- **Work B**: các mục B.1, B.2… theo mục I của file Excel (hoặc **mẫu Work B** có sẵn ở nút *Chỉ tiêu KPI → Dùng mẫu Work B*). Mục *Công việc hằng ngày* có danh sách việc riêng: nhân viên bấm **＋ Thêm việc** ở mục, ghi nội dung, deadline, ngày hoàn thành. Mục có liên kết PPE nhận việc tự động mỗi lần cấp phát ở **Quản lý PPE** (mọi người dùng xem và nhập PPE). Mục không có việc trong tháng: 0 điểm hoặc đủ điểm tuỳ cài đặt của mục.
+- **Work C**: quản lý nhập (hỗ trợ việc phát sinh, sáng kiến MOC).
+
+| Phần | Cách tính |
 |---|---|
-| Khung 1 · Thái độ công việc · Việc quản lý giao (10) | 10 điểm chia đều cho số việc By Manager trong tháng, cộng khi việc được Duyệt. Tháng không có việc giao: giữ đủ 10 |
-| Khung 1 · Tuân thủ (10) | Trừ 1 mỗi lần đi trễ (sau 08:05) và 1 mỗi lỗi NC (TVE Safety, Audit định kỳ, ISO / OHSAS); thấp nhất 0 |
-| Khung 2 · KRI | Danh mục chỉ tiêu riêng của từng người (mục I trong sheet `Individual KPIs – tên`). Mỗi dòng: **Điểm = % đạt × trọng số**. Dòng *Kết quả tháng*: quản lý nhập kết quả, % đạt theo **Quy ước tính** (công thức kiểu Excel, biến `x`, ví dụ `IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))`); để trống tính như Excel. Dòng *Công việc hằng ngày*: % đạt = điểm thành phần các việc đã Duyệt ÷ tổng trọng số các việc gắn vào dòng, tối đa 110% |
-| Khung 3 · Điểm thưởng | Hỗ trợ việc phát sinh ngoài việc thường ngày: 1 lần = 5, từ 2 lần = 10. Sáng kiến MOC được chấp nhận = 10 |
+| Work A · A.1 Quản lý giao việc (10) | 10 điểm chia đều cho số việc By Manager trong tháng, cộng khi việc được Duyệt. Tháng không có việc giao: giữ đủ 10 |
+| Work A · A.2 Thái độ & Tuân thủ (10) | Trừ 1 mỗi lần đi trễ (sau 08:05) và 1 mỗi lỗi NC (TVE Safety, Audit định kỳ, ISO / OHSAS); thấp nhất 0 |
+| Work B · KRI | Danh mục chỉ tiêu riêng của từng người (mục I trong sheet `Individual KPIs – tên`). Mỗi dòng: **Điểm = % đạt × trọng số**. Dòng *Kết quả tháng*: quản lý nhập kết quả, % đạt theo **Quy ước tính** (công thức kiểu Excel, biến `x`, ví dụ `IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))`); để trống tính như Excel. Dòng *Công việc hằng ngày*: % đạt = điểm thành phần các việc đã Duyệt ÷ tổng trọng số các việc gắn vào dòng, tối đa 110% |
+| Work C · Điểm thưởng | Hỗ trợ việc phát sinh ngoài việc thường ngày: 1 lần = 5, từ 2 lần = 10. Sáng kiến MOC được chấp nhận = 10 |
 | Xếp loại | A+ ≥100 · A ≥86 · B ≥75 · C ≥61 · D >41 · E. Quý = trung bình các tháng có điểm |
 
 - **Nhập từ Excel** (Admin / Quản lý, nút *Nhập KPI Individual (Excel)* ở trang Tất cả nhân viên): đọc mọi sheet `Individual KPIs…`, ghép nhân viên theo Mã NV / họ tên / tên trên sheet (chọn lại được). Mỗi người chọn: cập nhật **danh mục KRI** (kèm quy ước tính lấy từ công thức cột % của Excel), lấy **điểm tháng** (Tổng điểm đánh giá các tháng chọn → *điểm chốt*), và có **xoá việc trên app** của các tháng đó không. Chế độ Firebase tự sao lưu trước khi ghi.
@@ -52,13 +56,13 @@ KPI tháng = **Khung 1 · Quản lý giao & Tuân thủ (20)** + **Khung 2 · KR
 
 ## Quản lý PPE
 
-Menu **🦺 Quản lý PPE** (Admin + Quản lý), theo mẫu sổ theo dõi cấp phát phương tiện bảo vệ cá nhân có chữ ký người nhận:
+Menu **🦺 Quản lý PPE** (mọi người dùng), theo mẫu sổ theo dõi cấp phát phương tiện bảo vệ cá nhân có chữ ký người nhận:
 
 - **Danh mục & dự án**: dự án / công trường; 6 loại PPE có sẵn (đồng phục, giày, nón, dây an toàn toàn thân, kính, chụp tai) với đơn vị, thời hạn sử dụng, size, tiêu chuẩn; sửa hoặc thêm loại khác.
 - **Sổ cấp phát**: mỗi lần giao ghi dự án, người nhận (mã NV, họ tên, tổ / nhà thầu phụ), các món, size, số lượng, lý do (cấp mới / thay định kỳ / hư hỏng / mất), đã ký nhận, ngày thu hồi. In **Biên bản giao nhận PPE** có chỗ ký. Lọc theo dự án, loại, tình trạng; xuất Excel / PDF / In.
 - **Theo dự án**: bảng người × loại PPE, màu còn hạn / sắp đến hạn thay (≤ 30 ngày) / quá hạn / chưa cấp.
 - **Đến hạn thay**: danh sách cần cấp lại, bấm **Cấp thay**.
-- Hạn thay = ngày cấp + thời hạn sử dụng của loại PPE. Dữ liệu lưu ở collection `ppe` (Firestore Rules v6).
+- Hạn thay = ngày cấp + thời hạn sử dụng của loại PPE. Dữ liệu lưu ở collection `ppe` (Firestore Rules v7).
 
 ## Điểm của từng việc (công việc hằng ngày)
 | Mục | Quy tắc |
@@ -114,7 +118,7 @@ Các file `js/` được nạp **theo thứ tự số**. Khi cập nhật, đổ
 | Thêm người làm chung | ✔ thêm ngay | ✔ thêm ngay | Gửi lời mời, người được mời tự bấm Nhận |
 | Duyệt / Re-check, Comment by Manager, nhận xét, dời deadline khi chuyển việc | ✔ | ✔ | — |
 | Danh mục chỉ tiêu KPI (Khung 2): nhập Excel, sửa | ✔ | ✔ | Xem; chọn chỉ tiêu cho việc của mình |
-| Quản lý PPE: dự án, cấp phát, biên bản giao nhận | ✔ | ✔ | — |
+| Quản lý PPE: dự án, cấp phát, biên bản giao nhận | ✔ | ✔ | ✔ (cấp phát tự thành việc Work B) |
 | Nhập Excel KPI | ✔ mọi file, tạo nhân viên mới | ✔ nhân viên đã có | File của chính mình, việc ở trạng thái Chờ duyệt |
 | Thêm / sửa / xoá nhân viên | ✔ | — | — |
 | Settings: nhóm, ngày lễ, người dùng, sao lưu / khôi phục | ✔ | — | — |

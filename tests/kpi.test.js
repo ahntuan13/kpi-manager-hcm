@@ -94,8 +94,8 @@ test('kpiSel: dòng trống đầu được chọn khi chưa gắn / chỉ tiêu
   ctx.K2={rows:[{id:'a',no:'1',text:'Solo',w:10},{id:'b',no:'3',text:'<img src=x onerror=alert(1)>',w:null},{id:'c',no:'',text:'Con "1" a',w:40}]};
   const h=run("kpiSel(K2,'zzz','required')");
   assert.match(h,/^<select class="in" name="kpi" required><option value="" selected>— Chọn chỉ tiêu KPI —<\/option>/);
-  assert.match(h,/<option value="a" >1\. Solo<\/option>/);
-  assert.match(h,/<optgroup label="3\. &lt;img src=x onerror=alert\(1\)&gt;"><option value="c" >Con &quot;1&quot; a<\/option><\/optgroup>/);
+  assert.match(h,/<option value="a" >B\.1 Solo<\/option>/);   /* mã mục Work B */
+  assert.match(h,/<optgroup label="3\. &lt;img src=x onerror=alert\(1\)&gt;"><option value="c" >B\.2 Con &quot;1&quot; a<\/option><\/optgroup>/);
   assert.ok(!h.includes('<img'));
   assert.match(run("kpiSel(K2,'c')"),/<option value="" >— Chọn chỉ tiêu KPI —<\/option>.*<option value="c" selected>/);
 });
@@ -110,11 +110,11 @@ test('monthTable Khung 2: có danh mục → dòng I / nhóm / chỉ tiêu / Ch�
   const html=()=>run("(()=>{const st=monthStats(sheetOf('e5',2026).months['10'],'2026-10');return monthTable(empOf('e5'),'2026','10',st,{rows:st.rows,kind:'user'})})()");
   const flat=html();
   assert.ok(!flat.includes('kh-sec')&&!flat.includes('data-kpi'));
-  assert.ok(flat.includes('<td colspan="2">Khung 2 · By User</td>'));
+  assert.ok(flat.includes('<td colspan="2">Work B · By User</td>'));
   run("sheetOf('e5',2026).kpi={sec:'KPI Công ty',rows:[{id:'a',no:'1',text:'Solo',w:10},{id:'b',no:'3',text:'Vệ sinh',w:null},{id:'c',no:'',text:'Các phòng họp',w:40}]}");
   const g=html();
   for(const c of['class="kh kh-sec"','class="kh kh-cat','class="kh kh-line','class="kh kh-none"','class="kt'])assert.ok(g.includes(c),c);   /* nhóm / chỉ tiêu / việc có thêm lớp màu */
-  assert.ok(g.includes('<td colspan="3">Khung 2 · By User</td>'));   /* thêm cột Trọng số nhóm */
+  assert.ok(g.includes('<td colspan="3">Work B · By User</td>'));   /* thêm cột Trọng số nhóm */
   assert.match(g,/<select class="in" name="kpi" data-kpi aria-label="Chỉ tiêu KPI cho việc \d+">/);   /* việc chưa gắn có ô chọn … */
   assert.match(g,/data-act="kpi-set" data-e="e5" data-y="2026" data-mm="10" data-id="x2" disabled/);   /* … và nút Gắn (tắt đến khi chọn) */
   assert.ok(!g.includes('data-act="kpi-set" data-e="e5" data-y="2026" data-mm="10" data-id="x1"'));   /* việc đã gắn thì không */

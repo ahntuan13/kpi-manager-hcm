@@ -153,7 +153,7 @@ function monthStats(m,ym,kc){
         if(o.src==='tasks'){   /* việc By User gắn vào dòng (việc chưa gắn chỉ tiêu nào thuộc về dòng "việc hằng ngày" duy nhất) */
           const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
           let num=0,numS=0;mine.forEach(x=>{o.n++;o.den+=x.sc.w;if(x.sc.comp!=null){o.done++;if(x.sc.ap==='ok'){o.ok++;num+=x.sc.comp}if(x.sc.ap!=='recheck')numS+=x.sc.comp}});
-          o.den=r2(o.den);if(o.den>0){o.pct=Math.min(capT,num/o.den);o.pSelf=Math.min(capT,numS/o.den)}
+          o.den=r2(o.den);if(o.den>0){o.pct=Math.min(capT,num/o.den);o.pSelf=Math.min(capT,numS/o.den)}else if(r.empty==='full'){o.pct=1;o.pSelf=1;o.free=true}   /* tháng không có việc: dòng đặt "đủ điểm" thì 100% (như ô Excel để trống) */
         }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
         o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
         o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});
