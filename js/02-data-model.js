@@ -110,6 +110,10 @@ const mcOf=t=>t&&t.mgrComment&&String(t.mgrComment.text||'').trim()?t.mgrComment
    - Tháng có điểm chốt (m.fixed, nhập từ file Excel) dùng đúng điểm đó.
    Tham số sửa được ở Settings → Nhóm & ngày lễ (db.company.kpi2).
    ===================================================================== */
+/* Work B: quy ước mặc định theo số lỗi trong tháng (giống file Excel): 0 lỗi 100% · 1 lỗi 80% · 2 lỗi 60% · từ 3 lỗi 0% */
+const KRI_EF='IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))';
+/* một việc là 1 lỗi khi: hoàn thành trễ hạn, bị Re-check, hoặc quá hạn mà chưa hoàn thành */
+const taskErr=sc=>sc.state!=='moved'&&(sc.ap==='recheck'||sc.state==='overdue'||(sc.late!=null&&sc.late>0));
 const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110};
 const kpi2=()=>({...KPI2_DEF,...((db&&db.company&&db.company.kpi2)||{})});
 const isV2=ym=>!!ym&&ym>=kpi2().since;
@@ -136,6 +140,7 @@ function monthStats(m,ym,kc){
     st.fixed=m.fixed;st.v2=false;st.kpi=cap(+m.fixed.total);st.self=st.kpi;return st;
   }
   if(v2){
+    st.lock=m&&m.lock||null;
     st.lateList=[...((m&&m.late)||[])].sort((a,b)=>a.d<b.d?-1:1);st.ncList=[...((m&&m.nc)||[])].sort((a,b)=>a.d<b.d?-1:1);
     /* Khung 1 – việc quản lý giao: ${mgrMax} điểm chia đều cho số việc giao trong tháng (10 việc → 1 điểm/việc, 5 việc → 2, 8 việc → 1,25) */
     st.bmPer=st.bmN?P.mgrMax/st.bmN:0;
@@ -146,15 +151,16 @@ function monthStats(m,ym,kc){
     /* Khung 2 – KRI theo danh mục chỉ tiêu */
     const lines=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[];let k2Self=st.rawSelf;
     if(lines.length){
-      const ids=new Set(lines.map(r=>r.id)),tl=lines.filter(r=>r.src==='tasks'),only=tl.length===1?tl[0].id:null,res=(m&&m.kri)||{},capT=(+P.taskCap||110)/100;
+      const ids=new Set(lines.map(r=>r.id)),tl=lines.filter(r=>r.src!=='res'),only=tl.length===1?tl[0].id:null,res=(m&&m.kri)||{},capT=(+P.taskCap||110)/100;
       let a=0,b=0;
       st.kri=lines.map(r=>{
         const w=+r.w,o={row:r,w,src:r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
          pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
-        if(o.src==='tasks'){   /* việc By User gắn vào dòng (việc chưa gắn chỉ tiêu nào thuộc về dòng "việc hằng ngày" duy nhất) */
+        if(o.src==='tasks'){   /* Work B: % đạt theo SỐ LỖI của các việc trong mục (quy ước Excel), mục không có việc = 0 lỗi = đủ điểm */
           const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
-          let num=0,numS=0;mine.forEach(x=>{o.n++;o.den+=x.sc.w;if(x.sc.comp!=null){o.done++;if(x.sc.ap==='ok'){o.ok++;num+=x.sc.comp}if(x.sc.ap!=='recheck')numS+=x.sc.comp}});
-          o.den=r2(o.den);if(o.den>0){o.pct=Math.min(capT,num/o.den);o.pSelf=Math.min(capT,numS/o.den)}else if(r.empty==='full'){o.pct=1;o.pSelf=1;o.free=true}   /* tháng không có việc: dòng đặt "đủ điểm" thì 100% (như ô Excel để trống) */
+          let er=0;mine.forEach(x=>{o.n++;if(x.sc.comp!=null)o.done++;if(x.sc.ap==='ok')o.ok++;if(taskErr(x.sc))er++});
+          const v=res[r.id],add=v&&+v.x>0?+v.x:0;o.errT=er;o.errM=add;o.err=er+add;o.note=v&&v.n||'';
+          o.pct=kxPct(r.ef||KRI_EF,o.err);o.pSelf=o.pct;
         }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
         o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
         o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});
