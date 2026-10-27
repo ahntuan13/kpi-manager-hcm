@@ -61,12 +61,18 @@ function loadSample(){
     mk(1,pm,g1.title,g1.deadline,g1.submitted,AP_VAL.ok).gid=g1.id;mk(5,pm,g1.title,g1.deadline,g1.submitted,'').gid=g1.id;
     const g2={id:uid('g')+'2',title:'Kiểm kê thiết bị IT cuối quý',deadline:iso(cm,25),submitted:null,doneBy:null,members:[E2(6).id],invited:[E2(0).id],declined:[],names:{[E2(6).id]:E2(6).name,[E2(0).id]:E2(0).name},invitedBy:{[E2(0).id]:{empId:E2(6).id,name:E2(6).name,at:today}},year:y,mm:pad(cm),by:'',byName:E2(6).name,createdAt:today};
     mk(6,cm,g2.title,g2.deadline,null,'').gid=g2.id;db.groups=[g1,g2]}
-  /* PPE mẫu: 2 phiếu đăng ký, tên giả */
+  /* PPE mẫu: danh mục nhân viên công trường và 2 phiếu cấp phát, tên giả */
   {const back=d=>isoOf(dayNum(today)-d);
-    db.ppe=[{id:'rg_s1',kind:'reg',type:'ppe',proj:'MAU-P01 · Nhà máy mẫu A',pic:'Mr Mẫu',regDate:back(30),reqDate:back(28),puDate:back(15),pu:{helm:'Nón trắng mẫu',shoe:'Giày mẫu cổ thấp'},note:'Dữ liệu mẫu',
-      rows:[{name:'Ngô Văn Tài',code:'CN-01',helm:1,shoe:1,shoeSz:'41',glass:1,date:back(14),signed:true},{name:'Lý Minh Phúc',code:'CN-02',helm:1,belt:1,shoe:1,shoeSz:'40',ear:2,date:back(14),signed:true},{name:'Visitor',code:'',helm:3}],by:'Quản lý',at:back(30)},
-      {id:'rg_s2',kind:'reg',type:'uni',proj:'MAU-P02 · Văn phòng mẫu B',pic:'Ms Mẫu',regDate:back(5),reqDate:'',puDate:'',pu:{},note:'Dữ liệu mẫu',
-      rows:[{name:'Trịnh Quang Vinh',code:'CN-03',shirt:2,shirtSz:'L',pant:2,pantSz:'L'},{name:'Mai Hữu Nghĩa',code:'CN-04',shirt:2,shirtSz:'XL',pant:2,pantSz:'XL'}],by:'Quản lý',at:back(5)}];}
+    db.ppe=[{id:'pj_s1',kind:'proj',code:'MAU-A',name:'Nhà máy mẫu A',pic:'Mr Mẫu',status:'run'},{id:'pj_s2',kind:'proj',code:'MAU-B',name:'Văn phòng mẫu B',pic:'Ms Mẫu',status:'run'},
+      {id:'pe_s1',kind:'pemp',code:'CN-01',name:'Ngô Văn Tài',dept:'Thi công',proj:'pj_s1',sz_shirt:'L',sz_pant:'L',sz_shoe:'41',sz_glove:'L',active:true},
+      {id:'pe_s2',kind:'pemp',code:'CN-02',name:'Lý Minh Phúc',dept:'Thi công',proj:'pj_s1',sz_shirt:'M',sz_pant:'M',sz_shoe:'40',sz_glove:'M',active:true},
+      {id:'pe_s3',kind:'pemp',code:'CN-03',name:'Trịnh Quang Vinh',dept:'Kỹ thuật',proj:'pj_s1',sz_shirt:'XL',sz_pant:'XL',sz_shoe:'42',active:true},
+      {id:'pe_s4',kind:'pemp',code:'CN-04',name:'Mai Hữu Nghĩa',dept:'Văn phòng',proj:'pj_s2',sz_shirt:'L',sz_pant:'L',sz_shoe:'41',active:true},
+      {id:'ps_s1',kind:'slip',no:`PPE-${back(12).replace(/-/g,'')}-001`,type:'ppe',proj:'pj_s1',dept:'Thi công',date:back(12),reqDate:back(25),puDate:back(14),note:'Dữ liệu mẫu',items:['pi_helm','pi_shoe','pi_glass'],
+        lines:[{pid:'pe_s1',code:'CN-01',name:'Ngô Văn Tài',dept:'Thi công',q:{pi_helm:{n:1,sz:''},pi_shoe:{n:1,sz:'41'},pi_glass:{n:1,sz:''}},signed:true,signedAt:back(12)},
+          {pid:'pe_s2',code:'CN-02',name:'Lý Minh Phúc',dept:'Thi công',q:{pi_helm:{n:1,sz:''},pi_shoe:{n:1,sz:'40'}},signed:false},{pid:'',code:'',name:'Visitor',dept:'',q:{pi_helm:{n:3,sz:''}},signed:true,signedAt:back(12)}],by:'Quản lý',at:back(12)},
+      {id:'ps_s2',kind:'slip',no:`DP-${back(3).replace(/-/g,'')}-001`,type:'uni',proj:'pj_s2',dept:'Văn phòng',date:back(3),reqDate:'',puDate:'',note:'Dữ liệu mẫu',items:['pi_uni','pi_pant'],
+        lines:[{pid:'pe_s4',code:'CN-04',name:'Mai Hữu Nghĩa',dept:'Văn phòng',q:{pi_uni:{n:2,sz:'L'},pi_pant:{n:2,sz:'L'}},signed:false}],by:'Quản lý',at:back(3)}];}
   /* Chế độ cục bộ: thêm 2 tài khoản dùng thử để xem màn hình của Quản lý và Nhân viên (không tạo khi dùng Firebase) */
   if(!CLOUD){
     const add=(username,name,role,empId)=>{if(!db.users.some(x=>x.username===username))db.users.push({id:uid('u'),username,name,role,empId:empId||'',pass:pw(username+'123'),active:true});else{const x=db.users.find(x=>x.username===username);x.empId=empId||''}};

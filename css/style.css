@@ -942,6 +942,31 @@ table.t td.kric small{display:block}
 .slip.book td{height:26px;vertical-align:middle;padding:3px 5px}
 @media print{.slip.book{max-width:none}}
 
+/* ---------- Quản lý PPE & Đồng phục ---------- */
+.phero{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 18px;margin-bottom:12px;background:var(--card,#fff);border:1px solid var(--line);border-radius:14px}
+.phero h2{margin:0;font-size:22px}.phero p{margin:2px 0 0;color:var(--muted)}
+.pic{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:var(--info-s,#e6edf9);font-size:17px;vertical-align:middle}
+.pic.big{width:52px;height:52px;border-radius:50%;font-size:28px}
+.pfil{background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.pform{border-color:#bcd0f2;background:linear-gradient(#f7faff,#fff 120px)}
+.pform h4,.plist h4{display:flex;align-items:center;gap:8px}
+.pgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px;margin-top:8px}
+.pgrid .w2{grid-column:span 2}
+.pgrid input[readonly]{background:var(--mute-s,#f1f3f7);color:var(--muted)}
+.psub{margin-top:14px}
+.pchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pchip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink);text-decoration:none}
+.pchip.on{background:var(--acc,#2f57a6);border-color:var(--acc,#2f57a6);color:#fff;font-weight:600}
+.pchip.add{border-style:dashed;color:var(--muted)}
+.padd{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.padd .in{flex:1 1 280px;max-width:460px}
+table.t.pgt th{text-align:center;vertical-align:middle;white-space:nowrap}
+table.t.pgt td{vertical-align:middle;padding:4px 6px}
+table.t.pgt input[type=number]{width:60px;text-align:center;padding:4px}
+table.t.pgt select.in{width:72px;padding:4px}
+.pfoot{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.empty.sm{padding:14px;margin-top:8px}
+.pinfo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;margin-bottom:10px}.pinfo div{display:flex;flex-direction:column}.pinfo small{color:var(--muted)}
+@media (max-width:900px){.pgrid,.pinfo{grid-template-columns:1fr 1fr}.pgrid .w2{grid-column:span 2}}
 /* ---------- Phiếu đăng ký PPE & đồng phục ---------- */
 .ppef .bar{margin-bottom:10px}
 .ppef .card{margin-bottom:12px}
