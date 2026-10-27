@@ -157,7 +157,7 @@ PAGES['ppe/out']={t:'Cấp phát PPE & đồng phục',
       {h:'Vật tư',c:'nt',f:r=>esc(slipItemsTxt(r.s)),x:r=>slipItemsTxt(r.s)},
       {h:'Số lượng',c:'num',f:r=>fmtNum(slipQty(r.s)),x:r=>slipQty(r.s)},
       {h:'Trạng thái',f:r=>stB(r.s),x:r=>SLIP_ST[slipSt(r.s)][1]},
-      actCol(r=>`<button class="btn sm" data-act="ps-view" data-id="${r.s.id}" title="Xem / ký nhận" aria-label="Xem phiếu">👁</button><button class="btn sm" data-act="ps-edit" data-id="${r.s.id}" title="Sửa" aria-label="Sửa phiếu">✎</button><button class="btn sm" data-act="ps-print" data-id="${r.s.id}" title="In phiếu" aria-label="In phiếu">🖨</button><button class="btn sm" data-act="ps-del" data-id="${r.s.id}" title="Xoá" aria-label="Xoá phiếu">🗑</button>`)
+      actCol(r=>`<button class="btn sm" data-act="ps-view" data-id="${r.s.id}" title="Xem / ký nhận" aria-label="Xem phiếu">👁</button><button class="btn sm" data-act="ps-edit" data-id="${r.s.id}" title="Sửa" aria-label="Sửa phiếu">✎</button><button class="btn sm" data-act="ps-iso" data-id="${r.s.id}" title="Xuất Excel theo mẫu ISO AZ-PG-440-A05" aria-label="Xuất Excel mẫu ISO">📗</button><button class="btn sm" data-act="ps-print" data-id="${r.s.id}" title="In phiếu" aria-label="In phiếu">🖨</button><button class="btn sm" data-act="ps-del" data-id="${r.s.id}" title="Xoá" aria-label="Xoá phiếu">🗑</button>`)
     ],rows,{empty:`Chưa có phiếu nào phù hợp. Bấm “＋ Tạo phiếu cấp phát”.`,meta:false})+'</section>'}};
 function slipRows(){const f=F(),q=norm(f.q);
   return pSlips().filter(s=>grpHas(s,f.grp)&&(!f.dept||s.dept===f.dept)&&(!f.proj||s.proj===f.proj)&&(!f.from||s.date>=f.from)&&(!f.to||s.date<=f.to)&&(!f.st||slipSt(s)===f.st)
@@ -173,7 +173,7 @@ function slipTable(s,signBtns){const ids=[...new Set(slipLines(s).flatMap(l=>Obj
 ACT['ps-view']=el=>{const s=pSlips().find(x=>x.id===el.dataset.id);if(!s)return;
   const info=[['Số phiếu',s.no],['Job number',s.job||'–'],['Ngày cấp',fmtDate(s.date)],['Nhóm',PTYPE[slipGrp(s)].grp],['Dự án',projName(s.proj)||'–'],['Phòng ban',s.dept||'–'],['Người lập',s.by||''],['Trạng thái',stB(s)]];
   modal(`Phiếu ${s.no}`,`<div class="pinfo">${info.map(([k,v])=>`<div><small>${k}</small><b>${k==='Trạng thái'?v:esc(v)}</b></div>`).join('')}</div>${s.note?`<p class="note">${esc(s.note)}</p>`:''}${slipTable(s,true)}`,
-    {footer:`<button class="btn danger" data-act="ps-del" data-id="${s.id}" style="margin-right:auto">Xoá</button>${slipSt(s)!=='ok'?`<button class="btn acc" data-act="ps-signall" data-id="${s.id}">✔ Ký nhận tất cả</button>`:''}<button class="btn" data-act="ps-edit" data-id="${s.id}">✎ Sửa</button><button class="btn primary" data-act="ps-print" data-id="${s.id}">🖨 In phiếu</button>`,size:'wide kt'})};
+    {footer:`<button class="btn danger" data-act="ps-del" data-id="${s.id}" style="margin-right:auto">Xoá</button>${slipSt(s)!=='ok'?`<button class="btn acc" data-act="ps-signall" data-id="${s.id}">✔ Ký nhận tất cả</button>`:''}<button class="btn" data-act="ps-edit" data-id="${s.id}">✎ Sửa</button><button class="btn" data-act="ps-iso" data-id="${s.id}">📗 Excel mẫu ISO</button><button class="btn primary" data-act="ps-print" data-id="${s.id}">🖨 In phiếu</button>`,size:'wide kt'})};
 ACT['ps-sign']=el=>{if(!canPPE())return;const id=el.dataset.id,i=+el.dataset.i,on=el.dataset.v==='1';
   if(ppeSave(()=>{const s=db.ppe.find(z=>z.id===id),l=s&&s.lines[i];if(!l)throw new Error('Dòng này không còn.');l.signed=on;if(on)l.signedAt=todayStr();else delete l.signedAt})){refreshTbl();ACT['ps-view']({dataset:{id}})}};
 ACT['ps-signall']=el=>{if(!canPPE())return;const id=el.dataset.id;if(ppeSave(()=>{const s=db.ppe.find(z=>z.id===id);slipLines(s).forEach(l=>{if(!l.signed){l.signed=true;l.signedAt=todayStr()}})})){refreshTbl();ACT['ps-view']({dataset:{id}});toast('Đã ghi ký nhận cho tất cả')}};
@@ -187,7 +187,7 @@ function slipPrintHTML(s){const ids=[...new Set(slipLines(s).flatMap(l=>Object.k
   const hasSz=it=>splitSz(it.sizes).length||ls.some(l=>(l.q[it.id]||{}).sz);
   const cells=l=>its.map(it=>{const v=l&&l.q[it.id];return `<td class="c">${v&&+v.n?fmtNum(+v.n):''}</td>${hasSz(it)?`<td class="c">${v?esc(v.sz||''):''}</td>`:''}`}).join('');
   const tot=it=>ls.reduce((a,l)=>a+(+(l.q[it.id]||{}).n||0),0);
-  return `<div class="slip book"><div class="sh"><div class="co"><b>${esc(c.name||'')}</b></div><div style="text-align:right">Số phiếu: <b>${esc(s.no)}</b><br>Ngày in: ${fmtDate(todayStr())}</div></div>
+  return `<div class="slip book iso"><div class="sh"><img class="iso-l" src="assets/iso/logo-left.png" alt="Logo"><div style="text-align:center;font-size:11px">Số phiếu: <b>${esc(s.no)}</b> · Ngày in: ${fmtDate(todayStr())}</div><img class="iso-r" src="assets/iso/logo-right.png" alt="Chứng nhận ISO"></div>
     <h2>${esc(PTYPE[slipGrp(s)].book)}</h2><div class="sub">Phiếu cấp phát ${PTYPE[slipGrp(s)].sub}</div>
     <div class="mt"><div>Project/Department: <b>${esc([projName(s.proj),s.dept].filter(Boolean).join(' ; '))}</b></div><div>PIC: <b>${esc(p?.pic||'')}</b></div><div>Job number: <b>${esc(s.job||'')}</b></div><div>Ngày cấp: <b>${fmtDate(s.date)}</b></div></div>
     <table><thead><tr><th rowspan="2" style="width:34px">No</th><th rowspan="2">Receiver Name</th><th rowspan="2">Staff code</th>${its.map(it=>`<th ${hasSz(it)?'colspan="2"':'rowspan="2"'}>${esc(it.en||it.name)}${it.en&&it.en!==it.name?`<br><i>${esc(it.name)}</i>`:''}</th>`).join('')}<th rowspan="2">Date</th><th rowspan="2" style="width:120px">Sign</th></tr><tr>${its.filter(hasSz).map(()=>'<th>SL</th><th>Size</th>').join('')}</tr></thead><tbody>
@@ -195,8 +195,8 @@ function slipPrintHTML(s){const ids=[...new Set(slipLines(s).flatMap(l=>Object.k
     ${Array.from({length:pad},(_,n)=>`<tr><td class="c">${ls.length+n+1}</td><td></td><td></td>${cells(null)}<td></td><td></td></tr>`).join('')}
     <tr class="rgtot"><td colspan="3"><b>Tổng</b></td>${its.map(it=>`<td class="c"><b>${fmtNum(tot(it))}</b></td>${hasSz(it)?'<td></td>':''}`).join('')}<td></td><td></td></tr></tbody></table>
     ${s.note?`<p class="sn">Ghi chú: ${esc(s.note)}</p>`:''}
-    <div class="sign" style="grid-template-columns:1fr 1fr"><div><b>Người lập phiếu</b><br><small>(Ký, ghi rõ họ tên)</small></div><div><b>PIC dự án / bộ phận</b><br><small>(Ký, ghi rõ họ tên)</small></div></div>
-    <div style="margin-top:6px;font-size:10.5px;color:#777;text-align:right">${esc(CREDIT)}</div></div>`}
+    <p class="iso-note"><b><i>${esc(ISO_NOTE_EN)}</i></b><br><i>${esc(ISO_NOTE_VI)}</i></p>
+    <div class="iso-ft"><span>${esc(ISO_CODE)}</span><span>Page: 1 / 1</span></div></div>`}
 ACT['ps-print']=el=>{const s=pSlips().find(x=>x.id===el.dataset.id);if(s){closeModal();printHTML(slipPrintHTML(s))}};
 
 /* ---------- Danh mục: nhân viên, dự án & phòng ban, vật tư ---------- */

@@ -1001,3 +1001,13 @@ table.t.rgsum .in{width:100%}
 .slip.book td.c{text-align:center}
 .slip.book tr.rgtot td{background:#f6f6f6}
 @media (max-width:800px){.rgsteps{grid-template-columns:1fr 1fr}.rgh{grid-template-columns:1fr}}
+
+/* phiếu cấp phát in theo mẫu ISO AZ-PG-440-A05 */
+.slip.iso{font-family:Tahoma,'Be Vietnam Pro',Arial,sans-serif}
+.slip.iso .sh{align-items:center}
+.slip.iso .iso-l{height:46px;width:auto}.slip.iso .iso-r{height:34px;width:auto}
+.slip.iso h2{font-size:16px;font-weight:400;text-align:left;margin:14px 0 2px 120px;letter-spacing:0}
+.slip.iso .sub{display:none}
+.slip.iso .mt{margin-left:120px;border-bottom:1px solid #2f75b5;padding-bottom:4px}
+.iso-note{font-size:10.5px;margin:10px 0 4px;line-height:1.45}
+.iso-ft{display:flex;justify-content:space-between;font-size:10.5px;margin-top:6px}
