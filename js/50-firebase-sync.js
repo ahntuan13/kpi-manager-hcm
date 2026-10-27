@@ -130,6 +130,7 @@ function scheduleRender(){
   clearTimeout(renderTimer);
   renderTimer=setTimeout(()=>{
     if(!session||!$('#content'))return;
+    const ae=document.activeElement;if(ae&&ae.closest&&ae.closest('.ppef')&&ae.matches('input,select,textarea')){scheduleRender();return}   /* đang gõ phiếu PPE: chờ rời ô rồi mới vẽ lại */
     $('#side').innerHTML=sideHTML();
     if(PAGE&&PAGE.tbl&&$('#tbl'))refreshTbl();else rerender();
   },150);

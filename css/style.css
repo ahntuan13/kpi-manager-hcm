@@ -941,3 +941,28 @@ table.t td.kric small{display:block}
 .slip.book th i{display:block}
 .slip.book td{height:26px;vertical-align:middle;padding:3px 5px}
 @media print{.slip.book{max-width:none}}
+
+/* ---------- Phiếu đăng ký PPE & đồng phục ---------- */
+.ppef .bar{margin-bottom:10px}
+.ppef .card{margin-bottom:12px}
+.rgh{grid-template-columns:1fr 1fr}
+.rgsteps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.rgs{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--card,#fff)}
+.rgs.ok{border-color:#9fd8c3;background:var(--ok-s,#e3f5ee)}
+.rgs.cur{border-color:var(--acc,#2f57a6);box-shadow:0 0 0 2px rgba(47,87,166,.12)}
+.rgs .fl{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.rgs small{color:var(--muted)}
+table.t.rgt th{text-align:center;vertical-align:middle;white-space:nowrap}
+table.t.rgt td{padding:3px 4px;vertical-align:middle}
+table.t.rgt .in{padding:4px 6px;min-width:0}
+table.t.rgt input[type=number]{width:58px;text-align:center}
+table.t.rgt select.in{width:68px}
+table.t.rgt .nm{min-width:180px}
+table.t.rgt .cd{width:90px}
+table.t.rgt input[type=date]{width:132px}
+table.t.rgt input[type=checkbox]{width:18px;height:18px}
+.rgbtn{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+table.t.rgsum .in{width:100%}
+.slip.book td.c{text-align:center}
+.slip.book tr.rgtot td{background:#f6f6f6}
+@media (max-width:800px){.rgsteps{grid-template-columns:1fr 1fr}.rgh{grid-template-columns:1fr}}
