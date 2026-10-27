@@ -401,7 +401,7 @@ a.ext:hover{text-decoration:underline}
 .mstrip button:focus-visible{outline-offset:-3px}
 .mmeta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
 .mmeta .big{font-size:26px;font-weight:700;line-height:1;letter-spacing:-.3px}
-.kc{font-weight:600}.kc.low{color:var(--bad)}.kc.top{color:var(--ok)}
+.kc{font-weight:600}.kc.low{color:var(--bad)}.kc.hi{color:var(--ok)}
 a.kl-m{text-decoration:none;color:inherit;display:block}a.kl-m:hover .kc{text-decoration:underline}
 table.t td.ttl{min-width:240px;max-width:440px}
 table.t td.ttl .tt{white-space:pre-line;font-weight:500}
@@ -920,3 +920,14 @@ table.t td.kric small{display:block}
 @media (max-width:900px){.cmp.cmp3{grid-template-columns:1fr}}
 .kpw{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
 .kpw select.in{min-width:170px;max-width:260px}
+/* Work B: cột bên phải thẳng hàng giữa các mục; nhóm tiêu đề (B.2) và mục con (B.2.1) */
+.wbs{justify-content:flex-end}
+.wbs .wbst{display:inline-flex;gap:8px;align-items:center;justify-content:flex-end;min-width:210px;text-align:right}
+.wbs .wbw{min-width:92px;text-align:right}
+.wbs .wbp{min-width:52px;text-align:right;font-weight:700}
+.wbs .wba{display:inline-flex;gap:6px;justify-content:flex-end;min-width:150px}
+.wbg{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;margin:4px 0 8px;border-radius:12px;background:var(--th)}
+.wbg .wbt .tt{font-weight:700}
+.wb.wbk{margin-left:28px}
+.wbc.sub{background:var(--acc-s,#e6edf9);color:var(--acc,#2f57a6);min-width:52px}
+@media (max-width:700px){.wb.wbk{margin-left:10px}.wbs .wbst,.wbs .wba{min-width:0}}

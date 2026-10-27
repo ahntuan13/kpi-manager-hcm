@@ -149,7 +149,8 @@ function monthStats(m,ym,kc){
       const ids=new Set(lines.map(r=>r.id)),tl=lines.filter(r=>r.src==='tasks'),only=tl.length===1?tl[0].id:null,res=(m&&m.kri)||{},capT=(+P.taskCap||110)/100;
       let a=0,b=0;
       st.kri=lines.map(r=>{
-        const w=+r.w,o={row:r,w,src:r.src==='tasks'?'tasks':'res',pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
+        const w=+r.w,o={row:r,w,src:r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
+         pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
         if(o.src==='tasks'){   /* việc By User gắn vào dòng (việc chưa gắn chỉ tiêu nào thuộc về dòng "việc hằng ngày" duy nhất) */
           const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
           let num=0,numS=0;mine.forEach(x=>{o.n++;o.den+=x.sc.w;if(x.sc.comp!=null){o.done++;if(x.sc.ap==='ok'){o.ok++;num+=x.sc.comp}if(x.sc.ap!=='recheck')numS+=x.sc.comp}});

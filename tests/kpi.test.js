@@ -93,11 +93,11 @@ test('kpiSel: dòng trống đầu được chọn khi chưa gắn / chỉ tiêu
   vm.runInContext(fs.readFileSync(path.join(__dirname,'..','js','21-employees.js'),'utf8'),ctx,{filename:'21-employees.js'});
   ctx.K2={rows:[{id:'a',no:'1',text:'Solo',w:10},{id:'b',no:'3',text:'<img src=x onerror=alert(1)>',w:null},{id:'c',no:'',text:'Con "1" a',w:40}]};
   const h=run("kpiSel(K2,'zzz','required')");
-  assert.match(h,/^<select class="in" name="kpi" required><option value="" selected>— Chọn chỉ tiêu KPI —<\/option>/);
+  assert.match(h,/^<select class="in" name="kpi" required><option value="" selected>— Chọn mục Work B —<\/option>/);
   assert.match(h,/<option value="a" >B\.1 Solo<\/option>/);   /* mã mục Work B */
-  assert.match(h,/<optgroup label="3\. &lt;img src=x onerror=alert\(1\)&gt;"><option value="c" >B\.2 Con &quot;1&quot; a<\/option><\/optgroup>/);
+  assert.match(h,/<optgroup label="B\.2 &lt;img src=x onerror=alert\(1\)&gt;"><option value="c" >B\.2\.1 Con &quot;1&quot; a<\/option><\/optgroup>/);
   assert.ok(!h.includes('<img'));
-  assert.match(run("kpiSel(K2,'c')"),/<option value="" >— Chọn chỉ tiêu KPI —<\/option>.*<option value="c" selected>/);
+  assert.match(run("kpiSel(K2,'c')"),/<option value="" >— Chọn mục Work B —<\/option>.*<option value="c" selected>/);
 });
 
 test('monthTable Khung 2: có danh mục → dòng I / nhóm / chỉ tiêu / Chưa phân loại, chân bảng thêm 1 cột; không có danh mục → như cũ',()=>{
@@ -268,7 +268,7 @@ test('kxFromExcel: ô Kết quả thành x, ô khác thành giá trị',()=>{
 });
 test('monthStats: Khung 1 + KRI + Thưởng, dòng công việc hằng ngày',()=>{
   run(`db.company.kpi2={since:'2026-10'}`);
-  ctx.KC={rows:[{id:'a',no:'1',text:'Compliance',w:10,f:'MAX(0,100%-x*10%)'},{id:'b',no:'2',text:'L&D',w:40,src:'tasks'},{id:'c',no:'3',text:'Lương',w:30,f:'IF(x=0,100%,IF(x=1,50%,0))'}]};
+  ctx.KC={rows:[{id:'a',no:'1',text:'Compliance',w:10,f:'MAX(0,100%-x*10%)',src:'res'},{id:'b',no:'2',text:'L&D',w:40,src:'tasks'},{id:'c',no:'3',text:'Lương',w:30,f:'IF(x=0,100%,IF(x=1,50%,0))',src:'res'}]};
   ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'',{approval:''})],kri:{a:{r:2},c:{r:1}},late:[{id:'l',d:'2026-10-02'}],ga:[{id:'g',d:'2026-10-03'}]};
   const st=run('monthStats(M,"2026-10",KC)');
   /* KRI: 0.8*10 + (5/10)*40 + 0.5*30 = 8+20+15 = 43; Khung 1: không có việc giao → 10, tuân thủ 10-1 = 9; Thưởng: 1 lần hỗ trợ = 5 */

@@ -8,7 +8,7 @@ const card=(title,body,cls='')=>`<section class="card ${cls}">${title?`<h4>${tit
 const miniTable=(heads,rows,empty='Không có dữ liệu.')=>rows.length?`<div class="tw"><table class="t"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`:`<div class="note">${empty}</div>`;
 const gradeBd=v=>{const g=gradeOf(v);return g?badge(g[1],g[2]):'<span class="muted">Chưa có điểm</span>'};
 const gradeTone=v=>{const g=gradeOf(v);return g?(g[1]==='mute'?'':g[1]):''};
-const kCell=v=>v==null?'<span class="muted">–</span>':`<span class="kc ${v<80?'low':v>=120?'top':''}">${fmtK(v)}</span>`;
+const kCell=v=>v==null?'<span class="muted">–</span>':`<span class="kc ${v<75?'low':v>=100?'hi':''}">${fmtK(v)}</span>`;   /* không dùng lớp .top (trùng thanh trên cùng) */
 const kBar=v=>v==null?'<span class="muted">Chưa có điểm</span>':`<div class="pgw"><div class="pg" style="flex:1"><i style="width:${Math.min(100,v/KPI_CAP*100)}%${v<80?';background:var(--bad)':''}"></i></div><small><b>${fmtK(v)}</b></small></div>`;
 const empLink=e=>e?`<a class="lnk" href="${empHref(e)}">${esc(e.name)}</a>`:'<span class="muted">(đã xoá)</span>';
 const empCell=e=>`<span class="mem">${empAv(e)}<span>${empLink(e)}<small>${esc(e.code||'')}${e.title?' · '+esc(e.title):''}</small></span></span>`;

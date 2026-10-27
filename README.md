@@ -38,7 +38,7 @@ Chế độ dùng thử (chưa bật Firebase) đăng nhập bằng `admin` / `a
 KPI tháng = **Work A · Quản lý giao & Tuân thủ (20)** + **Work B · Công việc By User (KRI, ~80)** + **Work C · Điểm thưởng (20)**, khống chế 0–120.
 
 - **Work A**: A.1 Quản lý giao việc (việc By Manager) · A.2 Thái độ & Tuân thủ nội quy: TVE Safety hàng tháng, No NC Audit định kỳ, Đi trễ.
-- **Work B**: các mục B.1, B.2… theo mục I của file Excel (hoặc **mẫu Work B** có sẵn ở nút *Chỉ tiêu KPI → Dùng mẫu Work B*). Mục *Công việc hằng ngày* có danh sách việc riêng: nhân viên bấm **＋ Thêm việc** ở mục, ghi nội dung, deadline, ngày hoàn thành. Mục có liên kết PPE nhận việc tự động mỗi lần cấp phát ở **Quản lý PPE** (mọi người dùng xem và nhập PPE). Mục không có việc trong tháng: 0 điểm hoặc đủ điểm tuỳ cài đặt của mục.
+- **Work B**: các mục B.1, B.2, B.2.1… (nhóm tiêu đề có mục con) theo mục I của file Excel (hoặc **mẫu Work B** có sẵn ở nút *Chỉ tiêu KPI → Dùng mẫu Work B*). Mặc định mọi mục tính từ việc: mỗi mục có danh sách việc riêng (chọn *Kết quả tháng* ở nút Sửa nếu muốn quản lý nhập kết quả như Excel): nhân viên bấm **＋ Thêm việc** ở mục, ghi nội dung, deadline, ngày hoàn thành. Mục có liên kết PPE nhận việc tự động mỗi lần cấp phát ở **Quản lý PPE** (mọi người dùng xem và nhập PPE). Mục không có việc trong tháng: 0 điểm hoặc đủ điểm tuỳ cài đặt của mục.
 - **Work C**: quản lý nhập (hỗ trợ việc phát sinh, sáng kiến MOC).
 
 | Phần | Cách tính |
