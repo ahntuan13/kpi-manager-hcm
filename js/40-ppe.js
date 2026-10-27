@@ -1,12 +1,14 @@
 /* 40-ppe.js – Quản lý PPE & Đồng phục
-   Trang: Cấp phát PPE · Cấp phát đồng phục · Danh mục · Báo cáo.
+   Trang: Nhập kho · Cấp phát (PPE và đồng phục chung một phiếu) · Danh mục · Báo cáo.
+   Tồn của từng vật tư (theo size) = SL nhập − SL cấp phát, hiện ở Danh mục và Nhập kho.
    Một phiếu cấp phát = một dự án / phòng ban + ngày cấp + nhiều người nhận; mỗi người nhận có số lượng và size của từng vật tư,
    ký nhận từng người. In theo mẫu giấy "PPE ALLOCATION BOOK" (No · Receiver Name · Staff code · từng vật tư · Date · Sign).
    Dữ liệu: db.ppe (Firestore: collection ppe), mỗi document có kind:
      item  – vật tư: tên, nhóm (ppe | uni), đơn vị, các size, szKey (lấy size mặc định theo hồ sơ NV: shirt | pant | shoe | glove)
      pemp  – nhân viên nhận cấp phát: mã NV, họ tên, phòng ban, dự án, size áo / quần / giày / găng tay
      proj  – dự án: mã, tên, PIC          dept – phòng ban: tên
-     slip  – phiếu cấp phát: {no, type, proj, dept, date, reqDate, puDate, note, items:[id], lines:[{pid, code, name, dept, q:{id:{n,sz}}, signed, signedAt}], by, at}
+     rcv   – phiếu nhập: {no, reqDate (ngày request mua), puDate (ngày PU giao), pr (số PR/PO), note, lines:[{item, sz, n, detail}], by, at}
+     slip  – phiếu cấp phát: {no, type, job (Job number), proj, dept, date, note, items:[id], lines:[{pid, code, name, dept, q:{id:{n,sz}}, signed, signedAt}], by, at}
    Mọi người dùng đều xem và nhập. App không tự tạo việc KPI. */
 'use strict';
 (self.__mods=self.__mods||[]).push('40-ppe');
@@ -24,8 +26,18 @@ const PITEM_DEF=[
   {id:'pi_pant',type:'uni',name:'Quần đồng phục',en:'Quần',unit:'Cái',sizes:SZ_CLOTH,szKey:'pant',ord:12},
   {id:'pi_ushoe',type:'uni',name:'Giày đồng phục',en:'Giày',unit:'Đôi',sizes:SZ_SHOE,szKey:'shoe',ord:13}
 ];
-const PTYPE={ppe:{t:'Cấp phát PPE',s:'Quản lý cấp phát trang thiết bị bảo hộ lao động',icon:'⛑️',pre:'PPE',book:'PPE ALLOCATION BOOK',grp:'PPE'},
-  uni:{t:'Cấp phát đồng phục',s:'Quản lý cấp phát áo, quần, giày đồng phục theo nhân viên, dự án và kích cỡ',icon:'👕',pre:'DP',book:'PPE ALLOCATION · ĐỒNG PHỤC',grp:'Đồng phục'}};
+const PTYPE={ppe:{icon:'⛑️',book:'PPE ALLOCATION BOOK',grp:'PPE',sub:'bảo hộ lao động'},
+  uni:{icon:'👕',book:'PPE ALLOCATION · ĐỒNG PHỤC',grp:'Đồng phục',sub:'đồng phục'},
+  mix:{icon:'⛑️',book:'PPE ALLOCATION BOOK',grp:'PPE & đồng phục',sub:'bảo hộ lao động & đồng phục'}};
+const slipType=items=>{const t=new Set(items.map(id=>pItem(id)?.type||'ppe'));return t.size>1?'mix':t.has('uni')?'uni':'ppe'};
+/* tồn theo vật tư + size: nhập (phiếu nhập) − cấp (phiếu cấp phát) */
+function pStock(){const m=new Map(),g=(id,sz)=>{const k=id+'|'+(sz||'');if(!m.has(k))m.set(k,{id,sz:sz||'',inn:0,out:0});return m.get(k)};
+  pDocs('rcv').forEach(r=>(r.lines||[]).forEach(l=>{if(l.item&&+l.n>0)g(l.item,l.sz).inn+=+l.n}));
+  pDocs('slip').forEach(s=>(s.lines||[]).forEach(l=>Object.entries(l.q||{}).forEach(([id,v])=>{if(+v.n>0)g(id,v.sz).out+=+v.n})));
+  return m}
+const stockOf=(st,id)=>[...st.values()].filter(o=>o.id===id);
+const stockTxt=(st,id)=>{const rs=stockOf(st,id),t=rs.reduce((a,o)=>a+o.inn-o.out,0);return{t,inn:rs.reduce((a,o)=>a+o.inn,0),out:rs.reduce((a,o)=>a+o.out,0),
+  sz:rs.filter(o=>o.sz&&(o.inn||o.out)).sort((a,b)=>{const it=pItem(id),ss=splitSz(it?.sizes);return ss.indexOf(a.sz)-ss.indexOf(b.sz)}).map(o=>`<span class="chip ${o.inn-o.out<0?'bad':''}">${esc(o.sz)}: <b>${o.inn-o.out}</b></span>`).join(' ')}};
 const SZK={shirt:'Size áo',pant:'Size quần',shoe:'Size giày',glove:'Size găng tay'};
 const canPPE=()=>{if(!session){toast('Cần đăng nhập.','error');return false}return true};   /* mọi người dùng đều xem và nhập */
 const ppeSave=fn=>transact(()=>{if(!Array.isArray(db.ppe))db.ppe=[];fn()});
@@ -55,29 +67,28 @@ const deptOptsP=(all)=>[['',all||'— Chọn phòng ban —'],...pDepts().map(d=
 
 /* ---------- phiếu đang tạo / sửa (giữ trong bộ nhớ đến khi bấm Lưu) ---------- */
 let PDRAFT=null;
-const nextNo=(type,date)=>{const pre=`${PTYPE[type].pre}-${String(date||todayStr()).replace(/-/g,'')}-`,used=new Set(pSlips().map(s=>s.no));let n=1;while(used.has(pre+String(n).padStart(3,'0')))n++;return pre+String(n).padStart(3,'0')};
-function newDraft(type){const f=F(),items=pItems(type);
-  return{type,no:'',proj:f.proj||'',dept:f.dept||'',date:todayStr(),reqDate:'',puDate:'',note:'',items:items.slice(0,type==='uni'?2:3).map(i=>i.id),lines:[]}}
+const nextNo=(pfx,date)=>{const pre=`${pfx}-${String(date||todayStr()).replace(/-/g,'')}-`,used=new Set([...pSlips(),...pDocs('rcv')].map(s=>s.no));let n=1;while(used.has(pre+String(n).padStart(3,'0')))n++;return pre+String(n).padStart(3,'0')};
+function newDraft(){const f=F();
+  return{no:'',job:'',proj:f.proj||'',dept:f.dept||'',date:todayStr(),note:'',items:pItems('ppe').slice(0,3).map(i=>i.id),lines:[]}}
 const defSz=(it,e)=>it&&it.szKey&&e?String(e['sz_'+it.szKey]||''):'';
 function addLine(e){const d=PDRAFT;if(e.pid&&d.lines.some(l=>l.pid===e.pid))return false;
   const q={};d.items.forEach(id=>{const it=pItem(id);q[id]={n:1,sz:defSz(it,e.pid?pEmp(e.pid):null)}});
   d.lines.push({pid:e.pid||'',code:e.code||'',name:e.name,dept:e.dept||'',q,signed:false});return true}
 const empLbl=e=>`${e.code?e.code+' · ':''}${e.name}`;
-function draftHTML(){const d=PDRAFT,T=PTYPE[d.type],its=d.items.map(pItem).filter(Boolean),all=pItems(d.type);
+function draftHTML(){const d=PDRAFT,its=d.items.map(pItem).filter(Boolean),st=pStock();
   const pool=pEmps().filter(e=>e.active!==false&&(!d.proj||!e.proj||e.proj===d.proj)&&!d.lines.some(l=>l.pid===e.id));
   const inProj=d.proj?pEmps().filter(e=>e.active!==false&&e.proj===d.proj&&!d.lines.some(l=>l.pid===e.id)).length:0;
   const szSel=(it,i,v)=>{const s=splitSz(it.sizes);return s.length?`<select class="in" data-pq="${i}|${it.id}|sz" aria-label="Size ${esc(it.name)} dòng ${i+1}"><option value="">–</option>${s.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}${v&&!s.includes(v)?`<option selected>${esc(v)}</option>`:''}</select>`:''};
-  return `<section class="card pform"><div class="pfh"><h4><span class="pic">${T.icon}</span> Thông tin cấp phát ${d.id?`<small class="muted">· sửa phiếu ${esc(d.no)}</small>`:''}</h4></div>
+  return `<section class="card pform"><div class="pfh"><h4><span class="pic">⛑️</span> Thông tin cấp phát PPE &amp; đồng phục ${d.id?`<small class="muted">· sửa phiếu ${esc(d.no)}</small>`:''}</h4></div>
     <div class="pgrid">
       <label class="f"><span>Dự án</span><select class="in" data-pd="proj">${projOptsP().map(([v,l])=>`<option value="${esc(v)}" ${v===d.proj?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
       <label class="f"><span>Phòng ban</span><select class="in" data-pd="dept">${deptOptsP().map(([v,l])=>`<option value="${esc(v)}" ${v===d.dept?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+      <label class="f"><span>Job number</span><input class="in" data-pd="job" value="${esc(d.job||'')}" placeholder="VD: J26-0158" list="dl-pd-job"><datalist id="dl-pd-job">${[...new Set(pSlips().map(x=>x.job).filter(Boolean))].map(j=>`<option value="${esc(j)}">`).join('')}</datalist></label>
       <label class="f"><span>Ngày cấp phát <i>*</i></span><input class="in" type="date" data-pd="date" value="${esc(d.date)}"></label>
       <label class="f"><span>Số phiếu</span><input class="in" readonly value="${esc(d.no||'Tự động sinh')}"></label>
-      <label class="f"><span>Ngày request mua</span><input class="in" type="date" data-pd="reqDate" value="${esc(d.reqDate||'')}"></label>
-      <label class="f"><span>Ngày PU giao hàng</span><input class="in" type="date" data-pd="puDate" value="${esc(d.puDate||'')}"></label>
-      <label class="f w2"><span>Ghi chú <small class="muted">(chi tiết sản phẩm PU giao, lý do cấp…)</small></span><input class="in" data-pd="note" value="${esc(d.note||'')}"></label>
+      <label class="f w3"><span>Ghi chú <small class="muted">(lý do cấp: cấp mới, thay hư hỏng, mất…)</small></span><input class="in" data-pd="note" value="${esc(d.note||'')}"></label>
     </div>
-    <div class="psub"><b>Vật tư cấp</b> <small class="muted">bấm để chọn / bỏ</small><div class="pchips">${all.map(i=>`<button type="button" class="pchip ${d.items.includes(i.id)?'on':''}" data-act="pd-item" data-id="${i.id}">${d.items.includes(i.id)?'✓ ':''}${esc(i.name)}</button>`).join('')}<a class="pchip add" href="#/ppe/cat" data-act="pd-cat">＋ Danh mục</a></div></div>
+    <div class="psub"><b>Vật tư cấp</b> <small class="muted">bấm để chọn / bỏ</small>${['ppe','uni'].map(t=>`<div class="pchips"><span class="pcg">${PTYPE[t].icon} ${PTYPE[t].grp}</span>${pItems(t).map(i=>{const k=stockTxt(st,i.id).t;return `<button type="button" class="pchip ${d.items.includes(i.id)?'on':''}" data-act="pd-item" data-id="${i.id}" title="Tồn kho: ${k}">${d.items.includes(i.id)?'✓ ':''}${esc(i.name)} <small>· tồn ${k}</small></button>`}).join('')}</div>`).join('')}<div class="pchips"><a class="pchip add" href="#/ppe/cat" data-act="pd-cat">＋ Thêm vật tư ở Danh mục</a></div></div>
     <div class="psub"><b>Người nhận</b> <small class="muted">${fmtNum(d.lines.length)} người</small>
       <div class="padd"><input class="in" id="pd-emp" list="dl-pd-emp" placeholder="Chọn nhân viên (gõ tên hoặc mã NV)…" autocomplete="off" aria-label="Chọn nhân viên"><datalist id="dl-pd-emp">${pool.map(e=>`<option value="${esc(empLbl(e))}">${esc([e.dept,projName(e.proj)].filter(Boolean).join(' · '))}</option>`).join('')}<option value="Visitor">Khách (không mã NV)</option></datalist>
         <button type="button" class="btn" data-act="pd-add">＋ Thêm</button>${inProj?`<button type="button" class="btn acc" data-act="pd-addall">＋ Thêm cả dự án (${inProj} người)</button>`:''}</div></div>
@@ -85,85 +96,91 @@ function draftHTML(){const d=PDRAFT,T=PTYPE[d.type],its=d.items.map(pItem).filte
       ${d.lines.map((l,i)=>`<tr><td class="c">${i+1}</td><td><b>${esc(l.name)}</b><br><small class="muted">${esc([l.code,l.dept].filter(Boolean).join(' · '))}</small></td>
         ${its.map(it=>{const v=(l.q||{})[it.id]||{};return `<td><input class="in" type="number" min="0" max="999" data-pq="${i}|${it.id}|n" value="${v.n?esc(v.n):''}" aria-label="${esc(it.name)} dòng ${i+1}"></td>${splitSz(it.sizes).length?`<td>${szSel(it,i,v.sz||'')}</td>`:''}`}).join('')}
         <td class="c"><label class="chk"><input type="checkbox" data-pq="${i}||signed" ${l.signed?'checked':''}> Đã ký</label></td><td class="c"><button type="button" class="btn sm" data-act="pd-del" data-i="${i}" title="Bỏ người này" aria-label="Bỏ dòng ${i+1}">🗑</button></td></tr>`).join('')}
-      </tbody></table></div><p class="note">Size tự điền theo hồ sơ nhân viên ở Danh mục (sửa được). Số lượng mặc định 1, để trống = không cấp món đó.</p>`:'<div class="empty sm">Chưa có người nhận. Chọn nhân viên ở trên, hoặc chọn dự án rồi bấm “Thêm cả dự án”.</div>'}
+      </tbody></table></div><p class="note">Size tự điền theo hồ sơ nhân viên ở Danh mục (sửa được). Số lượng mặc định 1, để trống = không cấp món đó.</p><div id="pd-stock">${draftStockWarn()}</div>`:'<div class="empty sm">Chưa có người nhận. Chọn nhân viên ở trên, hoặc chọn dự án rồi bấm “Thêm cả dự án”.</div>'}
     <div class="pfoot"><span class="muted">${fmtNum(d.lines.length)} người · ${fmtNum(d.lines.reduce((a,l)=>a+lineQty(l),0))} món</span><div class="sp"></div><button type="button" class="btn" data-act="pd-cancel">Hủy</button><button type="button" class="btn primary" data-act="pd-save">Lưu phiếu</button></div></section>`}
 const redrawDraft=()=>{const el=$('#pform');if(el&&PDRAFT)el.innerHTML=draftHTML()};
+/* cảnh báo cấp vượt tồn (vẫn cho lưu: có thể hàng tồn từ trước chưa nhập vào app) */
+function draftStockWarn(){const d=PDRAFT;if(!d)return '';const st=pStock(),need=new Map();
+  d.lines.forEach(l=>d.items.forEach(id=>{const v=l.q[id];if(v&&+v.n>0){const k=id+'|'+(v.sz||'');need.set(k,(need.get(k)||0)+ +v.n)}}));
+  if(d.id){const old=pSlips().find(x=>x.id===d.id);old&&(old.lines||[]).forEach(l=>Object.entries(l.q||{}).forEach(([id,v])=>{const o=st.get(id+'|'+(v.sz||''));if(o)o.out-=+v.n||0}))}
+  const bad=[...need.entries()].map(([k,n])=>{const o=st.get(k)||{inn:0,out:0},[id,sz]=k.split('|');return{id,sz,n,left:o.inn-o.out}}).filter(x=>x.n>x.left);
+  return bad.length?`<div class="pwarn">⚠ Cấp vượt tồn kho: ${bad.map(x=>`<b>${esc(pItem(x.id)?.name||'')}${x.sz?' '+esc(x.sz):''}</b> cấp ${x.n}, tồn ${x.left}`).join(' · ')}. Kiểm tra lại hoặc nhập kho trước.</div>`:''}
 document.addEventListener('input',ev=>{const el=ev.target;if(!PDRAFT||!el.closest||!el.closest('#pform'))return;
   if(el.dataset.pd){PDRAFT[el.dataset.pd]=el.value;return}
   if(el.dataset.pq){const [i,id,k]=el.dataset.pq.split('|'),l=PDRAFT.lines[+i];if(!l)return;if(k==='signed'){l.signed=el.checked;return}
-    const v=(l.q[id]=l.q[id]||{n:0,sz:''});if(k==='n')v.n=Math.max(0,+el.value||0);else v.sz=el.value}});
+    const v=(l.q[id]=l.q[id]||{n:0,sz:''});if(k==='n')v.n=Math.max(0,+el.value||0);else v.sz=el.value;const w=$('#pd-stock');if(w)w.innerHTML=draftStockWarn()}});
 document.addEventListener('change',ev=>{const el=ev.target;if(!PDRAFT||!el.closest||!el.closest('#pform'))return;
   if(el.dataset.pd==='proj'||el.dataset.pd==='dept'){PDRAFT[el.dataset.pd]=el.value;redrawDraft();return}
   if(el.dataset.pq&&el.type==='checkbox'){const l=PDRAFT.lines[+el.dataset.pq.split('|')[0]];if(l){l.signed=el.checked;if(el.checked&&!l.signedAt)l.signedAt=PDRAFT.date||todayStr()}}
   if(el.id==='pd-emp'&&el.value)ACT['pd-add']()});
 function pickEmp(v){v=String(v||'').trim();if(!v)return null;const e=pEmps().find(e=>norm(empLbl(e))===norm(v)||norm(e.code)===norm(v)||norm(e.name)===norm(v));
   return e?{pid:e.id,code:e.code,name:e.name,dept:e.dept||''}:{pid:'',code:'',name:v,dept:''}}
-ACT['pd-new']=el=>{if(!canPPE())return;PDRAFT=newDraft(el.dataset.type);rerender();setTimeout(()=>$('#pd-emp')?.focus(),50)};
+ACT['pd-new']=()=>{if(!canPPE())return;PDRAFT=newDraft();rerender();setTimeout(()=>$('#pd-emp')?.focus(),50)};
 ACT['pd-cancel']=()=>{PDRAFT=null;rerender()};
 ACT['pd-cat']=()=>{PDRAFT=null;location.hash='#/ppe/cat'};
 ACT['pd-item']=el=>{const d=PDRAFT,id=el.dataset.id;if(d.items.includes(id))d.items=d.items.filter(x=>x!==id);else{d.items.push(id);const it=pItem(id);d.lines.forEach(l=>{if(!l.q[id])l.q[id]={n:1,sz:defSz(it,l.pid?pEmp(l.pid):null)}})}
-  const ord=pItems(d.type).map(i=>i.id);d.items.sort((a,b)=>ord.indexOf(a)-ord.indexOf(b));redrawDraft()};
+  const ord=pItems('').map(i=>i.id);d.items.sort((a,b)=>ord.indexOf(a)-ord.indexOf(b));redrawDraft()};
 ACT['pd-add']=()=>{const inp=$('#pd-emp'),e=pickEmp(inp&&inp.value);if(!e)return toast('Chọn hoặc gõ tên nhân viên.','warn');if(!addLine(e))toast('Người này đã có trong phiếu.','warn');redrawDraft();setTimeout(()=>$('#pd-emp')?.focus(),20)};
 ACT['pd-addall']=()=>{const d=PDRAFT;let n=0;pEmps().filter(e=>e.active!==false&&e.proj===d.proj).forEach(e=>{if(addLine({pid:e.id,code:e.code,name:e.name,dept:e.dept}))n++});redrawDraft();toast(`Đã thêm ${n} người của dự án`)};
 ACT['pd-del']=el=>{PDRAFT.lines.splice(+el.dataset.i,1);redrawDraft()};
 ACT['pd-save']=()=>{if(!canPPE())return;const d=PDRAFT;
   if(!d.proj&&!d.dept)return toast('Chọn dự án hoặc phòng ban.','error');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(d.date||''))return toast('Nhập ngày cấp phát.','error');
-  if(d.puDate&&d.reqDate&&d.puDate<d.reqDate)return toast('Ngày PU giao không được trước ngày request mua.','error');
   const lines=d.lines.map(l=>({...l,q:Object.fromEntries(Object.entries(l.q||{}).filter(([id,v])=>d.items.includes(id)&&+v.n>0).map(([id,v])=>[id,{n:+v.n,sz:v.sz||''}]))})).filter(l=>Object.keys(l.q).length);
   if(!lines.length)return toast('Phiếu chưa có người nhận nào có số lượng.','error');
   if(!d.dept){const ds=[...new Set(lines.map(l=>l.dept).filter(Boolean))];if(ds.length===1)d.dept=ds[0]}
   lines.forEach(l=>{if(l.signed&&!l.signedAt)l.signedAt=d.date;if(!l.signed)delete l.signedAt});
-  const v={type:d.type,proj:d.proj,dept:d.dept,date:d.date,reqDate:d.reqDate||'',puDate:d.puDate||'',note:String(d.note||'').trim(),items:d.items,lines};
+  const used=d.items.filter(id=>lines.some(l=>l.q[id]));
+  const v={type:slipType(used),job:String(d.job||'').trim(),proj:d.proj,dept:d.dept,date:d.date,note:String(d.note||'').trim(),items:used,lines};
   let no=d.no;
   if(ppeSave(()=>{if(d.id){const x=db.ppe.find(z=>z.id===d.id);if(!x)throw new Error('Phiếu này không còn tồn tại.');Object.assign(x,v,{updatedAt:new Date().toISOString(),updatedBy:session?.name||''})}
-    else{no=nextNo(d.type,d.date);db.ppe.push({id:uid('ps'),kind:'slip',no,...v,by:session?.name||'',at:new Date().toISOString()})}})){PDRAFT=null;rerender();toast(`Đã lưu phiếu ${no}`)}};
+    else{no=nextNo('CP',d.date);db.ppe.push({id:uid('ps'),kind:'slip',no,...v,by:session?.name||'',at:new Date().toISOString()})}})){PDRAFT=null;rerender();toast(`Đã lưu phiếu ${no}`)}};
 
 /* ---------- trang Cấp phát PPE / Cấp phát đồng phục ---------- */
-function slipPage(type){const T=PTYPE[type];
-  return{t:T.t,
-    sub(){return T.s},
-    head(){const f=F();
-      return `<div class="phero"><span class="pic big">${T.icon}</span><div><h2>${esc(T.t)}</h2><p>${esc(T.s)}</p></div><div class="sp"></div><button class="btn primary" data-act="pd-new" data-type="${type}">＋ Tạo phiếu cấp phát</button><button class="btn" data-act="ps-xlsx" data-type="${type}">⬇ Xuất Excel</button></div>
-        <div class="bar pfil">${fSearch('Tìm theo tên, mã nhân viên, mã phiếu…')}<label class="fl">Phòng ban ${fSel('dept','Phòng ban',deptOptsP('Tất cả'))}</label><label class="fl">Dự án ${fSel('proj','Dự án',projOptsP('Tất cả'))}</label><label class="fl">Trạng thái ${fSel('st','Trạng thái',[['','Tất cả'],['ok','Đã ký'],['wait','Chờ ký'],['part','Ký một phần']])}</label>${fDate('from','Từ ngày')}${fDate('to','Đến ngày')}<button class="btn" data-act="ps-reset" title="Bỏ các bộ lọc">⟲ Đặt lại</button></div>
-        ${PDRAFT&&PDRAFT.type===type?`<div id="pform">${draftHTML()}</div>`:''}`},
-    tbl(){const rows=slipRows(type);
-      return `<section class="card plist"><h4><span class="pic">${T.icon}</span> Danh sách phiếu ${esc(T.t.toLowerCase())} <small class="muted">· tổng ${fmtNum(rows.length)} phiếu</small></h4>`+table([
-        {h:'STT',c:'c',f:(r)=>r.n,x:r=>r.n},
-        {h:'Mã phiếu',f:r=>`<a href="#/ppe/${type}" data-act="ps-view" data-id="${r.s.id}"><b style="white-space:nowrap">${esc(r.s.no)}</b></a>`,x:r=>r.s.no},
-        {h:'Nhân viên',f:r=>{const ls=slipLines(r.s);return `${ls.slice(0,2).map(l=>esc(l.name)).join(', ')}${ls.length>2?` <small class="muted">+${ls.length-2} người</small>`:''}`},x:r=>slipLines(r.s).map(l=>l.name).join(', ')},
-        {h:'Phòng ban',f:r=>esc(r.s.dept||'–'),x:r=>r.s.dept||''},
-        {h:'Dự án',f:r=>{const p=pProj(r.s.proj);return p?`<span style="white-space:nowrap" title="${esc(projName(p.id))}">${esc(p.code||p.name)}</span>`:'–'},x:r=>projName(r.s.proj)},
-        {h:'Ngày cấp phát',f:r=>`<span style="white-space:nowrap">${fmtDate(r.s.date)}</span>`,x:r=>fmtDate(r.s.date)},
-        {h:'Vật tư',c:'nt',f:r=>esc(slipItemsTxt(r.s)),x:r=>slipItemsTxt(r.s)},
-        {h:'Số lượng',c:'num',f:r=>fmtNum(slipQty(r.s)),x:r=>slipQty(r.s)},
-        {h:'Trạng thái',f:r=>stB(r.s),x:r=>SLIP_ST[slipSt(r.s)][1]},
-        actCol(r=>`<button class="btn sm" data-act="ps-view" data-id="${r.s.id}" title="Xem / ký nhận" aria-label="Xem phiếu">👁</button><button class="btn sm" data-act="ps-edit" data-id="${r.s.id}" title="Sửa" aria-label="Sửa phiếu">✎</button><button class="btn sm" data-act="ps-print" data-id="${r.s.id}" title="In phiếu" aria-label="In phiếu">🖨</button><button class="btn sm" data-act="ps-del" data-id="${r.s.id}" title="Xoá" aria-label="Xoá phiếu">🗑</button>`)
-      ],rows,{empty:`Chưa có phiếu nào phù hợp. Bấm “＋ Tạo phiếu cấp phát”.`,meta:false})+'</section>'}}}
-function slipRows(type){const f=F(),q=norm(f.q);
-  return pSlips(type).filter(s=>(!f.dept||s.dept===f.dept)&&(!f.proj||s.proj===f.proj)&&(!f.from||s.date>=f.from)&&(!f.to||s.date<=f.to)&&(!f.st||slipSt(s)===f.st)
-    &&(!q||norm(`${s.no} ${slipLines(s).map(l=>l.name+' '+l.code).join(' ')}`).includes(q)))
+/* nhóm của phiếu (PPE / đồng phục / cả hai) theo các vật tư trong phiếu */
+const slipGrp=s=>s.type==='mix'||s.type==='uni'||s.type==='ppe'?s.type:'ppe';
+const grpHas=(s,g)=>{const t=slipGrp(s);return !g||t===g||t==='mix'};
+PAGES['ppe/out']={t:'Cấp phát PPE & đồng phục',
+  sub(){return 'Một phiếu cho nhiều người trong cùng dự án, gồm cả PPE và đồng phục'},
+  head(){return `<div class="phero"><span class="pic big">⛑️</span><div><h2>Cấp phát PPE &amp; đồng phục</h2><p>Quản lý cấp phát trang thiết bị bảo hộ lao động và đồng phục</p></div><div class="sp"></div><button class="btn primary" data-act="pd-new">＋ Tạo phiếu cấp phát</button><button class="btn" data-act="ps-xlsx">⬇ Xuất Excel</button></div>
+      <div class="bar pfil">${fSearch('Tìm tên, mã NV, mã phiếu, Job number…')}<label class="fl">Nhóm ${fSel('grp','Nhóm',[['','Tất cả'],['ppe','PPE'],['uni','Đồng phục']])}</label><label class="fl">Phòng ban ${fSel('dept','Phòng ban',deptOptsP('Tất cả'))}</label><label class="fl">Dự án ${fSel('proj','Dự án',projOptsP('Tất cả'))}</label><label class="fl">Trạng thái ${fSel('st','Trạng thái',[['','Tất cả'],['ok','Đã ký'],['wait','Chờ ký'],['part','Ký một phần']])}</label>${fDate('from','Từ ngày')}${fDate('to','Đến ngày')}<button class="btn" data-act="ps-reset" title="Bỏ các bộ lọc">⟲ Đặt lại</button></div>
+      ${PDRAFT?`<div id="pform">${draftHTML()}</div>`:''}`},
+  tbl(){const rows=slipRows();
+    return `<section class="card plist"><h4><span class="pic">📋</span> Danh sách phiếu cấp phát <small class="muted">· tổng ${fmtNum(rows.length)} phiếu</small></h4>`+table([
+      {h:'STT',c:'c',f:r=>r.n,x:r=>r.n},
+      {h:'Mã phiếu',f:r=>`<a href="#/ppe/out" data-act="ps-view" data-id="${r.s.id}"><b style="white-space:nowrap">${esc(r.s.no)}</b></a><br>${badge(slipGrp(r.s)==='uni'?'acc':slipGrp(r.s)==='mix'?'mute':'info',PTYPE[slipGrp(r.s)].grp)}`,x:r=>r.s.no},
+      {h:'Job number',f:r=>`<span style="white-space:nowrap">${esc(r.s.job||'–')}</span>`,x:r=>r.s.job||''},
+      {h:'Nhân viên',f:r=>{const ls=slipLines(r.s);return `${ls.slice(0,2).map(l=>esc(l.name)).join(', ')}${ls.length>2?` <small class="muted">+${ls.length-2} người</small>`:''}`},x:r=>slipLines(r.s).map(l=>l.name).join(', ')},
+      {h:'Phòng ban',f:r=>esc(r.s.dept||'–'),x:r=>r.s.dept||''},
+      {h:'Dự án',f:r=>{const p=pProj(r.s.proj);return p?`<span style="white-space:nowrap" title="${esc(projName(p.id))}">${esc(p.code||p.name)}</span>`:'–'},x:r=>projName(r.s.proj)},
+      {h:'Ngày cấp phát',f:r=>`<span style="white-space:nowrap">${fmtDate(r.s.date)}</span>`,x:r=>fmtDate(r.s.date)},
+      {h:'Vật tư',c:'nt',f:r=>esc(slipItemsTxt(r.s)),x:r=>slipItemsTxt(r.s)},
+      {h:'Số lượng',c:'num',f:r=>fmtNum(slipQty(r.s)),x:r=>slipQty(r.s)},
+      {h:'Trạng thái',f:r=>stB(r.s),x:r=>SLIP_ST[slipSt(r.s)][1]},
+      actCol(r=>`<button class="btn sm" data-act="ps-view" data-id="${r.s.id}" title="Xem / ký nhận" aria-label="Xem phiếu">👁</button><button class="btn sm" data-act="ps-edit" data-id="${r.s.id}" title="Sửa" aria-label="Sửa phiếu">✎</button><button class="btn sm" data-act="ps-print" data-id="${r.s.id}" title="In phiếu" aria-label="In phiếu">🖨</button><button class="btn sm" data-act="ps-del" data-id="${r.s.id}" title="Xoá" aria-label="Xoá phiếu">🗑</button>`)
+    ],rows,{empty:`Chưa có phiếu nào phù hợp. Bấm “＋ Tạo phiếu cấp phát”.`,meta:false})+'</section>'}};
+function slipRows(){const f=F(),q=norm(f.q);
+  return pSlips().filter(s=>grpHas(s,f.grp)&&(!f.dept||s.dept===f.dept)&&(!f.proj||s.proj===f.proj)&&(!f.from||s.date>=f.from)&&(!f.to||s.date<=f.to)&&(!f.st||slipSt(s)===f.st)
+    &&(!q||norm(`${s.no} ${s.job||''} ${slipLines(s).map(l=>l.name+' '+l.code).join(' ')}`).includes(q)))
     .sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.no).localeCompare(String(a.no))).map((s,i)=>({s,n:i+1}))}
-PAGES['ppe/ppe']=slipPage('ppe');
-PAGES['ppe/uni']=slipPage('uni');
 ACT['ps-reset']=()=>{const k=ui.key;ui.f[k]={};rerender()};
 ACT['ps-edit']=el=>{if(!canPPE())return;const s=pSlips().find(x=>x.id===el.dataset.id);if(!s)return;closeModal();PDRAFT=JSON.parse(JSON.stringify({...s,items:s.items&&s.items.length?s.items:[...new Set(slipLines(s).flatMap(l=>Object.keys(l.q)))]}));
-  if(location.hash!=='#/ppe/'+s.type)location.hash='#/ppe/'+s.type;else rerender();setTimeout(()=>$('#pform')?.scrollIntoView({behavior:'smooth',block:'start'}),60)};
+  if(location.hash!=='#/ppe/out')location.hash='#/ppe/out';else rerender();setTimeout(()=>$('#pform')?.scrollIntoView({behavior:'smooth',block:'start'}),60)};
 ACT['ps-del']=el=>{if(!canPPE())return;const s=pSlips().find(x=>x.id===el.dataset.id);if(!s||!confirm(`Xoá phiếu ${s.no}?`))return;if(ppeSave(()=>{db.ppe=db.ppe.filter(v=>v.id!==s.id)})){closeModal();refreshTbl();toast('Đã xoá phiếu')}};
 function slipTable(s,signBtns){const ids=[...new Set(slipLines(s).flatMap(l=>Object.keys(l.q)))],its=pItems('',true).filter(i=>ids.includes(i.id));
   return `<div class="tw"><table class="t pgt"><thead><tr><th>STT</th><th>Nhân viên</th>${its.map(i=>`<th>${esc(i.name)}</th>`).join('')}<th>Ký nhận</th></tr></thead><tbody>${slipLines(s).map((l,i)=>`<tr><td class="c">${i+1}</td><td><b>${esc(l.name)}</b><br><small class="muted">${esc([l.code,l.dept].filter(Boolean).join(' · '))}</small></td>${its.map(it=>{const v=l.q[it.id];return `<td class="c">${v&&+v.n?`<b>${fmtNum(+v.n)}</b>${v.sz?` <small class="muted">${esc(v.sz)}</small>`:''}`:''}</td>`}).join('')}
     <td>${l.signed?`<span class="pos">✔ Đã ký</span> <small class="muted">${fmtDate(l.signedAt)}</small>${signBtns?` <button class="btn sm" data-act="ps-sign" data-id="${s.id}" data-i="${(s.lines||[]).indexOf(l)}" data-v="0">Bỏ</button>`:''}`:signBtns?`<button class="btn sm acc" data-act="ps-sign" data-id="${s.id}" data-i="${(s.lines||[]).indexOf(l)}" data-v="1">Ký nhận</button>`:'<span class="muted">Chờ ký</span>'}</td></tr>`).join('')}</tbody></table></div>`}
 ACT['ps-view']=el=>{const s=pSlips().find(x=>x.id===el.dataset.id);if(!s)return;
-  const info=[['Số phiếu',s.no],['Ngày cấp',fmtDate(s.date)],['Dự án',projName(s.proj)||'–'],['Phòng ban',s.dept||'–'],['Request mua',fmtDate(s.reqDate)||'–'],['PU giao hàng',fmtDate(s.puDate)||'–'],['Người lập',s.by||''],['Trạng thái',stB(s)]];
+  const info=[['Số phiếu',s.no],['Job number',s.job||'–'],['Ngày cấp',fmtDate(s.date)],['Nhóm',PTYPE[slipGrp(s)].grp],['Dự án',projName(s.proj)||'–'],['Phòng ban',s.dept||'–'],['Người lập',s.by||''],['Trạng thái',stB(s)]];
   modal(`Phiếu ${s.no}`,`<div class="pinfo">${info.map(([k,v])=>`<div><small>${k}</small><b>${k==='Trạng thái'?v:esc(v)}</b></div>`).join('')}</div>${s.note?`<p class="note">${esc(s.note)}</p>`:''}${slipTable(s,true)}`,
     {footer:`<button class="btn danger" data-act="ps-del" data-id="${s.id}" style="margin-right:auto">Xoá</button>${slipSt(s)!=='ok'?`<button class="btn acc" data-act="ps-signall" data-id="${s.id}">✔ Ký nhận tất cả</button>`:''}<button class="btn" data-act="ps-edit" data-id="${s.id}">✎ Sửa</button><button class="btn primary" data-act="ps-print" data-id="${s.id}">🖨 In phiếu</button>`,size:'wide kt'})};
 ACT['ps-sign']=el=>{if(!canPPE())return;const id=el.dataset.id,i=+el.dataset.i,on=el.dataset.v==='1';
   if(ppeSave(()=>{const s=db.ppe.find(z=>z.id===id),l=s&&s.lines[i];if(!l)throw new Error('Dòng này không còn.');l.signed=on;if(on)l.signedAt=todayStr();else delete l.signedAt})){refreshTbl();ACT['ps-view']({dataset:{id}})}};
 ACT['ps-signall']=el=>{if(!canPPE())return;const id=el.dataset.id;if(ppeSave(()=>{const s=db.ppe.find(z=>z.id===id);slipLines(s).forEach(l=>{if(!l.signed){l.signed=true;l.signedAt=todayStr()}})})){refreshTbl();ACT['ps-view']({dataset:{id}});toast('Đã ghi ký nhận cho tất cả')}};
-ACT['ps-xlsx']=el=>{const type=el.dataset.type,rows=slipRows(type);if(!rows.length)return toast('Không có phiếu để xuất.','warn');
-  const out=[['Mã phiếu','Ngày cấp','Dự án','Phòng ban','Mã NV','Họ tên','Phòng ban NV','Vật tư','Size','Số lượng','ĐVT','Ký nhận','Ngày ký','Request mua','PU giao','Ghi chú']];
-  rows.forEach(({s})=>slipLines(s).forEach(l=>Object.entries(l.q).forEach(([id,v])=>{if(!(+v.n>0))return;const it=pItem(id)||{};out.push([s.no,fmtDate(s.date),projName(s.proj),s.dept||'',l.code||'',l.name,l.dept||'',it.name||'',v.sz||'',+v.n,it.unit||'',l.signed?'Đã ký':'Chờ ký',fmtDate(l.signedAt)||'',fmtDate(s.reqDate)||'',fmtDate(s.puDate)||'',s.note||''])})));
-  xlsxSave(out,type==='uni'?'cap-phat-dong-phuc':'cap-phat-ppe',type==='uni'?'Dong phuc':'PPE')};
+ACT['ps-xlsx']=()=>{const rows=slipRows();if(!rows.length)return toast('Không có phiếu để xuất.','warn');
+  const out=[['Mã phiếu','Job number','Ngày cấp','Dự án','Phòng ban','Mã NV','Họ tên','Phòng ban NV','Nhóm','Vật tư','Size','Số lượng','ĐVT','Ký nhận','Ngày ký','Ghi chú']];
+  rows.forEach(({s})=>slipLines(s).forEach(l=>Object.entries(l.q).forEach(([id,v])=>{if(!(+v.n>0))return;const it=pItem(id)||{};out.push([s.no,s.job||'',fmtDate(s.date),projName(s.proj),s.dept||'',l.code||'',l.name,l.dept||'',PTYPE[it.type||'ppe'].grp,it.name||'',v.sz||'',+v.n,it.unit||'',l.signed?'Đã ký':'Chờ ký',fmtDate(l.signedAt)||'',s.note||''])})));
+  xlsxSave(out,'cap-phat-ppe-dong-phuc','Cap phat')};
 
 /* ---------- in phiếu theo mẫu giấy ---------- */
 function slipPrintHTML(s){const ids=[...new Set(slipLines(s).flatMap(l=>Object.keys(l.q)))],its=pItems('',true).filter(i=>ids.includes(i.id)),ls=slipLines(s),pad=Math.max(0,10-ls.length),c=db.company||{},p=pProj(s.proj);
@@ -171,8 +188,8 @@ function slipPrintHTML(s){const ids=[...new Set(slipLines(s).flatMap(l=>Object.k
   const cells=l=>its.map(it=>{const v=l&&l.q[it.id];return `<td class="c">${v&&+v.n?fmtNum(+v.n):''}</td>${hasSz(it)?`<td class="c">${v?esc(v.sz||''):''}</td>`:''}`}).join('');
   const tot=it=>ls.reduce((a,l)=>a+(+(l.q[it.id]||{}).n||0),0);
   return `<div class="slip book"><div class="sh"><div class="co"><b>${esc(c.name||'')}</b></div><div style="text-align:right">Số phiếu: <b>${esc(s.no)}</b><br>Ngày in: ${fmtDate(todayStr())}</div></div>
-    <h2>${esc(PTYPE[s.type].book)}</h2><div class="sub">Phiếu cấp phát ${s.type==='uni'?'đồng phục':'bảo hộ lao động'}</div>
-    <div class="mt"><div>Project/Department: <b>${esc([projName(s.proj),s.dept].filter(Boolean).join(' ; '))}</b></div><div>PIC: <b>${esc(p?.pic||'')}</b></div><div>Ngày cấp: <b>${fmtDate(s.date)}</b></div><div>${s.reqDate||s.puDate?`Request mua: <b>${fmtDate(s.reqDate)||'–'}</b> · PU giao: <b>${fmtDate(s.puDate)||'–'}</b>`:''}</div></div>
+    <h2>${esc(PTYPE[slipGrp(s)].book)}</h2><div class="sub">Phiếu cấp phát ${PTYPE[slipGrp(s)].sub}</div>
+    <div class="mt"><div>Project/Department: <b>${esc([projName(s.proj),s.dept].filter(Boolean).join(' ; '))}</b></div><div>PIC: <b>${esc(p?.pic||'')}</b></div><div>Job number: <b>${esc(s.job||'')}</b></div><div>Ngày cấp: <b>${fmtDate(s.date)}</b></div></div>
     <table><thead><tr><th rowspan="2" style="width:34px">No</th><th rowspan="2">Receiver Name</th><th rowspan="2">Staff code</th>${its.map(it=>`<th ${hasSz(it)?'colspan="2"':'rowspan="2"'}>${esc(it.en||it.name)}${it.en&&it.en!==it.name?`<br><i>${esc(it.name)}</i>`:''}</th>`).join('')}<th rowspan="2">Date</th><th rowspan="2" style="width:120px">Sign</th></tr><tr>${its.filter(hasSz).map(()=>'<th>SL</th><th>Size</th>').join('')}</tr></thead><tbody>
     ${ls.map((l,n)=>`<tr><td class="c">${n+1}</td><td>${esc(l.name)}</td><td>${esc(l.code||'')}</td>${cells(l)}<td style="white-space:nowrap">${fmtDate(l.signedAt||s.date)}</td><td></td></tr>`).join('')}
     ${Array.from({length:pad},(_,n)=>`<tr><td class="c">${ls.length+n+1}</td><td></td><td></td>${cells(null)}<td></td><td></td></tr>`).join('')}
@@ -191,7 +208,8 @@ PAGES['ppe/cat']={t:'Danh mục PPE & đồng phục',
   tbl(){const f=F(),tab=f.tab||'emp';
     if(tab==='org')return `<div class="grid g2">${card(`Dự án <button class="btn sm primary" data-act="pp-edit" style="float:right">＋ Thêm dự án</button>`,miniTable(['Mã','Tên dự án','PIC','Trạng thái','Nhân viên','Phiếu',''],pProjs().map(p=>`<tr><td><b>${esc(p.code||'')}</b></td><td>${esc(p.name||'')}</td><td>${esc(p.pic||'')}</td><td>${p.status==='done'?badge('mute','Đã xong'):badge('ok','Đang chạy')}</td><td class="num">${pEmps().filter(e=>e.proj===p.id).length}</td><td class="num">${pSlips().filter(s=>s.proj===p.id).length}</td><td class="act"><button class="btn sm" data-act="pp-edit" data-id="${p.id}">Sửa</button></td></tr>`),'Chưa có dự án. Bấm “＋ Thêm dự án”.'))}
       ${card(`Phòng ban <button class="btn sm primary" data-act="pdp-add" style="float:right">＋ Thêm phòng ban</button>`,miniTable(['Phòng ban','Nhân viên','Phiếu',''],pDepts().map(d=>{const doc=pDocs('dept').find(x=>x.name===d);return `<tr><td><b>${esc(d)}</b></td><td class="num">${pEmps().filter(e=>e.dept===d).length}</td><td class="num">${pSlips().filter(s=>s.dept===d).length}</td><td class="act">${doc?`<button class="btn sm" data-act="pdp-del" data-id="${doc.id}">Xoá</button>`:'<small class="muted">từ hồ sơ NV</small>'}</td></tr>`}),'Chưa có phòng ban.'))}</div>`;
-    if(tab==='item')return `<div class="grid g2">${['ppe','uni'].map(t=>card(`${PTYPE[t].icon} ${t==='ppe'?'Vật tư PPE':'Đồng phục'} <button class="btn sm primary" data-act="pi-edit" data-type="${t}" style="float:right">＋ Thêm</button>`,miniTable(['Tên','Tên in phiếu','ĐVT','Size','Lấy size theo',''],pItems(t).map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(i.en||'')}</td><td>${esc(i.unit||'')}</td><td class="nt">${esc(i.sizes||'—')}</td><td>${esc(SZK[i.szKey]||'—')}</td><td class="act"><button class="btn sm" data-act="pi-edit" data-id="${i.id}">Sửa</button></td></tr>`))+'<p class="note">“Lấy size theo”: khi thêm người vào phiếu, size tự điền theo hồ sơ nhân viên (ví dụ Giày bảo hộ lấy Size giày).</p>')).join('')}</div>`;
+    const ST=pStock();
+    if(tab==='item')return `<div>${['ppe','uni'].map(t=>card(`${PTYPE[t].icon} ${t==='ppe'?'Vật tư PPE':'Đồng phục'} <button class="btn sm primary" data-act="pi-edit" data-type="${t}" style="float:right">＋ Thêm</button>`,miniTable(['Tên','ĐVT','Size','Lấy size theo','Nhập','Đã cấp','Tồn',''],pItems(t).map(i=>{const k=stockTxt(ST,i.id);return `<tr><td><b>${esc(i.name)}</b>${i.en?`<br><small class="muted">${esc(i.en)}</small>`:''}</td><td>${esc(i.unit||'')}</td><td class="nt"><small>${esc(i.sizes||'—')}</small></td><td><small>${esc(SZK[i.szKey]||'—')}</small></td><td class="num">${fmtNum(k.inn)}</td><td class="num">${fmtNum(k.out)}</td><td><b class="${k.t<0?'tag-bad':''}">${fmtNum(k.t)}</b>${k.sz?`<div class="pszs">${k.sz}</div>`:''}</td><td class="act"><button class="btn sm" data-act="pi-edit" data-id="${i.id}">Sửa</button></td></tr>`}))+'<p class="note">Nhập = tổng các phiếu nhập kho; Tồn = Nhập − Đã cấp (theo size). “Lấy size theo”: khi thêm người vào phiếu, size tự điền theo hồ sơ nhân viên (ví dụ Giày bảo hộ lấy Size giày).</p>')).join('')}</div>`;
     const q=norm(f.q),rows=pEmps().filter(e=>(!f.proj||e.proj===f.proj)&&(!f.dept||e.dept===f.dept)&&(!q||norm(`${e.code} ${e.name}`).includes(q)));
     return table([
       {h:'Mã NV',f:e=>`<b style="white-space:nowrap">${esc(e.code||'')}</b>`,x:e=>e.code||''},
@@ -258,8 +276,8 @@ ACT['pi-del']=el=>{if(!canPPE()||!confirm('Xoá vật tư này khỏi danh mục
 PAGES['ppe/rpt']={t:'Báo cáo cấp phát PPE & đồng phục',
   sub(){const f=F();return [f.type?PTYPE[f.type].grp:'PPE và đồng phục',f.proj?projName(f.proj):'',f.from||f.to?`${fmtDate(f.from)||'…'} – ${fmtDate(f.to)||'…'}`:''].filter(Boolean).join(' · ')},
   head(){return `<div class="bar"><label class="fl">Nhóm ${fSel('type','Nhóm',[['','Tất cả'],['ppe','PPE'],['uni','Đồng phục']])}</label><label class="fl">Dự án ${fSel('proj','Dự án',projOptsP('Tất cả'))}</label><label class="fl">Phòng ban ${fSel('dept','Phòng ban',deptOptsP('Tất cả'))}</label>${fDate('from','Từ ngày')}${fDate('to','Đến ngày')}<div class="sp"></div>${rptBtns('bao-cao-ppe')}</div>`},
-  tbl(){const f=F(),ss=pSlips(f.type).filter(s=>(!f.proj||s.proj===f.proj)&&(!f.dept||s.dept===f.dept)&&(!f.from||s.date>=f.from)&&(!f.to||s.date<=f.to));
-    const m=new Map();ss.forEach(s=>slipLines(s).forEach(l=>Object.entries(l.q).forEach(([id,v])=>{if(!(+v.n>0))return;const k=id+'|'+(v.sz||'');if(!m.has(k))m.set(k,{id,sz:v.sz||'',n:0,ppl:new Set(),slips:new Set(),sig:0});const o=m.get(k);o.n+=+v.n;o.ppl.add(l.pid||l.name);o.slips.add(s.id);if(l.signed)o.sig+=+v.n})));
+  tbl(){const f=F(),ss=pSlips().filter(s=>grpHas(s,f.type)&&(!f.proj||s.proj===f.proj)&&(!f.dept||s.dept===f.dept)&&(!f.from||s.date>=f.from)&&(!f.to||s.date<=f.to));
+    const m=new Map();ss.forEach(s=>slipLines(s).forEach(l=>Object.entries(l.q).forEach(([id,v])=>{if(!(+v.n>0)||(f.type&&(pItem(id)?.type||'ppe')!==f.type))return;const k=id+'|'+(v.sz||'');if(!m.has(k))m.set(k,{id,sz:v.sz||'',n:0,ppl:new Set(),slips:new Set(),sig:0});const o=m.get(k);o.n+=+v.n;o.ppl.add(l.pid||l.name);o.slips.add(s.id);if(l.signed)o.sig+=+v.n})));
     const ord=pItems('',true).map(i=>i.id),rows=[...m.values()].sort((a,b)=>ord.indexOf(a.id)-ord.indexOf(b.id)||String(a.sz).localeCompare(String(b.sz),'vi',{numeric:true}));
     const byP=new Map();ss.forEach(s=>{const k=s.proj||('d:'+s.dept);if(!byP.has(k))byP.set(k,{lbl:projName(s.proj)||s.dept||'–',slips:0,ppl:new Set(),n:0,wait:0});const o=byP.get(k);o.slips++;slipLines(s).forEach(l=>{o.ppl.add(l.pid||l.name);o.n+=lineQty(l);if(!l.signed)o.wait++})});
     const tot=rows.reduce((a,o)=>a+o.n,0);
@@ -270,3 +288,73 @@ PAGES['ppe/rpt']={t:'Báo cáo cấp phát PPE & đồng phục',
         {h:'Số lượng cấp',c:'num',f:o=>`<b>${fmtNum(o.n)}</b>`,x:o=>o.n},{h:'Đã ký nhận',c:'num',f:o=>fmtNum(o.sig),x:o=>o.sig},{h:'Số người',c:'num',f:o=>fmtNum(o.ppl.size),x:o=>o.ppl.size},{h:'Số phiếu',c:'num',f:o=>fmtNum(o.slips.size),x:o=>o.slips.size}
       ],rows,{empty:'Chưa có số liệu cấp phát trong bộ lọc.'}))
       +card('Theo dự án / phòng ban',miniTable(['Dự án / phòng ban','Số phiếu','Số người','Số món','Chờ ký'],[...byP.values()].sort((a,b)=>b.n-a.n).map(o=>`<tr><td><b>${esc(o.lbl)}</b></td><td class="num">${o.slips}</td><td class="num">${o.ppl.size}</td><td class="num">${fmtNum(o.n)}</td><td class="num">${o.wait?`<span class="tag-warn">${o.wait}</span>`:'0'}</td></tr>`),'Chưa có số liệu.'))}};
+
+/* ---------- Nhập PPE & đồng phục: Request mua → PU giao hàng (chi tiết sản phẩm) → cộng vào tồn ---------- */
+let RDRAFT=null;
+const pRcvs=()=>pDocs('rcv');
+const rcvQty=r=>(r.lines||[]).reduce((a,l)=>a+(+l.n||0),0);
+const rcvTxt=r=>(r.lines||[]).filter(l=>+l.n>0).map(l=>`${pItem(l.item)?.name||'?'}${l.sz?' '+l.sz:''} × ${l.n}`).join(', ');
+const rcvLead=r=>r.reqDate&&r.puDate?dayNum(r.puDate)-dayNum(r.reqDate):null;
+const itemOpts=v=>['ppe','uni'].map(t=>`<optgroup label="${PTYPE[t].grp}">${pItems(t).map(i=>`<option value="${i.id}" ${i.id===v?'selected':''}>${esc(i.name)}</option>`).join('')}</optgroup>`).join('');
+function rcvLineHTML(l,i){const it=pItem(l.item)||{},ss=splitSz(it.sizes);
+  return `<tr><td class="c">${i+1}</td><td><select class="in" data-rq="${i}|item" aria-label="Vật tư dòng ${i+1}">${itemOpts(l.item)}</select></td><td>${esc(it.unit||'')}</td>
+    <td>${ss.length?`<select class="in" data-rq="${i}|sz" aria-label="Size dòng ${i+1}"><option value="">–</option>${ss.map(x=>`<option ${x===l.sz?'selected':''}>${esc(x)}</option>`).join('')}</select>`:'<span class="muted">–</span>'}</td>
+    <td><input class="in" type="number" min="0" max="99999" data-rq="${i}|n" value="${l.n?esc(l.n):''}" aria-label="Số lượng dòng ${i+1}"></td>
+    <td><input class="in" data-rq="${i}|detail" value="${esc(l.detail||'')}" placeholder="Hãng, model, màu, tiêu chuẩn…" aria-label="Chi tiết sản phẩm dòng ${i+1}"></td>
+    <td class="c"><button type="button" class="btn sm" data-act="rd-del" data-i="${i}" aria-label="Xoá dòng ${i+1}">🗑</button></td></tr>`}
+function rdraftHTML(){const d=RDRAFT;
+  return `<section class="card pform"><h4><span class="pic">📦</span> Thông tin nhập ${d.id?`<small class="muted">· sửa phiếu ${esc(d.no)}</small>`:''}</h4>
+    <div class="pgrid">
+      <label class="f"><span>Ngày request mua</span><input class="in" type="date" data-rd="reqDate" value="${esc(d.reqDate||'')}"></label>
+      <label class="f"><span>Ngày PU giao hàng <i>*</i></span><input class="in" type="date" data-rd="puDate" value="${esc(d.puDate||'')}"></label>
+      <label class="f"><span>Số PR / PO</span><input class="in" data-rd="pr" value="${esc(d.pr||'')}" placeholder="VD: PR-2026-015"></label>
+      <label class="f"><span>Số phiếu</span><input class="in" readonly value="${esc(d.no||'Tự động sinh')}"></label>
+      <label class="f w4"><span>Ghi chú</span><input class="in" data-rd="note" value="${esc(d.note||'')}" placeholder="Nhà cung cấp, dự án đặt hàng…"></label></div>
+    <div class="psub"><b>Chi tiết sản phẩm PU giao</b></div>
+    <div class="tw"><table class="t pgt"><thead><tr><th>STT</th><th>Vật tư</th><th>ĐVT</th><th>Size</th><th>SL nhập</th><th>Chi tiết sản phẩm</th><th></th></tr></thead><tbody>${d.lines.map(rcvLineHTML).join('')}</tbody></table></div>
+    <div class="rgbtn"><button type="button" class="btn sm" data-act="rd-add">＋ Thêm dòng</button><span class="note">Mỗi size một dòng. SL nhập được cộng vào tồn của vật tư ở Danh mục.</span></div>
+    <div class="pfoot"><span class="muted">${fmtNum(d.lines.reduce((a,l)=>a+(+l.n||0),0))} món</span><div class="sp"></div><button type="button" class="btn" data-act="rd-cancel">Hủy</button><button type="button" class="btn primary" data-act="rd-save">Lưu phiếu nhập</button></div></section>`}
+const redrawR=()=>{const el=$('#rform');if(el&&RDRAFT)el.innerHTML=rdraftHTML()};
+document.addEventListener('input',ev=>{const el=ev.target;if(!RDRAFT||!el.closest||!el.closest('#rform'))return;
+  if(el.dataset.rd){RDRAFT[el.dataset.rd]=el.value;return}
+  if(el.dataset.rq){const [i,k]=el.dataset.rq.split('|'),l=RDRAFT.lines[+i];if(!l)return;l[k]=k==='n'?Math.max(0,+el.value||0):el.value;if(k==='item'){l.sz='';redrawR()}}});
+ACT['rd-new']=()=>{if(!canPPE())return;RDRAFT={no:'',reqDate:'',puDate:todayStr(),pr:'',note:'',lines:[{item:'pi_helm',sz:'',n:0,detail:''},{item:'pi_shoe',sz:'',n:0,detail:''},{item:'pi_uni',sz:'',n:0,detail:''}]};rerender()};
+ACT['rd-add']=()=>{const last=RDRAFT.lines[RDRAFT.lines.length-1];RDRAFT.lines.push({item:last?last.item:'pi_helm',sz:'',n:0,detail:last?last.detail:''});redrawR()};
+ACT['rd-del']=el=>{RDRAFT.lines.splice(+el.dataset.i,1);redrawR()};
+ACT['rd-cancel']=()=>{RDRAFT=null;rerender()};
+ACT['rd-save']=()=>{if(!canPPE())return;const d=RDRAFT;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d.puDate||''))return toast('Nhập ngày PU giao hàng.','error');
+  if(d.reqDate&&d.reqDate>d.puDate)return toast('Ngày PU giao không được trước ngày request mua.','error');
+  const lines=d.lines.filter(l=>l.item&&+l.n>0).map(l=>({item:l.item,sz:splitSz(pItem(l.item)?.sizes).length?l.sz||'':'',n:+l.n,detail:String(l.detail||'').trim()}));
+  if(!lines.length)return toast('Nhập số lượng cho ít nhất một dòng.','error');
+  const miss=lines.find(l=>splitSz(pItem(l.item)?.sizes).length&&!l.sz);if(miss)return toast(`Chọn size cho ${pItem(miss.item)?.name}.`,'error');
+  const v={reqDate:d.reqDate||'',puDate:d.puDate,pr:String(d.pr||'').trim(),note:String(d.note||'').trim(),lines};let no=d.no;
+  if(ppeSave(()=>{if(d.id){const x=db.ppe.find(z=>z.id===d.id);if(!x)throw new Error('Phiếu này không còn tồn tại.');Object.assign(x,v)}else{no=nextNo('NK',d.puDate);db.ppe.push({id:uid('rc'),kind:'rcv',no,...v,by:session?.name||'',at:new Date().toISOString()})}})){RDRAFT=null;rerender();toast(`Đã lưu phiếu nhập ${no}`)}};
+ACT['rc-edit']=el=>{const r=pRcvs().find(x=>x.id===el.dataset.id);if(!r||!canPPE())return;closeModal();RDRAFT=JSON.parse(JSON.stringify(r));rerender();setTimeout(()=>$('#rform')?.scrollIntoView({behavior:'smooth',block:'start'}),60)};
+ACT['rc-del']=el=>{const r=pRcvs().find(x=>x.id===el.dataset.id);if(!r||!canPPE()||!confirm(`Xoá phiếu nhập ${r.no}? Tồn kho sẽ giảm tương ứng.`))return;if(ppeSave(()=>{db.ppe=db.ppe.filter(z=>z.id!==r.id)})){closeModal();refreshTbl();toast('Đã xoá phiếu nhập')}};
+ACT['rc-view']=el=>{const r=pRcvs().find(x=>x.id===el.dataset.id);if(!r)return;const L=rcvLead(r);
+  modal(`Phiếu nhập ${r.no}`,`<div class="pinfo">${[['Số phiếu',r.no],['Số PR / PO',r.pr||'–'],['Ngày request mua',fmtDate(r.reqDate)||'–'],['Ngày PU giao hàng',fmtDate(r.puDate)+(L!=null?` (sau ${L} ngày)`:'')],['Người nhập',r.by||'']].map(([k,v])=>`<div><small>${k}</small><b>${esc(v)}</b></div>`).join('')}</div>${r.note?`<p class="note">${esc(r.note)}</p>`:''}
+    ${miniTable(['STT','Vật tư','Size','SL nhập','ĐVT','Chi tiết sản phẩm'],(r.lines||[]).map((l,i)=>{const it=pItem(l.item)||{};return `<tr><td class="c">${i+1}</td><td><b>${esc(it.name||'?')}</b></td><td>${esc(l.sz||'–')}</td><td class="num"><b>${fmtNum(+l.n)}</b></td><td>${esc(it.unit||'')}</td><td>${esc(l.detail||'')}</td></tr>`}))}`,
+    {footer:`<button class="btn danger" data-act="rc-del" data-id="${r.id}" style="margin-right:auto">Xoá</button><button class="btn" data-act="rc-edit" data-id="${r.id}">✎ Sửa</button><button class="btn primary" data-act="close">Đóng</button>`,size:'wide kt'})};
+function rcvRows(){const f=F(),q=norm(f.q);
+  return pRcvs().filter(r=>(!f.from||r.puDate>=f.from)&&(!f.to||r.puDate<=f.to)&&(!f.grp||(r.lines||[]).some(l=>(pItem(l.item)?.type||'ppe')===f.grp))&&(!q||norm(`${r.no} ${r.pr} ${r.note} ${rcvTxt(r)} ${(r.lines||[]).map(l=>l.detail).join(' ')}`).includes(q)))
+    .sort((a,b)=>String(b.puDate).localeCompare(String(a.puDate))||String(b.no).localeCompare(String(a.no))).map((r,i)=>({r,n:i+1}))}
+PAGES['ppe/in']={t:'Nhập PPE & đồng phục',
+  sub(){return 'Request mua → PU giao hàng → cộng vào tồn kho'},
+  head(){return `<div class="phero"><span class="pic big">📦</span><div><h2>Nhập PPE &amp; đồng phục</h2><p>Ghi ngày request mua, ngày PU giao hàng và chi tiết sản phẩm; số lượng nhập cộng vào tồn của từng vật tư</p></div><div class="sp"></div><button class="btn primary" data-act="rd-new">＋ Tạo phiếu nhập</button><button class="btn" data-act="export" data-name="nhap-ppe">⬇ Xuất Excel</button></div>
+      <div class="bar pfil">${fSearch('Tìm mã phiếu, số PR, vật tư, chi tiết sản phẩm…')}<label class="fl">Nhóm ${fSel('grp','Nhóm',[['','Tất cả'],['ppe','PPE'],['uni','Đồng phục']])}</label>${fDate('from','PU giao từ')}${fDate('to','đến')}<button class="btn" data-act="ps-reset" title="Bỏ các bộ lọc">⟲ Đặt lại</button></div>
+      ${RDRAFT?`<div id="rform">${rdraftHTML()}</div>`:''}`},
+  tbl(){const rows=rcvRows(),st=pStock(),stk=[...st.values()].filter(o=>o.inn||o.out),ord=pItems('',true).map(i=>i.id);
+    stk.sort((a,b)=>ord.indexOf(a.id)-ord.indexOf(b.id)||splitSz(pItem(a.id)?.sizes).indexOf(a.sz)-splitSz(pItem(b.id)?.sizes).indexOf(b.sz));
+    return `<section class="card plist"><h4><span class="pic">📦</span> Danh sách phiếu nhập <small class="muted">· tổng ${fmtNum(rows.length)} phiếu</small></h4>`+table([
+      {h:'STT',c:'c',f:x=>x.n,x:x=>x.n},
+      {h:'Mã phiếu',f:x=>`<a href="#/ppe/in" data-act="rc-view" data-id="${x.r.id}"><b style="white-space:nowrap">${esc(x.r.no)}</b></a>`,x:x=>x.r.no},
+      {h:'Số PR / PO',f:x=>esc(x.r.pr||'–'),x:x=>x.r.pr||''},
+      {h:'Ngày request mua',f:x=>`<span style="white-space:nowrap">${fmtDate(x.r.reqDate)||'–'}</span>`,x:x=>fmtDate(x.r.reqDate)},
+      {h:'Ngày PU giao',f:x=>`<b style="white-space:nowrap">${fmtDate(x.r.puDate)}</b>${rcvLead(x.r)!=null?`<br><small class="muted">sau ${rcvLead(x.r)} ngày</small>`:''}`,x:x=>fmtDate(x.r.puDate)},
+      {h:'Vật tư nhập',c:'nt',f:x=>esc(rcvTxt(x.r)),x:x=>rcvTxt(x.r)},
+      {h:'Chi tiết sản phẩm',c:'nt',f:x=>esc([...new Set((x.r.lines||[]).map(l=>l.detail).filter(Boolean))].join('; ')||'–'),x:x=>(x.r.lines||[]).map(l=>l.detail).filter(Boolean).join('; ')},
+      {h:'Số lượng',c:'num',f:x=>fmtNum(rcvQty(x.r)),x:x=>rcvQty(x.r)},
+      actCol(x=>`<button class="btn sm" data-act="rc-view" data-id="${x.r.id}" title="Xem" aria-label="Xem phiếu nhập">👁</button><button class="btn sm" data-act="rc-edit" data-id="${x.r.id}" title="Sửa" aria-label="Sửa phiếu nhập">✎</button><button class="btn sm" data-act="rc-del" data-id="${x.r.id}" title="Xoá" aria-label="Xoá phiếu nhập">🗑</button>`)
+    ],rows,{empty:'Chưa có phiếu nhập nào. Bấm “＋ Tạo phiếu nhập”.',meta:false})+'</section>'
+    +card('Tồn kho theo vật tư & size',miniTable(['Vật tư','Nhóm','Size','Nhập','Đã cấp','Tồn'],stk.map(o=>{const it=pItem(o.id)||{},t=o.inn-o.out;return `<tr><td><b>${esc(it.name||'?')}</b></td><td><small>${esc(PTYPE[it.type||'ppe'].grp)}</small></td><td>${esc(o.sz||'–')}</td><td class="num">${fmtNum(o.inn)}</td><td class="num">${fmtNum(o.out)}</td><td class="num"><b class="${t<0?'tag-bad':t===0?'muted':''}">${fmtNum(t)}</b></td></tr>`}),'Chưa có số liệu nhập / cấp.')+'<p class="note">Tồn âm: đã cấp nhiều hơn số đã nhập trên app (thường do hàng tồn từ trước chưa nhập phiếu).</p>')}};

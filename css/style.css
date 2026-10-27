@@ -951,7 +951,12 @@ table.t td.kric small{display:block}
 .pform{border-color:#bcd0f2;background:linear-gradient(#f7faff,#fff 120px)}
 .pform h4,.plist h4{display:flex;align-items:center;gap:8px}
 .pgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px;margin-top:8px}
-.pgrid .w2{grid-column:span 2}
+.pgrid .w2{grid-column:span 2}.pgrid .w3{grid-column:span 3}.pgrid .w4{grid-column:1/-1}
+.pcg{font-size:12px;font-weight:600;color:var(--muted);align-self:center;min-width:92px}
+.pchip small{opacity:.75;font-weight:400}
+.pwarn{margin-top:8px;padding:8px 12px;border-radius:8px;background:#fff3d6;border:1px solid #f2c86b;color:#7a4f00;font-size:13px}
+.pszs{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}.pszs .chip{font-size:11px;padding:1px 6px}.chip.bad{color:var(--bad)}
+table.t.pgt select.in[data-rq$='item']{width:auto;min-width:160px}table.t.pgt input[data-rq$='detail']{min-width:220px}
 .pgrid input[readonly]{background:var(--mute-s,#f1f3f7);color:var(--muted)}
 .psub{margin-top:14px}
 .pchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -966,7 +971,12 @@ table.t.pgt select.in{width:72px;padding:4px}
 .pfoot{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .empty.sm{padding:14px;margin-top:8px}
 .pinfo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 14px;margin-bottom:10px}.pinfo div{display:flex;flex-direction:column}.pinfo small{color:var(--muted)}
-@media (max-width:900px){.pgrid,.pinfo{grid-template-columns:1fr 1fr}.pgrid .w2{grid-column:span 2}}
+@media (max-width:900px){.pgrid,.pinfo{grid-template-columns:1fr 1fr}.pgrid .w2{grid-column:span 2}.pgrid .w3{grid-column:span 3}.pgrid .w4{grid-column:1/-1}
+.pcg{font-size:12px;font-weight:600;color:var(--muted);align-self:center;min-width:92px}
+.pchip small{opacity:.75;font-weight:400}
+.pwarn{margin-top:8px;padding:8px 12px;border-radius:8px;background:#fff3d6;border:1px solid #f2c86b;color:#7a4f00;font-size:13px}
+.pszs{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}.pszs .chip{font-size:11px;padding:1px 6px}.chip.bad{color:var(--bad)}
+table.t.pgt select.in[data-rq$='item']{width:auto;min-width:160px}table.t.pgt input[data-rq$='detail']{min-width:220px}}
 /* ---------- Phiếu đăng ký PPE & đồng phục ---------- */
 .ppef .bar{margin-bottom:10px}
 .ppef .card{margin-bottom:12px}

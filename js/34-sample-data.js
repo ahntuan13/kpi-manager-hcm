@@ -68,10 +68,11 @@ function loadSample(){
       {id:'pe_s2',kind:'pemp',code:'CN-02',name:'Lý Minh Phúc',dept:'Thi công',proj:'pj_s1',sz_shirt:'M',sz_pant:'M',sz_shoe:'40',sz_glove:'M',active:true},
       {id:'pe_s3',kind:'pemp',code:'CN-03',name:'Trịnh Quang Vinh',dept:'Kỹ thuật',proj:'pj_s1',sz_shirt:'XL',sz_pant:'XL',sz_shoe:'42',active:true},
       {id:'pe_s4',kind:'pemp',code:'CN-04',name:'Mai Hữu Nghĩa',dept:'Văn phòng',proj:'pj_s2',sz_shirt:'L',sz_pant:'L',sz_shoe:'41',active:true},
-      {id:'ps_s1',kind:'slip',no:`PPE-${back(12).replace(/-/g,'')}-001`,type:'ppe',proj:'pj_s1',dept:'Thi công',date:back(12),reqDate:back(25),puDate:back(14),note:'Dữ liệu mẫu',items:['pi_helm','pi_shoe','pi_glass'],
+      {id:'rc_s1',kind:'rcv',no:`NK-${back(14).replace(/-/g,'')}-001`,reqDate:back(25),puDate:back(14),pr:'PR-MAU-01',note:'Dữ liệu mẫu',lines:[{item:'pi_helm',sz:'',n:10,detail:'Mũ trắng mẫu'},{item:'pi_shoe',sz:'40',n:3,detail:'Giày mẫu'},{item:'pi_shoe',sz:'41',n:3,detail:'Giày mẫu'},{item:'pi_glass',sz:'',n:5,detail:''},{item:'pi_uni',sz:'L',n:4,detail:'Áo xanh mẫu'},{item:'pi_pant',sz:'L',n:4,detail:'Quần mẫu'}],by:'Quản lý',at:back(14)},
+      {id:'ps_s1',kind:'slip',no:`CP-${back(12).replace(/-/g,'')}-001`,type:'ppe',job:'J-MAU-01',proj:'pj_s1',dept:'Thi công',date:back(12),note:'Dữ liệu mẫu',items:['pi_helm','pi_shoe','pi_glass'],
         lines:[{pid:'pe_s1',code:'CN-01',name:'Ngô Văn Tài',dept:'Thi công',q:{pi_helm:{n:1,sz:''},pi_shoe:{n:1,sz:'41'},pi_glass:{n:1,sz:''}},signed:true,signedAt:back(12)},
           {pid:'pe_s2',code:'CN-02',name:'Lý Minh Phúc',dept:'Thi công',q:{pi_helm:{n:1,sz:''},pi_shoe:{n:1,sz:'40'}},signed:false},{pid:'',code:'',name:'Visitor',dept:'',q:{pi_helm:{n:3,sz:''}},signed:true,signedAt:back(12)}],by:'Quản lý',at:back(12)},
-      {id:'ps_s2',kind:'slip',no:`DP-${back(3).replace(/-/g,'')}-001`,type:'uni',proj:'pj_s2',dept:'Văn phòng',date:back(3),reqDate:'',puDate:'',note:'Dữ liệu mẫu',items:['pi_uni','pi_pant'],
+      {id:'ps_s2',kind:'slip',no:`CP-${back(3).replace(/-/g,'')}-001`,type:'uni',job:'J-MAU-02',proj:'pj_s2',dept:'Văn phòng',date:back(3),note:'Dữ liệu mẫu',items:['pi_uni','pi_pant'],
         lines:[{pid:'pe_s4',code:'CN-04',name:'Mai Hữu Nghĩa',dept:'Văn phòng',q:{pi_uni:{n:2,sz:'L'},pi_pant:{n:2,sz:'L'}},signed:false}],by:'Quản lý',at:back(3)}];}
   /* Chế độ cục bộ: thêm 2 tài khoản dùng thử để xem màn hình của Quản lý và Nhân viên (không tạo khi dùng Firebase) */
   if(!CLOUD){

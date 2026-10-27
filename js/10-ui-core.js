@@ -47,7 +47,7 @@ const MENU=[
  {g:'dash',icon:'📊',label:'Dashboard',items:[['me','KPI của tôi','me'],['overview','Tổng quan','mgr'],['month','KPI theo tháng','mgr'],['rank','Xếp hạng nhân viên','mgr']]},
  {g:'emp',icon:'👥',label:'Nhân viên',items:[['list','Tất cả nhân viên','mgr'],['dept','Theo nhóm','mgr']]},
  {g:'rpt',icon:'📅',label:'Báo cáo',items:[['employee','Theo nhân viên'],['monthly','Theo tháng'],['quarter','Theo quý'],['dept','Theo nhóm','mgr']]},
- {g:'ppe',icon:'🦺',label:'Quản lý PPE & Đồng phục',items:[['ppe','Cấp phát PPE'],['uni','Cấp phát đồng phục'],['cat','Danh mục'],['rpt','Báo cáo']]},
+ {g:'ppe',icon:'🦺',label:'Quản lý PPE & Đồng phục',items:[['in','Nhập PPE & đồng phục'],['out','Cấp phát'],['cat','Danh mục'],['rpt','Báo cáo']]},
  {g:'help',icon:'📘',label:'Quy chế',items:[['rules','Quy chế KPI']]},
  {g:'set',icon:'⚙️',label:'Settings',items:[['org','Nhóm & ngày lễ','admin'],['users','User / Permission','admin'],['system','Sao lưu & Hệ thống','admin']]}
 ];
