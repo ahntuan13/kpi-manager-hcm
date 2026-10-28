@@ -113,7 +113,9 @@ const mcOf=t=>t&&t.mgrComment&&String(t.mgrComment.text||'').trim()?t.mgrComment
 /* Work B: quy ước mặc định theo số lỗi trong tháng (giống file Excel): 0 lỗi 100% · 1 lỗi 80% · 2 lỗi 60% · từ 3 lỗi 0% */
 const KRI_EF='IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))';
 /* một việc là 1 lỗi khi: hoàn thành trễ hạn, bị Re-check, hoặc quá hạn mà chưa hoàn thành */
-const taskErr=sc=>sc.state!=='moved'&&(sc.ap==='recheck'||sc.state==='overdue'||(sc.late!=null&&sc.late>0));
+/* Work B: việc chỉ được tính điểm khi đã có ngày hoàn thành và không bị Re-check; việc được tính mà hoàn thành trễ = 1 lỗi */
+const taskCnt=(t,sc)=>sc.state!=='moved'&&!!t.submitted&&sc.ap!=='recheck';
+const taskErr=(sc,t)=>sc.state!=='moved'&&sc.ap!=='recheck'&&(!t||!!t.submitted)&&sc.late!=null&&sc.late>0;
 const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110};
 const kpi2=()=>({...KPI2_DEF,...((db&&db.company&&db.company.kpi2)||{})});
 const isV2=ym=>!!ym&&ym>=kpi2().since;
@@ -158,9 +160,10 @@ function monthStats(m,ym,kc){
          pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
         if(o.src==='tasks'){   /* Work B: % đạt theo SỐ LỖI của các việc trong mục (quy ước Excel), mục không có việc = 0 lỗi = đủ điểm */
           const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
-          let er=0;mine.forEach(x=>{o.n++;if(x.sc.comp!=null)o.done++;if(x.sc.ap==='ok')o.ok++;if(taskErr(x.sc))er++});
+          let er=0;o.cnt=0;mine.forEach(x=>{o.n++;if(x.sc.comp!=null)o.done++;if(x.sc.ap==='ok')o.ok++;if(taskCnt(x.t,x.sc))o.cnt++;if(taskErr(x.sc,x.t))er++});
           const v=res[r.id],add=v&&+v.x>0?+v.x:0;o.errT=er;o.errM=add;o.err=er+add;o.note=v&&v.n||'';
-          o.pct=kxPct(r.ef||KRI_EF,o.err);o.pSelf=o.pct;
+          /* việc chưa có ngày hoàn thành hoặc Re-check: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục không có việc = đủ điểm) */
+          o.share=o.n?o.cnt/o.n:1;o.pErr=kxPct(r.ef||KRI_EF,o.err);o.pct=o.pErr==null?null:o.pErr*o.share;o.pSelf=o.pct;
         }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
         o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
         o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});

@@ -9,6 +9,7 @@ const run=code=>{const v=vm.runInContext(code,ctx);return v&&typeof v==='object'
 run('db=defaultDB()');
 /* sheet giả theo kiểu SheetJS: {A10:'I', G11:0.1, …} → {A10:{v:'I'}, …} */
 const ws=cells=>Object.fromEntries(Object.entries(cells).map(([k,v])=>[k,{v}]));
+const r2t=v=>Math.round(v*100)/100;
 const task=(id,w,kpi,extra={})=>({id,title:id,weight:w,deadline:'2026-10-10',submitted:'2026-10-10',approval:'Duyệt',note:'',...(kpi?{kpi}:{}),...extra});
 
 test('kpiLabel: dòng đầu, bỏ nháy / gạch / số thứ tự của ô Excel',()=>{
@@ -276,5 +277,10 @@ test('monthStats: Khung 1 + KRI + Thưởng, dòng công việc hằng ngày',()
   ctx.M.kri.b={x:1};assert.equal(run('monthStats(M,"2026-10",KC)').p80,55);   /* quản lý ghi 1 lỗi → 80%*40 */
   ctx.M.kri.b={x:3};assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* ≥3 lỗi → 0 */
   delete ctx.M.kri.b;ctx.M.tasks=[];assert.equal(run('monthStats(M,"2026-10",KC)').p80,63);   /* mục không có việc vẫn đủ điểm */
+  /* việc chưa có ngày hoàn thành / Re-check: không tính điểm → mục được phần điểm theo số việc đã tính */
+  ctx.M.tasks=[task('t1',5,'b'),task('t2',5,'b',{submitted:null}),task('t3',5,'b',{approval:'Re-check'})];
+  assert.equal(run('monthStats(M,"2026-10",KC)').p80,r2t(8+40/3+15));
+  ctx.M.tasks=[task('t2',5,'b',{submitted:null})];assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* mục có việc nhưng chưa xong: 0 */
+  ctx.M.tasks=[task('t1',5,'b',{submitted:'2026-10-12'})];assert.equal(run('monthStats(M,"2026-10",KC)').p80,55);   /* hoàn thành trễ: tính, 1 lỗi → 80% */
   ctx.M.fixed={total:101,k1:20,k2:81,k3:0};assert.equal(run('monthStats(M,"2026-10",KC)').kpi,101);   /* điểm chốt từ Excel */
 });
