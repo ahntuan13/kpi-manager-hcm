@@ -49,7 +49,8 @@ function parseKpiCatalog(wb){
     for(let r=1;r<=80;r++){const a=s(cv(ws,'A'+r)),c=norm(cv(ws,'C'+r));if(a==='I'&&!r0)r0=r;else if(a==='II'&&!r2_)r2_=r;else if(a==='III'&&!r3)r3=r;if(!rt&&c.startsWith('tong diem'))rt=r;if(!rg&&c.startsWith('ket qua xep loai'))rg=r}
     const nm=s(cv(ws,'C3')),cd=s(cv(ws,'F4')),tail=n.trim().replace(/^individual kpis\s*[-–]?\s*/i,'').trim();
     const x={sheet:n.trim(),tail,code:/^[A-Za-z]{1,3}\d{3,}$/.test(cd)?cd:'',name:/[A-Za-zÀ-ỹ]{2,}/.test(nm)?nm:tail,year:+((/nam\s*(\d{4})/.exec(norm(cv(ws,'A1')))||[])[1]||0)||null,
-      sec:r0?s(cv(ws,'C'+r0)):'',secW:r0?r2((+cv(ws,'B'+r0)||0)*100):0,rows:[],months:{}};
+      sec:r0?s(cv(ws,'C'+r0)):'',secW:r0?r2((+cv(ws,'B'+r0)||0)*100):0,rows:[],months:{},items:[]};
+    const rowAt=new Map();
     const monthsOk=s(cv(ws,'I8')).toUpperCase()==='JAN';
     for(let r=r0+1;r0&&r<=r0+80;r++){
       const a=s(cv(ws,'A'+r));if(/^[IVX]+$/.test(a))break;   /* gặp mục II là hết mục I */
@@ -59,11 +60,20 @@ function parseKpiCatalog(wb){
       const row={no:/^\d+$/.test(a)?a:'',text,w,rule:s(cv(ws,'H'+r))};
       if(w!=null){const pc=ws['J'+r];if(monthsOk&&pc&&pc.f)row.f=kxFromExcel(pc.f,'I'+r,ref=>cv(ws,ref));
         const tg=cv(ws,'D'+r);if(tg!=null&&tg!=='')row.tgt=s(tg);const un=s(cv(ws,'E'+r));if(un)row.unit=un;const fq=s(cv(ws,'F'+r));if(fq)row.freq=fq.replace(/\s*\n[\s\S]*/,'')}
-      x.rows.push(row);
+      x.rows.push(row);if(w!=null)rowAt.set(r,row);
     }
     if(monthsOk&&rt)XL_MONTH_COLS.forEach((c,i)=>{const sc=sh(c,2),num=r=>{const v=r?cv(ws,sc+r):null;return typeof v==='number'?r2(v):null},t=num(rt);
-      if(t==null)return;x.months[MM[i]]={total:t,k2:num(r0),k1:num(r2_),k3:num(r3),grade:rg?s(cv(ws,c+rg)):''}});
+      if(t==null)return;x.months[MM[i]]={total:t,k2:num(r0),k1:num(r2_),k3:num(r3),grade:rg?s(cv(ws,c+rg)):'',lines:{}}});
     const taken=new Set();x.rows.forEach(k=>{k.id=kpiId(k.text||k.no,taken);taken.add(k.id)});
+    /* Đầu việc của cả 3 mục (I KRI · II Thái độ & tuân thủ · III Điểm thưởng): dòng có trọng số ở cột G; mỗi tháng lấy Result / % / Score */
+    if(monthsOk&&r0&&rt){let sec='',n=0,head='';const cnt={};
+      for(let r=r0;r<rt;r++){const a=s(cv(ws,'A'+r)),g=cv(ws,'G'+r),text=s(cv(ws,'C'+r));
+        if(/^(I|II|III)$/.test(a)){sec=a;head='';continue}
+        if(!sec)continue;if(typeof g!=='number'){if(text)head=text;continue}
+        cnt[sec]=(cnt[sec]||0)+1;const ref=sec==='I'?rowAt.get(r):null;
+        const it={key:`${sec}.${cnt[sec]}`,sec,text:(text||head).replace(/\s*\n[\s\S]*/,'').trim()||head,w:r2(g*100),...(ref?{kid:ref.id}:{})};x.items.push(it);
+        XL_MONTH_COLS.forEach((c,i)=>{const m=x.months[MM[i]];if(!m)return;const rv=cv(ws,c+r),pv=cv(ws,sh(c,1)+r),sv=cv(ws,sh(c,2)+r);
+          if(rv==null&&pv==null&&sv==null)return;m.lines[it.key]={r:rv==null||rv===''?null:typeof rv==='number'?r2(rv):s(rv),p:typeof pv==='number'?pv:null,s:typeof sv==='number'?r2(sv):null}})}}
     return x;
   });
 }
@@ -146,7 +156,7 @@ ACT['kc-imp']=el=>{
   IMP={kc:1,items:[],err:'',y:el.dataset.y||curYear()};   /* dùng chung biến IMP: đóng hộp thoại là tự xoá */
   modal('Nhập KPI từ file Excel (Individual KPIs)',`<form id="mf" data-submit="kc-imp-save">
     <p class="note" style="padding-top:0">Chọn file Excel KPI KRIs cá nhân có các sheet <b>Individual KPIs – tên</b>. Với mỗi nhân viên, chọn cần lấy gì:
-      <b>Danh mục KRI</b> (mục I kèm quy ước tính, dùng để chấm các tháng từ tháng áp dụng quy chế mới) và <b>Điểm tháng</b> (Tổng điểm đánh giá của các tháng chọn, ghi thành điểm chốt; có thể xoá việc trên app của các tháng đó).</p>
+      <b>Danh mục KRI</b> (mục I kèm quy ước tính, dùng để chấm các tháng từ tháng áp dụng quy chế mới) và <b>Điểm tháng</b> (Tổng điểm đánh giá của các tháng chọn, ghi thành điểm chốt; có thể xoá việc trên app của các tháng đó) và <b>Đầu việc theo tháng</b> (chọn từng đầu việc, từng tháng để đưa vào app kèm Kết quả, % đạt, Điểm như file).</p>
     <div class="drop" id="kc-drop"><input class="in" type="file" id="kc-file" accept=".xlsx,.xlsm" aria-label="File Excel KPI KRIs cá nhân"><small class="muted">hoặc kéo thả file vào đây</small></div>
     <div id="kc-list"></div></form>`,{footer:cancelBtn+'<button class="btn primary" form="mf" id="kc-ok" disabled>Nhập</button>',size:'wide'});
   const dz=$('#kc-drop');
@@ -171,26 +181,47 @@ async function kcRead(f){
   catch(e){console.error(e);err='Không đọc được file. Hãy chọn file .xlsx có các sheet “Individual KPIs…”.'}
   if(!IMP)return;
   const lastOld=MM.filter(mm=>`${IMP.y}-${mm}`<kpi2().since).pop()||'';   /* mặc định lấy điểm đến tháng trước tháng áp dụng quy chế mới */
-  IMP.err=err;IMP.items=items.map((x,i)=>{const e=kcMatch(x),ms=MM.filter(mm=>x.months[mm]);return{...x,i,year:x.year||+IMP.y,eid:e?e.id:'',on:!!e,cat:true,from:ms[0]||'',to:ms.filter(mm=>mm<=lastOld).pop()||'',del:true}});kcRender();
+  IMP.err=err;IMP.items=items.map((x,i)=>{const e=kcMatch(x),ms=MM.filter(mm=>x.months[mm]);
+    const sel=new Set();ms.forEach(mm=>Object.keys(x.months[mm].lines||{}).forEach(k=>sel.add(k+'|'+mm)));   /* mặc định chọn mọi đầu việc có số liệu */
+    return{...x,i,year:x.year||+IMP.y,eid:e?e.id:'',on:!!e,cat:true,from:ms[0]||'',to:ms.filter(mm=>mm<=lastOld).pop()||'',del:true,sel,open:false}});kcRender();
 }
 const kcSum=x=>{const ms=MM.filter(mm=>x.from&&x.to&&mm>=x.from&&mm<=x.to&&x.months[mm]);return ms};
+const kcSelN=x=>kcSum(x).reduce((a,mm)=>a+(x.items||[]).filter(it=>x.sel.has(it.key+'|'+mm)).length,0);
+const XL_SEC={I:'Work B · KRI (mục I)',II:'Work A · Thái độ & tuân thủ (mục II)',III:'Work C · Điểm thưởng (mục III)'};
+const xlPct=p=>p==null?'–':Math.round(p*100)+'%',xlV=v=>v==null||v===''?'–':typeof v==='number'?fmtK2(v):esc(v);
+/* bảng chọn đầu việc × tháng của một sheet */
+function kcItemsHTML(x){const ms=kcSum(x);if(!ms.length)return '<p class="note">Chọn khoảng tháng lấy điểm trước.</p>';
+  const cell=(it,mm)=>{const v=x.months[mm].lines[it.key];if(!v)return '<td class="c muted">·</td>';const on=x.sel.has(it.key+'|'+mm);
+    return `<td class="c"><label class="kxc ${on?'on':''}" title="${esc(`T${+mm}: Kết quả ${v.r??'–'} · % ${xlPct(v.p)} · Điểm ${v.s??'–'}`)}"><input type="checkbox" data-kcx="${esc(it.key)}|${mm}" data-i="${x.i}" ${on?'checked':''}> ${v.s==null?'–':fmtK2(v.s)}</label></td>`};
+  let sec='';
+  return `<div class="tw"><table class="t kxm"><thead><tr><th>Đầu việc</th><th>Trọng số</th>${ms.map(mm=>`<th class="c"><button type="button" class="btn sm" data-kcxc="${mm}" data-i="${x.i}" title="Chọn / bỏ cả tháng">T${+mm}</button><br><small>${fmtK(x.months[mm].total)} đ</small></th>`).join('')}</tr></thead><tbody>
+    ${x.items.map(it=>{const h=it.sec!==sec?`<tr class="kxs"><td colspan="${ms.length+2}"><b>${esc(XL_SEC[it.sec]||it.sec)}</b></td></tr>`:'';sec=it.sec;
+      return h+`<tr><td><button type="button" class="lnk" data-kcxr="${esc(it.key)}" data-i="${x.i}" title="Chọn / bỏ đầu việc này ở mọi tháng"><b>${esc(it.key)}</b> ${esc(it.text)}</button></td><td class="num">${fmtK(it.w)}</td>${ms.map(mm=>cell(it,mm)).join('')}</tr>`}).join('')}</tbody></table></div>
+    <p class="note">Ô đánh dấu = đưa đầu việc đó vào tháng đó (kèm Kết quả, % đạt, Điểm như file). Bấm tên đầu việc hoặc nút tháng để chọn / bỏ cả hàng, cả cột. Điểm KPI tháng luôn lấy đúng Tổng điểm đánh giá trong file.</p>`}
 /* Bảng xem trước: mỗi sheet một dòng – nhân viên, danh mục KRI, điểm tháng lấy về */
 function kcRender(){
   const box=$('#kc-list'),ok=$('#kc-ok');if(!box||!IMP)return;
   const opts=x=>`<option value="">— Chọn nhân viên —</option>${sortedEmps().map(e=>`<option value="${e.id}" ${e.id===x.eid?'selected':''}>${esc(e.name)} · ${esc(e.code)}</option>`).join('')}`;
   const mSel=(x,k)=>`<select class="in sm" data-kcm="${k}" data-i="${x.i}" aria-label="${k==='from'?'Từ tháng':'Đến tháng'} của ${esc(x.sheet)}"><option value="">—</option>${MM.filter(mm=>x.months[mm]).map(mm=>`<option value="${mm}" ${x[k]===mm?'selected':''}>T${+mm}</option>`).join('')}</select>`;
-  box.innerHTML=IMP.err?`<p class="note tag-bad">${esc(IMP.err)}</p>`:miniTable(['','Sheet / Nhân viên','Danh mục KRI','Điểm tháng lấy về','Xoá việc trên app các tháng đó'],IMP.items.map(x=>{
+  box.innerHTML=IMP.err?`<p class="note tag-bad">${esc(IMP.err)}</p>`:miniTable(['','Sheet / Nhân viên','Danh mục KRI','Điểm tháng lấy về','Đầu việc theo tháng','Xoá việc trên app các tháng đó'],IMP.items.map(x=>{
     const e=empOf(x.eid),lines=x.rows.filter(r=>r.w!=null),tot=r2(lines.reduce((a,r)=>a+r.w,0)),nf=lines.filter(r=>!r.f).length,ms=kcSum(x),sh=e&&sheetOf(e.id,x.year);
     const nTask=sh?ms.reduce((a,mm)=>a+sh.months[mm].tasks.length,0):0;
     return `<tr${x.on&&e?'':' style="opacity:.6"'}><td><input type="checkbox" data-kci="on" data-i="${x.i}" ${x.on?'checked':''} aria-label="Nhập sheet ${esc(x.sheet)}"></td>
       <td><b>${esc(x.sheet)}</b><small>${esc(x.name)}${x.code?' · '+esc(x.code):''} · năm ${x.year}</small><select class="in sm" data-kce data-i="${x.i}" aria-label="Nhân viên của sheet ${esc(x.sheet)}" style="margin-top:4px;max-width:240px">${opts(x)}</select></td>
       <td><label class="chk"><input type="checkbox" data-kci="cat" data-i="${x.i}" ${x.cat?'checked':''}> Cập nhật</label><small>${lines.length} chỉ tiêu · tổng trọng số ${fmtK(tot)}${nf?` · <span class="tag-warn">${nf} dòng chưa có quy ước tính</span>`:''}</small></td>
       <td><div style="display:flex;gap:6px;align-items:center">${mSel(x,'from')}<span>→</span>${mSel(x,'to')}</div><small>${ms.length?ms.map(mm=>`T${+mm}: <b>${fmtK(x.months[mm].total)}</b>`).join(' · '):'Không lấy điểm tháng nào'}</small></td>
-      <td>${ms.length?`<label class="chk"><input type="checkbox" data-kci="del" data-i="${x.i}" ${x.del?'checked':''}> Xoá ${nTask} việc</label><small>${x.del?'Chỉ giữ điểm Excel cho các tháng này':'Giữ việc; điểm tháng vẫn lấy theo Excel'}</small>`:'<span class="muted">—</span>'}</td></tr>`}),'Không có sheet nào.');
+      <td>${ms.length&&x.items.length?`<button type="button" class="btn sm ${x.open?'primary':''}" data-kco="${x.i}">${x.open?'▲ Thu gọn':'▼ Chọn đầu việc'}</button><small>${kcSelN(x)} / ${ms.reduce((a,mm)=>a+Object.keys(x.months[mm].lines||{}).length,0)} ô đã chọn · ${x.items.length} đầu việc</small>`:'<span class="muted">—</span>'}</td>
+      <td>${ms.length?`<label class="chk"><input type="checkbox" data-kci="del" data-i="${x.i}" ${x.del?'checked':''}> Xoá ${nTask} việc</label><small>${x.del?'Chỉ giữ điểm Excel cho các tháng này':'Giữ việc; điểm tháng vẫn lấy theo Excel'}</small>`:'<span class="muted">—</span>'}</td></tr>${x.open&&ms.length?`<tr class="kxrow"><td></td><td colspan="5">${kcItemsHTML(x)}</td></tr>`:''}`}),'Không có sheet nào.');
   const good=IMP.items.filter(x=>x.on&&x.eid&&(x.cat||kcSum(x).length));
   if(ok){ok.disabled=!good.length;ok.textContent=good.length?`Nhập cho ${good.length} nhân viên`:'Nhập'}
 }
+document.addEventListener('click',ev=>{const el=ev.target.closest&&ev.target.closest('[data-kco],[data-kcxc],[data-kcxr]');if(!el||!IMP||!IMP.kc)return;
+  if(el.dataset.kco!=null){const x=IMP.items[+el.dataset.kco];if(x){x.open=!x.open;kcRender()}return}
+  const x=IMP.items[+el.dataset.i];if(!x)return;const ms=kcSum(x);
+  const cells=el.dataset.kcxc?x.items.filter(it=>x.months[el.dataset.kcxc].lines[it.key]).map(it=>it.key+'|'+el.dataset.kcxc):ms.filter(mm=>x.months[mm].lines[el.dataset.kcxr]).map(mm=>el.dataset.kcxr+'|'+mm);
+  const all=cells.every(k=>x.sel.has(k));cells.forEach(k=>all?x.sel.delete(k):x.sel.add(k));kcRender()});
 document.addEventListener('change',ev=>{const el=ev.target;if(!IMP||!IMP.kc||!el.closest||!el.closest('#kc-list'))return;const x=IMP.items[+el.dataset.i];if(!x)return;
+  if(el.dataset.kcx){el.checked?x.sel.add(el.dataset.kcx):x.sel.delete(el.dataset.kcx);kcRender();return}
   if(el.dataset.kci)x[el.dataset.kci]=el.checked;else if(el.matches('[data-kce]')){x.eid=el.value;if(el.value)x.on=true}else if(el.dataset.kcm){x[el.dataset.kcm]=el.value;if(x.from&&x.to&&x.from>x.to){if(el.dataset.kcm==='from')x.to=x.from;else x.from=x.to}}
   kcRender()});
 SUB['kc-imp-save']=async()=>{
@@ -200,11 +231,14 @@ SUB['kc-imp-save']=async()=>{
   if(delN&&!confirm(`Sẽ xoá ${delN} việc trên app ở các tháng lấy điểm Excel. ${CLOUD?'App tự sao lưu đám mây trước khi ghi. ':'Nên xuất sao lưu trước. '}Tiếp tục?`))return;
   const btn=$('#kc-ok');if(btn){btn.disabled=true;btn.textContent='Đang nhập…'}
   if(CLOUD&&typeof cloudBackup==='function'&&can('write')){try{await cloudBackup('pre')}catch(e){if(!confirm('Chưa sao lưu đám mây được ('+authMsg(e)+'). Vẫn nhập?')){kcRender();return}}}
-  const at=todayStr(),by=session?.name||'';let nCat=0,nM=0,nDel=0;
+  const at=todayStr(),by=session?.name||'';let nCat=0,nM=0,nDel=0,nX=0;
   if(transact(()=>good.forEach(x=>{const sh=sheetOf(x.eid,x.year,true);
     if(x.cat){sh.kpi={sec:x.sec,rows:kpiMerge(kpiOf(x.eid,x.year),x.rows).rows.map(r=>{const o=sh.kpi&&sh.kpi.rows.find(z=>z.id===r.id);return o&&o.src?{...r,src:o.src}:r})};nCat++}   /* giữ lựa chọn "Công việc hằng ngày" đã đặt */
     kcSum(x).forEach(mm=>{const m=sh.months[mm],v=x.months[mm];m.fixed={total:v.total,k1:v.k1,k2:v.k2,k3:v.k3,grade:v.grade||'',src:'Excel',sheet:x.sheet,at,by};nM++;
+      /* đầu việc đã chọn của tháng: lưu kèm Kết quả / % đạt / Điểm như file */
+      const xl=x.items.filter(it=>x.sel.has(it.key+'|'+mm)&&v.lines[it.key]).map(it=>{const l=v.lines[it.key];return{key:it.key,sec:it.sec,text:it.text,w:it.w,...(it.kid?{kid:it.kid}:{}),r:l.r,p:l.p,s:l.s}});
+      if(xl.length){m.xl=xl;nX+=xl.length}else delete m.xl;
       if(x.del&&m.tasks.length){nDel+=m.tasks.length;m.tasks=[]}});
-    sh.updatedAt=at})))done(`Đã nhập: ${nCat} danh mục KRI · ${nM} tháng điểm chốt${nDel?` · xoá ${nDel} việc`:''}`);
+    sh.updatedAt=at})))done(`Đã nhập: ${nCat} danh mục KRI · ${nM} tháng điểm chốt · ${nX} đầu việc${nDel?` · xoá ${nDel} việc`:''}`);
   else kcRender();
 };

@@ -290,10 +290,16 @@ ACT['m-lock']=el=>{if(!can('manage'))return;const {e,y,mm}=el.dataset,sh=sheetOf
   if(lk&&!confirm('Bỏ chốt điểm tháng này?'))return;
   if(transact(()=>{const s2=sheetOf(e,y,true),m=s2.months[mm];if(lk)delete m.lock;else m.lock={by:session?.name||'',at:todayStr()};s2.updatedAt=todayStr()})){refreshTbl();toast(lk?'Đã bỏ chốt':'Đã chốt điểm tháng');if(!lk)notifyEmp(e,{ic:'🔒',title:`Điểm KPI tháng ${mm}/${y} đã được chốt`,body:'Xem chi tiết từng mục trong trang KPI của bạn',e,y,mm})}};
 /* Tháng có điểm chốt nhập từ file Excel */
+/* đầu việc của tháng nhập từ file Excel (Kết quả / % đạt / Điểm đúng như file), nhóm theo mục I · II · III */
+function xlLinesHTML(xl,f){if(!xl||!xl.length)return '';const secs=[['I','Work B · KRI (mục I)','k2'],['II','Work A · Thái độ & tuân thủ (mục II)','k1'],['III','Work C · Điểm thưởng (mục III)','k3']];
+  const v=x=>x==null||x===''?'–':typeof x==='number'?fmtK2(x):esc(x),pc=p=>p==null?'–':Math.round(p*100)+'%';
+  return `<div class="tw"><table class="t xlt"><thead><tr><th>STT</th><th>Đầu việc (theo file Excel)</th><th>Trọng số</th><th>Kết quả</th><th>% đạt</th><th>Điểm</th></tr></thead><tbody>${secs.map(([k,l,fk])=>{const ls=xl.filter(x=>x.sec===k);if(!ls.length)return '';
+    return `<tr class="xls"><td colspan="5"><b>${l}</b></td><td class="num"><b>${f&&f[fk]!=null?fmtK2(f[fk]):fmtK2(ls.reduce((a,x)=>a+(+x.s||0),0))}</b></td></tr>`+ls.map(x=>`<tr><td>${esc(x.key)}</td><td>${esc(x.text)}</td><td class="num">${fmtK(x.w)}</td><td class="num">${v(x.r)}</td><td class="num">${pc(x.p)}</td><td class="num"><b>${v(x.s)}</b></td></tr>`).join('')}).join('')}</tbody></table></div>`}
 function fixedCard(e,y,mm,st){
   const f=st.fixed,mg=can('manage'),n=v=>v==null?'–':fmtK2(v);
   return `<section class="kf kftot"><div class="kfh"><h4>Điểm chốt tháng ${mm}/${y} <small class="muted">từ file Excel${f.sheet?' · sheet '+esc(f.sheet):''}</small></h4><span class="kfs big"><b>${fmtK2(st.kpi)}</b></span></div>
     <div class="kfeq"><span>${n(f.k1)} <small>Work A · Thái độ &amp; tuân thủ (mục II)</small></span><i>+</i><span>${n(f.k2)} <small>Work B · KRI (mục I)</small></span><i>+</i><span>${n(f.k3)} <small>Work C · Thưởng (mục III)</small></span><i>=</i><span><b>${fmtK2(st.kpi)}</b> <small>KPI tháng</small></span>${gradeBd(st.kpi)}</div>
+    ${xlLinesHTML((sheetOf(e.id,y)||{months:{}}).months[mm]?.xl,f)}
     <p class="note">Điểm tháng này lấy nguyên từ file Excel${f.at?`, nhập ngày ${fmtDate(f.at)}${f.by?' bởi '+esc(f.by):''}`:''}; các việc trên app (nếu có) chỉ để theo dõi, không tính điểm.${mg?` <button type="button" class="btn sm" data-act="fx-del" data-e="${e.id}" data-y="${y}" data-mm="${mm}">Bỏ điểm chốt</button>`:''}</p></section>`;
 }
 ACT['fx-del']=el=>{if(!can('manage')||!confirm('Bỏ điểm chốt từ Excel của tháng này? Điểm sẽ tính lại từ dữ liệu trên app.'))return;const {e,y,mm}=el.dataset;
