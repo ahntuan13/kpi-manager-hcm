@@ -1078,3 +1078,10 @@ tr.gsep td{height:8px;background:#f7f8fb;border-right:0}
 .ox{display:inline-block;min-width:20px;text-align:center;border-radius:5px;font-size:12px}.ox.o{background:#e3f5ec;color:#0b6e47}.ox.x{background:#fde4e4;color:#a3271f}
 table.kzt{min-width:0}table.kzt td.gk{padding:6px 10px;line-height:1.4;font-size:12.5px}table.kzt th.ga{font-size:11.5px;line-height:1.25}table.kzt .gin{text-align:center}table.kzt col.k-l{width:130px}table.kzt col.k-t{width:360px}table.kzt col.k-a{width:88px}table.kzt col.k-r{width:110px}
 table.itpt{min-width:900px}table.itpt col.i-l{width:150px}
+
+/* ESG: bảng tổng quan thẳng hàng, các dòng cao bằng nhau */
+table.t.est{table-layout:fixed;min-width:980px}
+table.t.est th,table.t.est td{height:44px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:0;padding-bottom:0}
+table.t.est th:nth-child(1){width:240px}table.t.est th:nth-child(2){width:70px}table.t.est th:nth-child(3){width:170px}table.t.est th:nth-child(4),table.t.est th:nth-child(5){width:110px}table.t.est th:nth-child(6){width:150px}table.t.est th:nth-child(7){width:140px}table.t.est th:nth-child(8){width:190px}
+.eic{display:inline-flex;justify-content:center;width:22px;margin-right:6px;flex:none}
+table.t.est td:first-child{display:flex;align-items:center;height:44px}
