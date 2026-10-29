@@ -336,7 +336,7 @@ ACT['esg-pdf']=async el=>{const {f,d}=esgF();if(!d)return;const b=el.closest('bu
   try{const img=await esgChartImgs(d,Object.values(ESG_CH).flat());
     const els=ESG_PRINT.map((k,i)=>offscreen(`<div class="rpt-doc esg-doc">${esgDocHead(d,f.per,ESG_SEC.find(s=>s[0]===k)[1],i,ESG_PRINT.length)}<h2 class="esh">${esc(ESG_SEC.find(s=>s[0]===k)[1])}</h2>${esgSecHTML(d,k,f.per,{img})}<div class="eft">${esc(db.company?.name||'')} · Ngày lập: ${fmtDate(todayStr())}</div></div>`,1120));
     await new Promise(r=>setTimeout(r,250));
-    await pdfFromEls(els,`ESG_${d.year}_${f.per}_${todayStr()}.pdf`,{landscape:true});els.forEach(e=>e.remove())}
+    await pdfFromEls(els,`ESG_${d.year}_${f.per}_${todayStr()}.pdf`,{landscape:true});els.forEach(e=>e.remove());if(/^Q\d$/.test(f.per))esgSave(()=>esgAutoQuarter(d.year,f.per))}
   catch(e){console.error(e);toast('Xuất PDF thất bại: '+e.message,'error')}finally{if(b)b.disabled=false}};
 
 /* ======================= EXCEL (đủ các sheet, A4 ngang, vừa trang) ======================= */
@@ -446,7 +446,7 @@ async function esgXlsx(d,per){
   return isoHeaderLogos(buf,wb.worksheets.length,l,r)}
 ACT['esg-xlsx']=async el=>{const {f,d}=esgF();if(!d)return;const b=el.closest('button');if(b)b.disabled=true;toast('Đang tạo file Excel báo cáo ESG…');
   try{const out=await esgXlsx(d,f.per),blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);a.download=`ESG_REPORT_${d.year}_${f.per}_${todayStr()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast('Đã xuất Excel báo cáo ESG')}
+    a.href=URL.createObjectURL(blob);a.download=`ESG_REPORT_${d.year}_${f.per}_${todayStr()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);const q=/^Q\d$/.test(f.per)&&esgSave(()=>esgAutoQuarter(d.year,f.per));toast('Đã xuất Excel báo cáo ESG'+(q?` · đã ghi “Báo cáo ESG Quý ${f.per.slice(1)}.${d.year}” vào KPI`:''))}
   catch(e){console.error(e);toast('Không tạo được file: '+e.message,'error')}finally{if(b)b.disabled=false}};
 if(typeof module!=='undefined')module.exports={esgParse,esgStat,esgAssess};
 
@@ -554,7 +554,7 @@ document.addEventListener('focusout',ev=>{const el=ev.target;if(el.classList&&el
 document.addEventListener('change',ev=>{const el=ev.target;if(!el.closest||!el.closest('.esgs'))return;if(!canESG())return;const d=esgDoc(esgYear());if(!d)return;
   if(el.dataset.g){const [k,a,ms]=el.dataset.g.split('|'),m=+ms;let v;
     if(a==='note')v=String(el.value||'').trim()||null;else{v=parseE(el.value,el.dataset.nf);if(Number.isNaN(v)){toast('Ô này cần nhập số (ví dụ 2.450 hoặc 0,082).','error');el.focus();return}if(v!=null&&v<0){toast('Số không được âm.','error');el.focus();return}}
-    if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id),o=x.ind[k];if(!o[a])o[a]=e12();o[a][m]=v;x.upd={at:new Date().toISOString(),by:session?.name||''}})){if(a!=='note'){el.value=fmtE(v,el.dataset.nf);el.dataset.old=el.value}el.classList.add('saved');setTimeout(()=>el.classList.remove('saved'),900);esgRecalc()}return}
+    if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id),o=x.ind[k];if(!o[a])o[a]=e12();o[a][m]=v;x.upd={at:new Date().toISOString(),by:session?.name||''};if(v!=null&&(a==='act'||a==='cost'))esgAutoTask(d.year,m)})){if(a!=='note'){el.value=fmtE(v,el.dataset.nf);el.dataset.old=el.value}el.classList.add('saved');setTimeout(()=>el.classList.remove('saved'),900);esgRecalc()}return}
   if(el.dataset.kz!=null||el.dataset.kzr!=null){const i=+(el.dataset.kz??el.dataset.kzr),raw=String(el.value||'').trim();
     const num=raw.replace(/%/g,'').trim(),isN=/^\d+([.,]\d+)?$/.test(num),val=raw===''?null:isN?(+num.replace(',','.'))/100:raw;
     if(typeof val==='number'&&val>1){toast('Tỷ lệ tối đa 100%.','error');el.focus();return}
@@ -593,4 +593,12 @@ ACT['esg-itp-save']=()=>{if(!canESG())return;const d=esgDoc(esgYear()),fm=$('#es
   const it=(d.itp&&d.itp.length?d.itp:ESG_DEPTS.map(q=>({d:q}))).concat([...fm.querySelectorAll('tr[data-newd]')].map(tr=>({d:tr.dataset.newd})));
   if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id);x.price=R.pr;
     x.itp=it.map((o,j)=>{const mm=[...(o.m||Array(12).fill(null))],r=R.rows[j];if(r){const has=['c','cf','b','bf'].some(k=>r[k]!=null);mm[m]=has?{c:r.c||0,cf:r.cf??((r.c||0)*R.pr),b:r.b||0,bf:r.bf??((r.b||0)*R.pr)}:null}return{d:o.d,m:mm}});
-    const tot=R.T.c+R.T.b;if(tot){x.ind.print.act[m]=tot;x.ind.print.cost[m]=R.T.cf+R.T.bf}})){refreshTbl();_esgTm();toast(`Đã lưu số liệu in theo phòng ban tháng ${m+1}${R.T.c+R.T.b?' và cập nhật dòng 1.2':''}`)}};
+    const tot=R.T.c+R.T.b;if(tot){x.ind.print.act[m]=tot;x.ind.print.cost[m]=R.T.cf+R.T.bf;esgAutoTask(d.year,m)}})){refreshTbl();_esgTm();toast(`Đã lưu số liệu in theo phòng ban tháng ${m+1}${R.T.c+R.T.b?' và cập nhật dòng 1.2':''}`)}};
+
+/* ---------- tự ghi việc vào KPI: “Báo cáo ESG tháng 11.2026” (khi nhập số liệu tháng) · “Báo cáo ESG Quý 3.2026” (khi xuất báo cáo quý) ----------
+   Việc nằm ở tháng của số liệu (quý: tháng cuối quý), hạn = ngày 20 tháng sau (hạn gửi báo cáo TMV), ngày hoàn thành = lần nhập / xuất đầu tiên. */
+const p2=n=>String(n).padStart(2,'0');
+function esgDue(y,m){const n=m+1>11?{y:+y+1,m:0}:{y:+y,m:m+1};return `${n.y}-${p2(n.m+1)}-20`}
+function esgAutoTask(y,m){return kpiAuto(`esg-${y}-${p2(m+1)}`,{ym:`${y}-${p2(m+1)}`,title:`Báo cáo ESG tháng ${p2(m+1)}.${y}`,done:todayStr(),deadline:esgDue(y,m),keep:true,match:'esg',note:'Tự ghi khi nhập số liệu ESG (mục ESG văn phòng)'})}
+function esgAutoQuarter(y,per){const q=+String(per).slice(1);if(!/^Q[1-4]$/.test(per))return false;const m=q*3-1;
+  return kpiAuto(`esgq-${y}-Q${q}`,{ym:`${y}-${p2(m+1)}`,title:`Báo cáo ESG Quý ${q}.${y}`,done:todayStr(),deadline:esgDue(y,m),keep:true,match:'esg',note:'Tự ghi khi xuất báo cáo ESG quý (Excel / PDF)'})}
