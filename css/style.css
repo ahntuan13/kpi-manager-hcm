@@ -1052,13 +1052,29 @@ table.t.erk td{vertical-align:top;font-size:13px}
 .esg-doc table.t{font-size:11px}.esg-doc table.t th,.esg-doc table.t td{padding:3px 5px}
 .esg-doc table.epl td small{font-size:10px}.esg-doc .elist,.esg-doc .erisk{font-size:12px}
 
-/* nhập số liệu ESG tháng */
-.esgm{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin-bottom:12px}
-.esgm button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;font:inherit;position:relative;overflow:hidden}
-.esgm button small{font-size:11px;color:var(--muted)}.esgm button.on{border-color:#1f4e3d;box-shadow:0 0 0 2px rgba(31,78,61,.15)}
-.esgm button i{position:absolute;left:0;right:0;bottom:0;height:3px;background:#e3e7ef}.esgm button i.ok{background:#18a37a}.esgm button i.mid{background:#e0a32e}
-.esin{margin-bottom:12px}.esin table.t td{vertical-align:middle}.esin .esn{width:140px;text-align:right}.esin .f{margin-top:8px}
-table.t.eitp .esn{width:110px}
-.eskz{margin-top:10px}.eskz summary{cursor:pointer;font-weight:600;font-size:13px}.eskz .esn{width:70px}
-.esbar{position:sticky;bottom:0;display:flex;align-items:center;gap:10px;background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:6px;box-shadow:0 -4px 14px rgba(20,30,60,.06)}
-@media (max-width:800px){.esgm{grid-template-columns:repeat(6,1fr)}}
+/* ESG: bảng nhập giống sheet Excel */
+.estitle{margin:2px 0 12px;font-size:17px;color:#1f4e3d}
+.esgs .kpis{margin-bottom:12px}.esgs .kpi .kv small{font-size:12px;font-weight:500;color:var(--muted)}
+.esb{margin-bottom:12px}.esb h4{margin:0 0 4px;color:#1f4e3d}.gnote{margin:0 0 8px;padding:0}
+.gw{overflow-x:auto;border:1px solid #d7dde8;border-radius:10px}
+.gt-tbl{border-collapse:separate;border-spacing:0;width:100%;min-width:1620px;table-layout:fixed;font-size:13px;font-variant-numeric:tabular-nums}
+.gt-tbl col.c-l{width:260px}.gt-tbl col.c-u{width:62px}.gt-tbl col.c-m{width:98px}.gt-tbl col.c-t{width:124px}
+.gt-tbl th,.gt-tbl td{border-right:1px solid #e4e8f0;border-bottom:1px solid #e4e8f0;padding:0;height:32px;vertical-align:middle}
+.gt-tbl thead th{background:#1f4e3d;color:#fff;font-weight:600;font-size:12.5px;text-align:center;padding:6px 4px;position:sticky;top:0}
+.gt-tbl thead th.cm{background:#2e7d5b}
+.gt-tbl th.gl{text-align:left;font-weight:500;padding:4px 10px;background:#fbfcfe;position:sticky;left:0;z-index:1;line-height:1.3}
+.gt-tbl thead th.gl{background:#1f4e3d;z-index:2}
+.gt-tbl td.gu{text-align:center;color:var(--muted);font-size:12px}
+.gt-tbl td.gc,.gt-tbl td.gt,.gt-tbl td.gb{text-align:right;padding:0 8px;white-space:nowrap}
+.gt-tbl td.gc{background:#f3f5f9;color:#33405a}.gt-tbl td.gt{background:#eef1f6;font-weight:700}.gt-tbl td.gb{color:#8a93a8;font-style:italic}
+.gt-tbl td.cm{box-shadow:inset 2px 0 0 #2e7d5b,inset -2px 0 0 #2e7d5b}
+.gt-tbl td.ge{text-align:center}
+.gin{width:100%;height:31px;border:0;background:transparent;text-align:right;padding:0 8px;font:inherit;font-variant-numeric:tabular-nums;color:var(--ink)}
+.gin:hover{background:#f6fbff}.gin:focus{outline:2px solid #2f7de1;outline-offset:-2px;background:#fff}
+.gin.saved{background:#e3f5ec;transition:background .3s}
+.gnt{text-align:left;font-size:12px;color:#7a5a00}
+tr.r-in th.gl{font-weight:600}tr.r-in.tg th.gl,tr.r-in.tg .gin{color:#8a5a00}tr.r-calc th.gl,tr.r-eval th.gl{color:#33405a;background:#f3f5f9}tr.r-base th.gl{color:#8a93a8;font-style:italic}tr.r-note th.gl{color:#7a5a00;font-size:12px}
+tr.gsep td{height:8px;background:#f7f8fb;border-right:0}
+.ox{display:inline-block;min-width:20px;text-align:center;border-radius:5px;font-size:12px}.ox.o{background:#e3f5ec;color:#0b6e47}.ox.x{background:#fde4e4;color:#a3271f}
+table.kzt{min-width:0}table.kzt td.gk{padding:6px 10px;line-height:1.4;font-size:12.5px}table.kzt th.ga{font-size:11.5px;line-height:1.25}table.kzt .gin{text-align:center}table.kzt col.k-l{width:130px}table.kzt col.k-t{width:360px}table.kzt col.k-a{width:88px}table.kzt col.k-r{width:110px}
+table.itpt{min-width:900px}table.itpt col.i-l{width:150px}
