@@ -24,6 +24,12 @@ const ESG_SEC=[['sum','Tổng quan'],['elec','4. Điện năng - CO2'],['paper',
 const ESG_PER={Q1:[0,1,2],Q2:[3,4,5],Q3:[6,7,8],Q4:[9,10,11],H1:[0,1,2,3,4,5],'9T':[0,1,2,3,4,5,6,7,8],Y:[0,1,2,3,4,5,6,7,8,9,10,11]};
 const ESG_PER_L={Q1:'Quý 1',Q2:'Quý 2',Q3:'Quý 3',Q4:'Quý 4',H1:'6 tháng',
   '9T':'9 tháng',Y:'Cả năm'};
+const ESG_PQ=Object.keys(ESG_PER);   /* kỳ chọn bằng nút; thêm từng tháng M01…M12 chọn bằng ô chọn */
+for(let i=0;i<12;i++){const k='M'+String(i+1).padStart(2,'0');ESG_PER[k]=[i];ESG_PER_L[k]='Tháng '+(i+1)}
+/* Firestore không lưu mảng lồng mảng: chi tiết kaizen lưu {h,v}, dòng bảng sheet 3 lưu {c:[…]} – đọc được cả dạng cũ */
+const kzDet=x=>(x.detail||[]).map(e=>Array.isArray(e)?e:[e.h,e.v]);
+const dRows=t=>(t.rows||[]).map(r=>Array.isArray(r)?r:r.c||[]);
+function esgPack(d){(d.kz||[]).forEach(z=>{z.detail=kzDet(z).map(([h,v])=>({h,v}))});(d.dept||[]).forEach(t=>{t.rows=dRows(t).map(c=>({c}))});return d}
 const FUEL_CO2=2.3;   /* kg CO2 / lít xăng – hệ số ước tính thông dụng */
 const MON=Array.from({length:12},(_,i)=>'T'+(i+1));
 const esgDocs=()=>(db.ppe||[]).filter(x=>x.kind==='esg').sort((a,b)=>b.year-a.year);
@@ -195,7 +201,7 @@ function esgAssess(d,per){const ms=ESG_PER[per],ytd=ESG_PER.Y.filter(m=>m<=Math.
   /* ---- Xăng ---- */
   {const sk=S('km'),sf=S('fuel'),yk=Y('km');const b=[line('km',sk),sf.have.length?`<b>Xăng</b>: ${fmtNum(sf.a)} lít (${monL(sf.have)}) ≈ ${fmtNum(sf.a*FUEL_CO2)} kg CO2${sk.a&&sf.a?` · mức tiêu hao ${fmtK(sf.a/sk.a*100)} lít/100 km`:''}.`:'<b>Xăng</b>: chưa có số liệu.'];
     out.fuel=b;missRisk('fuel','km');missRisk('fuel','fuel');
-    const lowK=kzLow(d,'fuel').concat(kzOf(d,'fuel').filter(z=>z.rate==null));risk('fuel','Xe công tác',`Xe thuê chưa ưu tiên hybrid / đời mới; đi lẻ nhiều chuyến làm tăng km và phát thải.`,yk.st==='bad'?'Cao':'Thấp',lowK.map(z=>z.detail.map(x=>x[1]).filter(x=>typeof x==='string').join(' ')).filter(Boolean).join(' ')||'Hoạt động kaizen xe hybrid chưa thực hiện.','Gom chuyến theo lịch, ưu tiên xe điện / hybrid (Xanh SM) cho chặng ngắn, bảo dưỡng định kỳ, theo dõi lít/100 km từng xe.','AD / PU')}
+    const lowK=kzLow(d,'fuel').concat(kzOf(d,'fuel').filter(z=>z.rate==null));risk('fuel','Xe công tác',`Xe thuê chưa ưu tiên hybrid / đời mới; đi lẻ nhiều chuyến làm tăng km và phát thải.`,yk.st==='bad'?'Cao':'Thấp',lowK.map(z=>kzDet(z).map(x=>x[1]).filter(x=>typeof x==='string').join(' ')).filter(Boolean).join(' ')||'Hoạt động kaizen xe hybrid chưa thực hiện.','Gom chuyến theo lịch, ưu tiên xe điện / hybrid (Xanh SM) cho chặng ngắn, bảo dưỡng định kỳ, theo dõi lít/100 km từng xe.','AD / PU')}
   /* ---- In theo phòng ban ---- */
   {const it=d.itp||[],tot=it.map(o=>({d:o.d,b:o.m.reduce((a,x)=>a+(x?x.b:0),0),c:o.m.reduce((a,x)=>a+(x?x.c:0),0),f:o.m.reduce((a,x)=>a+(x?x.cf+x.bf:0),0)})).sort((a,b)=>b.b+b.c-a.b-a.c);
     const all=tot.reduce((a,o)=>a+o.b+o.c,0),col=tot.reduce((a,o)=>a+o.c,0),mm=it.length?Math.max(...it.map(o=>o.m.reduce((a,x,j)=>x?j:a,-1))):-1;
@@ -205,16 +211,16 @@ function esgAssess(d,per){const ms=ESG_PER[per],ytd=ESG_PER.Y.filter(m=>m<=Math.
 
 /* ======================= GIAO DIỆN ======================= */
 const canESG=()=>!!session;
-const esgSave=fn=>transact(()=>{if(!Array.isArray(db.ppe))db.ppe=[];fn()});
+const esgSave=fn=>transact(()=>{if(!Array.isArray(db.ppe))db.ppe=[];fn();db.ppe.filter(x=>x.kind==='esg').forEach(esgPack)});
 function esgF(){const f=F(),ds=esgDocs();if(!f.y||!esgDoc(f.y))f.y=ds[0]?String(ds[0].year):'';const d=esgDoc(f.y);if(d&&!ESG_PER[f.per])f.per=esgDefPer(d);if(!f.sec)f.sec='sum';return{f,d}}
 PAGES['esg/report']={t:'Báo cáo ESG văn phòng',
   sub(){const {f,d}=esgF();return d?`Năm ${d.year} · ${ESG_PER_L[f.per]} · dữ liệu đến T${esgLast(d)+1}${d.src&&d.src.file?' · file '+d.src.file:''}`:'Chưa có dữ liệu'},
   head(){const {f,d}=esgF(),ds=esgDocs();
-    return `<div class="bar">${ds.length?`<label class="fl">Năm <select class="in" data-f="y" aria-label="Năm báo cáo">${ds.map(x=>`<option ${String(x.year)===f.y?'selected':''}>${x.year}</option>`).join('')}</select></label>`:''}<div class="sp"></div><label class="btn" title="Chọn file ESG REPORT (.xls / .xlsx)">⬆ Nhập file ESG<input type="file" id="esg-file" accept=".xls,.xlsx,.xlsm" hidden></label>${d?`<button class="btn" data-act="esg-xlsx">⬇ Excel báo cáo</button><button class="btn" data-act="esg-pdf">⬇ PDF</button>`:''}</div>`},
+    return `<div class="bar">${ds.length?`<label class="fl">Năm <select class="in" data-f="y" aria-label="Năm báo cáo">${ds.map(x=>`<option ${String(x.year)===f.y?'selected':''}>${x.year}</option>`).join('')}</select></label>`:''}<div class="sp"></div><a class="btn" href="#/esg/input">✏ Nhập số liệu tháng</a><label class="btn" title="Chọn file ESG REPORT (.xls / .xlsx)">⬆ Nhập file ESG<input type="file" id="esg-file" accept=".xls,.xlsx,.xlsm" hidden></label>${d?`<button class="btn" data-act="esg-xlsx">⬇ Excel báo cáo</button><button class="btn" data-act="esg-pdf">⬇ PDF</button>`:''}</div>`},
   tbl(){const {f,d}=esgF();
     if(!d)return `<div class="empty"><b>Chưa có số liệu ESG.</b><br>Bấm <b>⬆ Nhập file ESG</b> và chọn file ESG REPORT của phòng (.xls / .xlsx). App đọc các sheet Điện năng - CO2, Giấy - in - chất thải, Xăng, Bảng tính chỉ tiêu, Tiêu chí phòng ban, REF-IT-PRINT.</div>`;
     const seg=(k,l)=>`<button type="button" data-act="setf" data-k="per" data-v="${k}" class="${f.per===k?'on':''}" aria-pressed="${f.per===k}">${l}</button>`,tab=([k,l])=>`<button type="button" class="etab ${f.sec===k?'on':''}" data-act="esg-sec" data-k="${k}">${l}</button>`;
-    return `<div class="bar"><div class="seg" role="group" aria-label="Kỳ báo cáo">${Object.keys(ESG_PER).map(k=>seg(k,ESG_PER_L[k])).join('')}</div></div><div class="etabs" role="tablist">${ESG_SEC.map(tab).join('')}</div>${esgSecHTML(d,f.sec,f.per,{ui:true})}`},
+    return `<div class="bar"><div class="seg" role="group" aria-label="Kỳ báo cáo">${ESG_PQ.map(k=>seg(k,ESG_PER_L[k])).join('')}</div><label class="fl">hoặc tháng <select class="in" data-f="per" aria-label="Báo cáo theo tháng"><option value="">—</option>${MON.map((m,i)=>{const k='M'+String(i+1).padStart(2,'0');return `<option value="${k}" ${f.per===k?'selected':''}>${m}</option>`}).join('')}</select></label></div><div class="etabs" role="tablist">${ESG_SEC.map(tab).join('')}</div>${esgSecHTML(d,f.sec,f.per,{ui:true})}`},
   tm(){const {f,d}=esgF();if(d)esgCharts(d,f.sec,f.per)}};
 ACT['esg-sec']=el=>{F().sec=el.dataset.k;refreshTbl()};
 
@@ -236,7 +242,7 @@ function esgMonthTable(d,keys,ms,opt={}){
     rows.push(eRow([`<td>Chỉ tiêu CO2 (= chỉ tiêu kWh × ${f})</td><td>kg</td>`,...MON.map((_,i)=>`<td class="num ${ms.includes(i)?'cur':''}">${t[i]!=null?fmtNum(t[i]):''}</td>`),`<td class="num">${fmtNum(t.reduce((s,v)=>s+(+v||0),0))}</td>`],'et'))}
   return `<div class="tw"><table class="t emt"><thead>${head}</thead><tbody>${rows.join('')}</tbody></table></div>`}
 function esgKzHTML(d,sec){const z=kzOf(d,sec);if(!z.length)return '';
-  return `<h5 class="esub">Hoạt động cắt giảm (kaizen)</h5><div class="tw"><table class="t ekz"><thead><tr><th>Lĩnh vực</th><th>Nội dung hoạt động</th><th>Chi tiết theo khu vực</th><th>Tỷ lệ thực hiện</th></tr></thead><tbody>${z.map(x=>`<tr><td><b>${esc(x.area)}</b>${x.type?`<br><small class="muted">${esc(x.type)}</small>`:''}</td><td>${esc(x.text).slice(0,260)}</td><td><small>${x.detail.filter(([h,v])=>typeof v==='string'||v<1).map(([h,v])=>`${esc(h)}: <b>${typeof v==='number'?pctE(v):esc(v)}</b>`).join(' · ')||'<span class="muted">tất cả khu vực 100%</span>'}</small></td><td>${x.rate==null?'<span class="muted">–</span>':`<div class="ebar"><i style="width:${Math.round(x.rate*100)}%" class="${x.rate>=1?'ok':x.rate>=0.8?'mid':'low'}"></i><b>${pctE(x.rate)}</b></div>`}</td></tr>`).join('')}</tbody></table></div>`}
+  return `<h5 class="esub">Hoạt động cắt giảm (kaizen)</h5><div class="tw"><table class="t ekz"><thead><tr><th>Lĩnh vực</th><th>Nội dung hoạt động</th><th>Chi tiết theo khu vực</th><th>Tỷ lệ thực hiện</th></tr></thead><tbody>${z.map(x=>`<tr><td><b>${esc(x.area)}</b>${x.type?`<br><small class="muted">${esc(x.type)}</small>`:''}</td><td>${esc(x.text).slice(0,260)}</td><td><small>${kzDet(x).filter(([h,v])=>typeof v==='string'||v<1).map(([h,v])=>`${esc(h)}: <b>${typeof v==='number'?pctE(v):esc(v)}</b>`).join(' · ')||'<span class="muted">tất cả khu vực 100%</span>'}</small></td><td>${x.rate==null?'<span class="muted">–</span>':`<div class="ebar"><i style="width:${Math.round(x.rate*100)}%" class="${x.rate>=1?'ok':x.rate>=0.8?'mid':'low'}"></i><b>${pctE(x.rate)}</b></div>`}</td></tr>`).join('')}</tbody></table></div>`}
 function esgAssessHTML(d,sec,per,A,opt){const b=A[sec]||[],rs=A.risk.filter(r=>r.sec===sec),cm=(d.cmt||{})[sec]||'';
   return `${b.length||rs.length?`<div class="eass"><div><h5 class="esub">Nhận xét</h5><ul class="elist">${b.map(x=>`<li>${x}</li>`).join('')}</ul></div>${rs.length?`<div><h5 class="esub">Rủi ro &amp; khuyến nghị</h5><ul class="erisk">${rs.map(r=>`<li><span class="elv ${r.lvl==='Cao'?'eh':r.lvl==='TB'?'em':'el'}">${r.lvl}</span> <b>${esc(r.item)}</b>: ${r.risk}<br><small>→ ${esc(r.act)}</small></li>`).join('')}</ul></div>`:''}</div>`:''}
     ${opt.ui?`<form class="ecm" data-esgcm="${sec}"><label><b>Nhận xét của người lập / quản lý</b><textarea class="in" rows="2" name="c" placeholder="Ghi thêm nhận xét, nguyên nhân, hành động tháng tới…">${esc(cm)}</textarea></label><button class="btn sm">Lưu nhận xét</button></form>`:cm?`<div class="cmtp"><b>Nhận xét của người lập / quản lý:</b> ${esc(cm)}</div>`:''}`}
@@ -261,7 +267,7 @@ function esgSecHTML(d,sec,per,opt={}){const ms=ESG_PER[per],A=esgAssess(d,per);
     const row=o=>{const t=o.m.reduce((a,x)=>a+(x?x.b+x.c:0),0),f=o.m.reduce((a,x)=>a+(x?x.bf+x.cf:0),0);return `<tr><td><b>${esc(o.d)}</b></td>${used.map(i=>{const x=o.m[i];return `<td class="num">${x?fmtNum(x.b):''}</td><td class="num ecl">${x?fmtNum(x.c):''}</td>`}).join('')}<td class="num"><b>${fmtNum(t)}</b></td><td class="num">${fmtNum(f)}</td></tr>`};
     const T={d:'TỔNG',m:MON.map((_,i)=>it.some(o=>o.m[i])?it.reduce((a,o)=>{const x=o.m[i];return x?{b:a.b+x.b,c:a.c+x.c,bf:a.bf+x.bf,cf:a.cf+x.cf}:a},{b:0,c:0,bf:0,cf:0}):null)};
     return `<div class="tw"><table class="t eit"><thead><tr><th rowspan="2">Phòng ban</th>${used.map(i=>`<th colspan="2">${MON[i]}</th>`).join('')}<th rowspan="2">Tổng bản in</th><th rowspan="2">Chi phí (VND)</th></tr><tr>${used.map(()=>'<th>T.đen</th><th>Màu</th>').join('')}</tr></thead><tbody>${it.map(row).join('')}${row(T).replace('<tr>','<tr class="etot">')}</tbody></table></div>${charts('itp')}${esgAssessHTML(d,'itp',per,A,opt)}`}
-  if(sec==='dept')return (d.dept||[]).length?(d.dept.map(t=>`<h5 class="esub">${esc(t.title)}</h5><div class="tw"><table class="t edt"><thead><tr><th>Phòng ban</th>${t.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r=>`<tr class="${/total/i.test(r[0])?'etot':''}"><td><b>${esc(r[0])}</b></td>${r.slice(1).map(v=>`<td class="num">${v==null?'':typeof v==='number'?(v>0&&v<=1&&v%1?pctE(v):fmtNum(v)):esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('')+esgDeptPrint(d,per)+esgAssessHTML(d,'dept',per,{dept:['Hạn mức theo phòng ban được AD đề xuất theo tỷ lệ nhân sự (điện, điện lạnh, giấy) và tỷ lệ bản in 2025 (mực in). Cột “Final – Các phòng” cần các HOD xác nhận.'],risk:[]},opt)):'<div class="empty">File chưa có sheet tiêu chí phòng ban.</div>';
+  if(sec==='dept')return (d.dept||[]).length?(d.dept.map(t=>`<h5 class="esub">${esc(t.title)}</h5><div class="tw"><table class="t edt"><thead><tr><th>Phòng ban</th>${t.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${dRows(t).map(r=>`<tr class="${/total/i.test(r[0])?'etot':''}"><td><b>${esc(r[0])}</b></td>${r.slice(1).map(v=>`<td class="num">${v==null?'':typeof v==='number'?(v>0&&v<=1&&v%1?pctE(v):fmtNum(v)):esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('')+esgDeptPrint(d,per)+esgAssessHTML(d,'dept',per,{dept:['Hạn mức theo phòng ban được AD đề xuất theo tỷ lệ nhân sự (điện, điện lạnh, giấy) và tỷ lệ bản in 2025 (mực in). Cột “Final – Các phòng” cần các HOD xác nhận.'],risk:[]},opt)):'<div class="empty">File chưa có sheet tiêu chí phòng ban.</div>';
   if(sec==='plan')return (d.plan||[]).length?`<div class="tw"><table class="t epl"><thead><tr><th>STT</th><th>Hoạt động giảm thiểu</th><th>Duy trì</th><th>Chưa thực hiện</th><th>Dept/PIC</th><th>Mục tiêu</th><th>Thời gian</th><th>Phương pháp định lượng</th><th>Ghi chú</th></tr></thead><tbody>${d.plan.map(p=>`<tr class="${p.stt?'egrp':''}"><td class="c">${esc(p.stt)}</td><td>${p.stt?'<b>':''}${esc(p.act)}${p.stt?'</b>':''}</td><td class="c">${p.done?'<b class="pos">✓</b>':''}</td><td class="c">${p.todo?'<b class="tag-warn">✓</b>':''}</td><td>${esc(p.dept)}</td><td><small>${esc(p.tgt)}</small></td><td><small>${esc(p.time)}</small></td><td><small>${esc(p.method)}</small></td><td><small>${esc(p.note)}</small></td></tr>`).join('')}</tbody></table></div><p class="note">${d.plan.filter(p=>p.done).length} hoạt động đang duy trì · <b class="tag-warn">${d.plan.filter(p=>p.todo).length} hoạt động chưa thực hiện</b>.</p>`:'<div class="empty">File chưa có sheet các chỉ tiêu.</div>';
   if(sec==='calc'){const rows=ESG_IND.filter(i=>d.ind[i.k].base.some(v=>v!=null)||d.ind[i.k].tgt.some(v=>v!=null));
     return `<div class="kpis sm">${kpi('Nhân sự văn phòng',`${fmtNum(d.staff?.cur||0)}`,`năm trước ${fmtNum(d.staff?.prev||0)}`,'info')}${kpi('Doanh thu',esc(d.rev?.cur||'–'),`năm trước ${esc(d.rev?.prev||'–')}`,'acc')}${kpi('Chỉ tiêu tăng theo doanh thu',d.rev?.grow!=null?pctE(d.rev.grow):'–','áp cho điện, điện lạnh, mực in, giấy','warn')}${kpi('Hệ số phát thải',`${d.factor||0.72}`,'kg CO2 / kWh (theo file)','mute')}</div>
@@ -274,7 +280,7 @@ function esgSecHTML(d,sec,per,opt={}){const ms=ESG_PER[per],A=esgAssess(d,per);
 function esgDeptPrint(d,per){const t=(d.dept||[]).find(x=>/muc in/.test(norm(x.title)));const it=d.itp||[];if(!t||!it.length)return '';
   const qi=t.cols.findIndex(c=>/suggest/i.test(c)&&/q1/i.test(c)),qj=t.cols.findIndex(c=>/suggest/i.test(c)&&/q2/i.test(c));if(qi<0)return '';
   const map={PUR:'PU',AZ:'HSE'},used=MON.map((_,i)=>it.some(o=>o.m[i])?i:-1).filter(i=>i>=0);
-  const rows=t.rows.filter(r=>!/total/i.test(r[0])).map(r=>{const o=it.find(x=>x.d===r[0]||map[x.d]===r[0]);return{d:r[0],q1:+r[qi+1]||null,q2:+r[(qj<0?qi:qj)+1]||null,o}}).filter(x=>x.o);
+  const rows=dRows(t).filter(r=>!/total/i.test(r[0])).map(r=>{const o=it.find(x=>x.d===r[0]||map[x.d]===r[0]);return{d:r[0],q1:+r[qi+1]||null,q2:+r[(qj<0?qi:qj)+1]||null,o}}).filter(x=>x.o);
   if(!rows.length)return '';
   return `<h5 class="esub">Bản in thực tế theo phòng ban so với hạn mức AD đề xuất (trang / tháng)</h5><div class="tw"><table class="t eit"><thead><tr><th>Phòng ban</th><th>Hạn mức Q1</th><th>Hạn mức Q2–Q4</th>${used.map(i=>`<th>${MON[i]}</th>`).join('')}<th>Số tháng vượt</th></tr></thead><tbody>${rows.map(x=>{let n=0;const cells=used.map(i=>{const v=x.o.m[i]?x.o.m[i].b+x.o.m[i].c:null,lim=i<3?x.q1:x.q2;const bad=v!=null&&lim&&v>lim;if(bad)n++;return `<td class="num ${v==null?'':bad?'ebad':'eok'}">${v==null?'':fmtNum(v)}</td>`}).join('');return `<tr><td><b>${esc(x.d)}</b></td><td class="num">${fmtNum(x.q1)}</td><td class="num">${fmtNum(x.q2)}</td>${cells}<td class="c">${n?`<b class="neg">${n}</b>`:'<span class="pos">0</span>'}</td></tr>`}).join('')}</tbody></table></div><p class="note">Ghép tên phòng: PUR → PU, AZ → HSE. Hạn mức lấy theo cột “AD Suggest” của sheet 3.</p>`}
 
@@ -298,13 +304,27 @@ async function esgChartImgs(d,keys,w=900,h=330){const out={};if(!window.Chart)re
   return out}
 
 /* ---------- nhập file, lưu nhận xét ---------- */
+/* Nhập file: lấy chỉ tiêu + các sheet ghi nhận (1, 2, 3, SUMMARY) và số liệu tháng. Năm đã có trên app: chọn giữ số liệu tháng đã nhập trên app hay ghi đè theo file */
+let ESGIMP=null;
+function esgMerge(old,p){const o=JSON.parse(JSON.stringify(p));
+  ESG_IND.forEach(i=>{const a=(old.ind||{})[i.k]||{},b=o.ind[i.k];['act','cost','note'].forEach(f=>{b[f]=b[f].map((v,m)=>a[f]&&a[f][m]!=null&&a[f][m]!==''?a[f][m]:v)})});
+  (old.itp||[]).forEach(od=>{let x=o.itp.find(z=>z.d===od.d);if(!x){x={d:od.d,m:Array(12).fill(null)};o.itp.push(x)}x.m=x.m.map((v,m)=>od.m&&od.m[m]?od.m[m]:v)});
+  (old.kz||[]).filter(z=>z.app).forEach(z=>{const x=o.kz.find(y=>y.sec===z.sec&&y.text===z.text);if(x){x.rate=z.rate;x.app=true}});
+  if(old.price)o.price=old.price;return o}
+function esgImpSave(mode){const x=ESGIMP;if(!x)return;const {p,f}=x,id='esg_'+p.year,old=esgDoc(p.year);
+  const doc={...(old&&mode==='merge'?esgMerge(old,p):p),id,kind:'esg',cmt:old&&old.cmt||{},src:{file:f,at:new Date().toISOString(),by:session?.name||''}};
+  if(esgSave(()=>{db.ppe=db.ppe.filter(z=>z.id!==id);db.ppe.push(doc)})){ESGIMP=null;closeModal();F().y=String(p.year);if(!F().per)F().per=esgDefPer(doc);rerender();
+    toast(`Đã nhập ESG ${p.year}${mode==='merge'?' (giữ số liệu đã nhập trên app)':''}: dữ liệu đến T${esgLast(doc)+1}, phát hiện ${p.qa.length} lỗi công thức / số liệu trong file`)}}
+ACT['esg-imp-merge']=()=>esgImpSave('merge');ACT['esg-imp-over']=()=>esgImpSave('over');
 document.addEventListener('change',async ev=>{const el=ev.target;if(el.id!=='esg-file'||!el.files||!el.files[0])return;if(!canESG())return;
   if(!window.XLSX){toast('Chưa tải được thư viện Excel.','error');return}
   const f=el.files[0];toast('Đang đọc file ESG…');
-  try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellFormula:true});const p=esgParse(wb),id='esg_'+p.year,old=esgDoc(p.year);
-    if(old&&!confirm(`Đã có số liệu ESG năm ${p.year}. Ghi đè bằng file “${f.name}”? (Nhận xét đã ghi trên app được giữ lại.)`))return;
-    if(esgSave(()=>{db.ppe=db.ppe.filter(x=>x.id!==id);db.ppe.push({id,kind:'esg',...p,cmt:old&&old.cmt||{},src:{file:f.name,at:new Date().toISOString(),by:session?.name||''}})})){
-      F().y=String(p.year);F().per=esgDefPer(p);rerender();toast(`Đã nhập ESG ${p.year}: dữ liệu đến T${esgLast(p)+1}, phát hiện ${p.qa.length} lỗi công thức / số liệu trong file`)}}
+  try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellFormula:true});const p=esgParse(wb),old=esgDoc(p.year);ESGIMP={p,f:f.name};
+    if(!old)return esgImpSave('over');
+    const nApp=ESG_IND.reduce((a,i)=>a+((old.ind[i.k]||{}).act||[]).filter(v=>v!=null).length,0),nFile=ESG_IND.reduce((a,i)=>a+p.ind[i.k].act.filter(v=>v!=null).length,0);
+    modal(`Nhập file ESG ${p.year}`,`<p>Năm ${p.year} đã có số liệu trên app (<b>${nApp}</b> ô số liệu tháng). File “${esc(f.name)}” có <b>${nFile}</b> ô số liệu tháng, dữ liệu đến T${esgLast(p)+1}.</p>
+      <p class="note">Cả hai cách đều cập nhật <b>chỉ tiêu</b> và các sheet ghi nhận (1. Các chỉ tiêu, 2. Bảng tính chỉ tiêu, 3. Tiêu chí phòng ban) theo file, và giữ nhận xét đã ghi.</p>`,
+      {footer:`${cancelBtn}<button class="btn" data-act="esg-imp-over">Ghi đè số liệu tháng theo file</button><button class="btn primary" data-act="esg-imp-merge">Giữ số liệu đã nhập trên app, chỉ bổ sung tháng còn trống</button>`})}
   catch(e){console.error(e);toast('Không đọc được file ESG: '+e.message,'error')}finally{el.value=''}});
 document.addEventListener('submit',ev=>{const fm=ev.target.closest&&ev.target.closest('form[data-esgcm]');if(!fm)return;ev.preventDefault();const {d}=esgF();if(!d)return;
   const k=fm.dataset.esgcm,v=String(fm.c.value||'').trim();if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id);x.cmt={...(x.cmt||{}),[k]:v}}))toast('Đã lưu nhận xét')},true);
@@ -367,7 +387,7 @@ function xMonth(ws,d,keys,ms,opt={}){const rows=[];const N=ws.__N;
   const r0=ws.__r+(opt.title?1:0)+1;xTable(ws,['Hạng mục','ĐVT',...MON,'Lũy kế'],rows,{title:opt.title,hh:20});
   rows.forEach((row,i)=>{if(row.note){ws.mergeCells(r0+i,1,r0+i,N);ws.getCell(r0+i,1).font={name:'Arial',size:8,italic:true}}})}
 function xKz(ws,d,sec){const z=kzOf(d,sec);if(!z.length)return;const N=ws.__N;
-  const rows=z.map(x=>({v:[x.area+(x.type?' – '+x.type:''),x.text,x.detail.filter(([h,v])=>typeof v==='string'||v<1).map(([h,v])=>`${h}: ${typeof v==='number'?pctE(v):v}`).join(' · ')||'Tất cả khu vực 100%',x.rate],st:[{bold:true},{},{},{fmt:'0%',h:'center',fill:x.rate==null?undefined:x.rate>=1?XC.ok:x.rate>=0.8?XC.warn:XC.bad}],h:Math.max(30,Math.ceil(x.text.length/110)*13)}));
+  const rows=z.map(x=>({v:[x.area+(x.type?' – '+x.type:''),x.text,kzDet(x).filter(([h,v])=>typeof v==='string'||v<1).map(([h,v])=>`${h}: ${typeof v==='number'?pctE(v):v}`).join(' · ')||'Tất cả khu vực 100%',x.rate],st:[{bold:true},{},{},{fmt:'0%',h:'center',fill:x.rate==null?undefined:x.rate>=1?XC.ok:x.rate>=0.8?XC.warn:XC.bad}],h:Math.max(30,Math.ceil(x.text.length/110)*13)}));
   /* gộp cột cho vừa bề ngang */
   const r0=ws.__r+2;xTable(ws,['Lĩnh vực','Nội dung hoạt động','Chi tiết theo khu vực','Tỷ lệ thực hiện'],rows,{title:'Hoạt động cắt giảm (kaizen)',hh:20});
   const sp=[[1,2],[3,9],[10,N-1],[N,N]];for(let i=-1;i<rows.length;i++){const r=r0+i;const vals=[1,2,3,4].map(c=>ws.getCell(r,c).value),sts=[1,2,3,4].map(c=>({font:ws.getCell(r,c).font,fill:ws.getCell(r,c).fill,al:ws.getCell(r,c).alignment,fmt:ws.getCell(r,c).numFmt}));
@@ -397,7 +417,7 @@ async function esgXlsx(d,per){
     xNote(ws,'Chỉ tiêu Q1 = giữ mức trung bình Q1/2025; Q2–Q4 = (tổng 2025 × (1 + tỷ lệ tăng theo doanh thu)) ÷ 11 tháng, theo cách tính trong file.',{i:true})}
   /* 3. Tiêu chí phòng ban */
   if((d.dept||[]).length){const mx=Math.max(...d.dept.map(t=>t.cols.length));const ws=xSheet(wb,'3. TIÊU CHÍ PHÒNG BAN','TIÊU CHÍ CHO CÁC PHÒNG BAN',d,per,[12,...Array(Math.max(mx,8)).fill(14)]);
-    d.dept.forEach(t=>xTable(ws,['Phòng ban',...t.cols],t.rows.map(r=>({cls:/total/i.test(r[0])?'t':'',v:r.map(v=>v==null?'':v),st:r.map(v=>typeof v==='number'&&v>0&&v<=1&&v%1?{fmt:'0%'}:{})})),{title:t.title,hh:42}));
+    d.dept.forEach(t=>xTable(ws,['Phòng ban',...t.cols],dRows(t).map(r=>({cls:/total/i.test(r[0])?'t':'',v:r.map(v=>v==null?'':v),st:r.map(v=>typeof v==='number'&&v>0&&v<=1&&v%1?{fmt:'0%'}:{})})),{title:t.title,hh:42}));
     const it=d.itp||[];if(it.length){const t=d.dept.find(x=>/muc in/.test(norm(x.title)));if(t){const box=document.createElement('div');box.innerHTML=esgDeptPrint(d,per);const tb=box.querySelector('table');if(tb){const rows=[...tb.tBodies[0].rows].map(tr=>[...tr.cells].map(c=>{const s=c.textContent.trim().replace(/\./g,'');return /^\d+$/.test(s)?+s:c.textContent.trim()}));const hd=[...tb.tHead.rows[0].cells].map(c=>c.textContent.trim());
       xTable(ws,hd,rows.map(r=>({v:r})),{title:'Bản in thực tế theo phòng ban so với hạn mức AD đề xuất (trang / tháng)',hh:20})}}}}
   /* 4. Điện năng */
@@ -429,3 +449,77 @@ ACT['esg-xlsx']=async el=>{const {f,d}=esgF();if(!d)return;const b=el.closest('b
     a.href=URL.createObjectURL(blob);a.download=`ESG_REPORT_${d.year}_${f.per}_${todayStr()}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast('Đã xuất Excel báo cáo ESG')}
   catch(e){console.error(e);toast('Không tạo được file: '+e.message,'error')}finally{if(b)b.disabled=false}};
 if(typeof module!=='undefined')module.exports={esgParse,esgStat,esgAssess};
+
+/* ======================= NHẬP SỐ LIỆU THÁNG (4 sheet nhập hàng tháng) =======================
+   4. Điện năng - CO2 · 5. Giấy, in, chất thải · 6. Xăng · 7. REF-IT-PRINT. Các sheet còn lại (1, 2, 3) lấy từ file, dùng để làm báo cáo. */
+const ESG_DEPTS=['AD','PD','PUR','AZ','QC','ED','EC'];
+function esgNewYear(y){const prev=esgDocs().find(x=>x.year<y),ind={};
+  ESG_IND.forEach(i=>{const p=prev&&prev.ind[i.k];ind[i.k]={act:e12(),tgt:p?[...p.tgt]:e12(),cost:e12(),base:p?[...p.act]:e12(),baseCost:p?[...p.cost]:e12(),note:e12()}});
+  return esgPack({id:'esg_'+y,kind:'esg',year:y,factor:prev?prev.factor:0.72,staff:prev?{...prev.staff}:{},rev:prev?{...prev.rev}:{},ind,
+    kz:prev?JSON.parse(JSON.stringify(prev.kz||[])).map(z=>({...z,app:false})):[],plan:prev?JSON.parse(JSON.stringify(prev.plan||[])):[],dept:prev?JSON.parse(JSON.stringify(prev.dept||[])):[],
+    itp:(prev&&prev.itp||ESG_DEPTS.map(d=>({d}))).map(o=>({d:o.d,m:Array(12).fill(null)})),qa:[],cmt:{},price:prev&&prev.price||2000,src:{file:'',at:new Date().toISOString(),by:session?.name||''}})}
+ACT['esg-new']=el=>{const y=+el.dataset.y;if(!canESG()||esgDoc(y))return;const prev=esgDocs().find(x=>x.year<y);
+  if(!confirm(`Tạo sổ ESG năm ${y}${prev?` (chép chỉ tiêu, hoạt động kaizen, các sheet ghi nhận từ năm ${prev.year}; số liệu ${prev.year} thành số so sánh)`:''}?`))return;
+  if(esgSave(()=>db.ppe.push(esgNewYear(y)))){F().y=String(y);rerender();toast('Đã tạo sổ ESG năm '+y)}};
+const ESG_IN=[
+  {sec:'elec',t:'4. Điện năng - CO2',icon:'⚡',f:[['elec','act','Điện năng tiêu thụ','kWh'],['elec','cost','Tiền điện','VND'],['ac','act','Điện lạnh OT (sau 18h)','kWh'],['ac','cost','Tiền điện lạnh OT','VND']],n:[['elec','Lý do bất thường – điện năng'],['ac','Lý do bất thường – điện lạnh']]},
+  {sec:'paper',t:'5. Giấy, in, chất thải',icon:'📄',f:[['paper','act','Giấy in','ram'],['print','act','Số bản in (trắng đen + màu)','trang'],['print','cost','Chi phí mực in','VND'],['waste','act','Rác thải','tấn'],['battery','act','Pin thải bỏ','viên'],['bottle','act','Nước uống đóng chai','chai']],n:[['paper','Lý do bất thường – giấy in'],['print','Lý do bất thường – bản in'],['waste','Lý do bất thường – rác thải']]},
+  {sec:'fuel',t:'6. Xăng',icon:'🚗',f:[['km','act','Km xe sử dụng','km'],['fuel','act','Xăng tiêu thụ','lít']],n:[['km','Lý do bất thường – xe']]}];
+function esgInF(){const f=F(),ds=esgDocs(),cy=new Date().getFullYear();if(!f.y)f.y=String(ds[0]?ds[0].year:cy);const d=esgDoc(f.y);
+  if(f.m==null||f.m===''){const l=d?esgLast(d):-1;f.m=String(Math.min(11,Math.max(0,l+1)))}return{f,d,m:+f.m}}
+PAGES['esg/input']={t:'Nhập số liệu ESG hàng tháng',
+  sub(){const {f,m}=esgInF();return `Năm ${f.y} · tháng ${m+1} · sheet 4. Điện năng - CO2 · 5. Giấy, in, chất thải · 6. Xăng · 7. REF-IT-PRINT`},
+  head(){const {f,d}=esgInF(),cy=new Date().getFullYear(),ys=[...new Set([...esgDocs().map(x=>x.year),cy,cy+1])].sort((a,b)=>b-a);
+    return `<div class="bar"><label class="fl">Năm <select class="in" data-f="y" aria-label="Năm">${ys.map(y=>`<option value="${y}" ${String(y)===f.y?'selected':''}>${y}${esgDoc(y)?'':' (chưa có)'}</option>`).join('')}</select></label><div class="sp"></div><label class="btn" title="File ESG REPORT: lấy chỉ tiêu, các sheet ghi nhận và số liệu tháng">⬆ Nhập file ESG<input type="file" id="esg-file" accept=".xls,.xlsx,.xlsm" hidden></label>${d?'<a class="btn" href="#/esg/report">📊 Xem báo cáo</a>':''}</div>`},
+  tbl(){const {f,d,m}=esgInF();
+    if(!d)return `<div class="empty"><b>Chưa có sổ ESG năm ${esc(f.y)}.</b><br>Bấm <b>⬆ Nhập file ESG</b> để lấy chỉ tiêu và các sheet ghi nhận từ file của phòng${esgDocs().find(x=>x.year<+f.y)?`, hoặc <button class="btn sm primary" data-act="esg-new" data-y="${esc(f.y)}">＋ Tạo sổ năm ${esc(f.y)} từ năm trước</button>`:''}.</div>`;
+    const fill=k=>MON.map((_,i)=>(d.ind[k]?.act||[])[i]!=null).filter(Boolean).length;
+    const strip=`<div class="mstrip esgm" role="tablist">${MON.map((x,i)=>{const n=['elec','ac','paper','print','waste','km'].filter(k=>(d.ind[k]?.act||[])[i]!=null).length;return `<button type="button" data-act="esg-m" data-m="${i}" class="${i===m?'on':''}" title="${n}/6 chỉ tiêu chính đã nhập"><b>${x}</b><small>${n?`${n}/6`:'–'}</small><i class="${n>=6?'ok':n?'mid':''}"></i></button>`}).join('')}</div>`;
+    const inp=(k,a,v,u)=>`<input class="in esn" data-ek="${k}" data-ea="${a}" inputmode="decimal" value="${v==null?'':esc(String(+(+v).toFixed(4)).replace('.',','))}" placeholder="${u}" aria-label="${esc(k+' '+a)}">`;
+    const row=([k,a,l,u])=>{const x=d.ind[k],v=x[a][m],t=a==='act'?x.tgt[m]:null,b=a==='act'?x.base[m]:a==='cost'?x.baseCost[m]:null;
+      return `<tr><td><b>${esc(l)}</b></td><td>${u}</td><td>${inp(k,a,v,u)}</td><td class="num">${t!=null?esgN(t,k):'–'}</td><td class="num muted">${b!=null?(a==='cost'?fmtNum(b):esgN(b,k)):'–'}</td><td class="est" data-est="${k}|${a}">${a==='act'?esgStTxt(v,t):''}</td></tr>`};
+    const card=g=>`<section class="card esin"><h4>${g.icon} ${g.t} <small class="muted">· tháng ${m+1}/${d.year}</small></h4><div class="tw"><table class="t"><thead><tr><th>Hạng mục</th><th>ĐVT</th><th>Tháng ${m+1}</th><th>Chỉ tiêu</th><th>Cùng kỳ ${d.year-1}</th><th>Đánh giá</th></tr></thead><tbody>${g.f.map(row).join('')}
+      ${g.sec==='elec'?`<tr><td>CO2 từ điện (tự tính)</td><td>kg</td><td class="num" id="esg-co2">${esgCo2Txt(d,m)}</td><td colspan="3"><small class="muted">= (điện + điện lạnh) × ${d.factor||0.72}</small></td></tr>`:''}</tbody></table></div>
+      ${g.n.map(([k,l])=>`<label class="f"><span>${esc(l)}</span><input class="in" data-ek="${k}" data-ea="note" value="${esc((d.ind[k].note||[])[m]||'')}" placeholder="Ghi rõ lý do nếu chỉ số bất thường"></label>`).join('')}
+      ${esgKzEdit(d,g.sec)}</section>`;
+    return strip+`<form id="esg-form" data-y="${d.year}" data-m="${m}">${ESG_IN.map(card).join('')}${esgItpEdit(d,m)}
+      <div class="esbar"><span class="muted">Số liệu chưa lưu sẽ mất khi đổi tháng.</span><div class="sp"></div><button type="submit" class="btn primary">💾 Lưu số liệu tháng ${m+1}</button></div></form>`}};
+const esgStTxt=(v,t)=>v==null||v===''?'<span class="muted">chưa nhập</span>':t==null?'<span class="muted">không có chỉ tiêu</span>':+v<=t?`<b class="pos">Đạt</b> <small>${pctE(v/t)}</small>`:`<b class="neg">Vượt</b> <small>${pctE(v/t)}</small>`;
+const esgCo2Txt=(d,m,e,a)=>{e=e??d.ind.elec.act[m];a=a??d.ind.ac.act[m];return e==null&&a==null?'–':`<b>${fmtNum(((+e||0)+(+a||0))*(d.factor||0.72))}</b>`};
+function esgKzEdit(d,sec){const z=(d.kz||[]).map((x,i)=>({x,i})).filter(o=>o.x.sec===sec);if(!z.length)return '';
+  return `<details class="eskz"><summary>Hoạt động kaizen – tỷ lệ thực hiện (${z.length})</summary><table class="t"><tbody>${z.map(({x,i})=>`<tr><td><b>${esc(x.area)}</b>${x.type?` <small class="muted">${esc(x.type)}</small>`:''}<br><small>${esc(x.text).slice(0,160)}</small></td><td style="width:120px"><input class="in esn" data-kz="${i}" inputmode="decimal" value="${x.rate==null?'':Math.round(x.rate*100)}" placeholder="%" aria-label="Tỷ lệ thực hiện"> %</td></tr>`).join('')}</tbody></table></details>`}
+function esgItpEdit(d,m){const it=(d.itp&&d.itp.length?d.itp:ESG_DEPTS.map(x=>({d:x,m:Array(12).fill(null)}))),pr=+d.price||2000;
+  const row=(o,j)=>{const x=(o.m||[])[m]||{};const c=(k)=>`<input class="in esn" data-ip="${j}" data-ik="${k}" inputmode="decimal" value="${x[k]!=null&&x[k]!==''?esc(x[k]):''}" aria-label="${esc(o.d+' '+k)}">`;return `<tr><td><b>${esc(o.d)}</b></td><td>${c('c')}</td><td>${c('cf')}</td><td>${c('b')}</td><td>${c('bf')}</td><td class="num" data-it="${j}">${x.c!=null||x.b!=null?fmtNum((+x.c||0)+(+x.b||0)):''}</td></tr>`};
+  return `<section class="card esin"><h4>🖨 7. REF-IT-PRINT <small class="muted">· số liệu máy in theo phòng ban, tháng ${m+1}</small></h4>
+    <div class="tw"><table class="t eitp"><thead><tr><th>Phòng ban</th><th>Màu (bản)</th><th>Phí màu (VND)</th><th>Trắng đen (bản)</th><th>Phí trắng đen (VND)</th><th>Tổng bản in</th></tr></thead><tbody>${it.map(row).join('')}</tbody>
+    <tfoot><tr><td><b>Tổng</b></td><td class="num" id="itp-c"></td><td class="num" id="itp-cf"></td><td class="num" id="itp-b"></td><td class="num" id="itp-bf"></td><td class="num" id="itp-t"></td></tr></tfoot></table></div>
+    <div class="rgbtn"><label class="fl">Đơn giá mặc định <input class="in esn" id="esg-price" value="${pr}" style="width:90px"> đ / bản</label><button type="button" class="btn sm" data-act="esg-itp-add">＋ Thêm phòng ban</button><button type="button" class="btn sm acc" data-act="esg-itp-sum" title="Điền Số bản in và Chi phí mực in ở mục 5 bằng tổng bảng này">↑ Lấy tổng sang mục 5</button><span class="note">Để trống ô phí thì app tự tính = số bản × đơn giá.</span></div></section>`}
+const esgNum=v=>{const t=String(v??'').trim().replace(/\s/g,'');if(!t)return null;const n=+t.replace(/\.(?=\d{3}(\D|$))/g,'').replace(',','.');return Number.isFinite(n)?n:NaN};
+function esgItpTotals(){const fm=$('#esg-form');if(!fm)return;const pr=esgNum($('#esg-price')?.value)||2000,T={c:0,cf:0,b:0,bf:0};
+  const rows={};fm.querySelectorAll('[data-ip]').forEach(el=>{(rows[el.dataset.ip]=rows[el.dataset.ip]||{})[el.dataset.ik]=esgNum(el.value)});
+  Object.entries(rows).forEach(([j,r])=>{const cf=r.cf??((r.c||0)*pr),bf=r.bf??((r.b||0)*pr);T.c+=r.c||0;T.b+=r.b||0;T.cf+=r.c!=null||r.cf!=null?cf:0;T.bf+=r.b!=null||r.bf!=null?bf:0;const td=fm.querySelector(`[data-it="${j}"]`);if(td)td.textContent=r.c!=null||r.b!=null?fmtNum((r.c||0)+(r.b||0)):''});
+  ['c','cf','b','bf'].forEach(k=>{const e=$('#itp-'+k);if(e)e.textContent=T[k]?fmtNum(T[k]):''});const t=$('#itp-t');if(t)t.textContent=T.c+T.b?fmtNum(T.c+T.b):'';return T}
+document.addEventListener('input',ev=>{const el=ev.target;if(!el.closest||!el.closest('#esg-form'))return;
+  if(el.dataset.ip!=null||el.id==='esg-price'){esgItpTotals();return}
+  if(el.dataset.ea==='act'){const {d,m}=esgInF();if(!d)return;const k=el.dataset.ek,v=esgNum(el.value),td=document.querySelector(`[data-est="${k}|act"]`);if(td)td.innerHTML=esgStTxt(Number.isNaN(v)?null:v,d.ind[k].tgt[m]);
+    if(k==='elec'||k==='ac'){const g=x=>esgNum(document.querySelector(`[data-ek="${x}"][data-ea="act"]`)?.value);const c=$('#esg-co2');if(c)c.innerHTML=esgCo2Txt(d,m,g('elec'),g('ac'))}}});
+document.addEventListener('focusin',ev=>{if(ev.target.closest&&ev.target.closest('#esg-form'))setTimeout(esgItpTotals,0)});
+ACT['esg-m']=el=>{F().m=el.dataset.m;refreshTbl();setTimeout(esgItpTotals,30)};
+ACT['esg-itp-add']=()=>{const n=prompt('Tên phòng ban (ví dụ HSE):');if(!n||!n.trim())return;const tb=document.querySelector('#esg-form table.eitp tbody');if(!tb)return;
+  const name=n.trim().toUpperCase();if([...tb.rows].some(tr=>norm(tr.cells[0].textContent)===norm(name)))return toast('Phòng ban này đã có.','warn');
+  const j=tb.rows.length,c=k=>`<input class="in esn" data-ip="${j}" data-ik="${k}" inputmode="decimal" aria-label="${esc(name+' '+k)}">`;   /* thêm dòng ngay trên bảng, không mất số đang nhập; lưu cùng nút Lưu */
+  tb.insertAdjacentHTML('beforeend',`<tr data-newd="${esc(name)}"><td><b>${esc(name)}</b> <small class="muted">mới</small></td><td>${c('c')}</td><td>${c('cf')}</td><td>${c('b')}</td><td>${c('bf')}</td><td class="num" data-it="${j}"></td></tr>`);tb.rows[j].querySelector('input').focus()};
+ACT['esg-itp-sum']=()=>{const T=esgItpTotals();if(!T||!(T.c+T.b))return toast('Bảng in theo phòng ban chưa có số.','warn');
+  const p=document.querySelector('[data-ek="print"][data-ea="act"]'),c=document.querySelector('[data-ek="print"][data-ea="cost"]');if(p){p.value=String(T.c+T.b);p.dispatchEvent(new Event('input',{bubbles:true}))}if(c)c.value=String(T.cf+T.bf);toast('Đã điền số bản in và chi phí mực in ở mục 5')};
+document.addEventListener('submit',ev=>{const fm=ev.target;if(fm.id!=='esg-form')return;ev.preventDefault();if(!canESG())return;
+  const y=+fm.dataset.y,m=+fm.dataset.m,d=esgDoc(y);if(!d)return;const bad=[];
+  const vals=[...fm.querySelectorAll('[data-ek]')].map(el=>{const a=el.dataset.ea,v=a==='note'?String(el.value||'').trim()||null:esgNum(el.value);if(Number.isNaN(v))bad.push(el);return{k:el.dataset.ek,a,v}});
+  const kz=[...fm.querySelectorAll('[data-kz]')].map(el=>{const v=esgNum(el.value);if(Number.isNaN(v)||(v!=null&&(v<0||v>100)))bad.push(el);return{i:+el.dataset.kz,v}});
+  const pr=esgNum($('#esg-price')?.value)||2000,ip={};fm.querySelectorAll('[data-ip]').forEach(el=>{const v=esgNum(el.value);if(Number.isNaN(v))bad.push(el);(ip[el.dataset.ip]=ip[el.dataset.ip]||{})[el.dataset.ik]=v});
+  if(bad.length){bad[0].focus();return toast('Có ô nhập không phải số. Kiểm tra lại ô đang chọn.','error')}
+  const it=(d.itp&&d.itp.length?d.itp:ESG_DEPTS.map(q=>({d:q}))).concat([...fm.querySelectorAll('tr[data-newd]')].map(tr=>({d:tr.dataset.newd})));
+  if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id);
+    vals.forEach(({k,a,v})=>{const o=x.ind[k];if(!o[a])o[a]=e12();o[a][m]=v});
+    kz.forEach(({i,v})=>{const z=x.kz[i];if(!z)return;const r=v==null?null:v/100;if(r!==z.rate){z.rate=r;z.app=true}});
+    x.price=pr;x.itp=it.map((o,j)=>{const mm=[...(o.m||Array(12).fill(null))];const r=ip[j];if(r){const has=['c','cf','b','bf'].some(k=>r[k]!=null);mm[m]=has?{c:r.c||0,cf:r.cf??((r.c||0)*pr),b:r.b||0,bf:r.bf??((r.b||0)*pr)}:null}return{d:o.d,m:mm}});
+    x.upd={at:new Date().toISOString(),by:session?.name||''}})){refreshTbl();setTimeout(esgItpTotals,30);toast(`Đã lưu số liệu ESG tháng ${m+1}/${y}`)}});

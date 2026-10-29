@@ -48,7 +48,7 @@ const MENU=[
  {g:'emp',icon:'👥',label:'Nhân viên',items:[['list','Tất cả nhân viên','mgr'],['dept','Theo nhóm','mgr']]},
  {g:'rpt',icon:'📅',label:'Báo cáo',items:[['employee','Theo nhân viên'],['monthly','Theo tháng'],['quarter','Theo quý'],['dept','Theo nhóm','mgr']]},
  {g:'ppe',icon:'🦺',label:'Quản lý PPE & Đồng phục',items:[['in','Nhập PPE & đồng phục'],['out','Cấp phát'],['cat','Danh mục'],['rpt','Báo cáo']]},
- {g:'esg',icon:'🌱',label:'ESG văn phòng',items:[['report','Báo cáo ESG']]},
+ {g:'esg',icon:'🌱',label:'ESG văn phòng',items:[['input','Nhập số liệu tháng'],['report','Báo cáo ESG']]},
  {g:'help',icon:'📘',label:'Quy chế',items:[['rules','Quy chế KPI']]},
  {g:'set',icon:'⚙️',label:'Settings',items:[['org','Nhóm & ngày lễ','admin'],['users','User / Permission','admin'],['system','Sao lưu & Hệ thống','admin']]}
 ];

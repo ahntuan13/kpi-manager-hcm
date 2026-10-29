@@ -1051,3 +1051,14 @@ table.t.erk td{vertical-align:top;font-size:13px}
 @media (max-width:900px){.eass,.egrid{grid-template-columns:1fr}}
 .esg-doc table.t{font-size:11px}.esg-doc table.t th,.esg-doc table.t td{padding:3px 5px}
 .esg-doc table.epl td small{font-size:10px}.esg-doc .elist,.esg-doc .erisk{font-size:12px}
+
+/* nhập số liệu ESG tháng */
+.esgm{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin-bottom:12px}
+.esgm button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:6px 2px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;font:inherit;position:relative;overflow:hidden}
+.esgm button small{font-size:11px;color:var(--muted)}.esgm button.on{border-color:#1f4e3d;box-shadow:0 0 0 2px rgba(31,78,61,.15)}
+.esgm button i{position:absolute;left:0;right:0;bottom:0;height:3px;background:#e3e7ef}.esgm button i.ok{background:#18a37a}.esgm button i.mid{background:#e0a32e}
+.esin{margin-bottom:12px}.esin table.t td{vertical-align:middle}.esin .esn{width:140px;text-align:right}.esin .f{margin-top:8px}
+table.t.eitp .esn{width:110px}
+.eskz{margin-top:10px}.eskz summary{cursor:pointer;font-weight:600;font-size:13px}.eskz .esn{width:70px}
+.esbar{position:sticky;bottom:0;display:flex;align-items:center;gap:10px;background:var(--card,#fff);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:6px;box-shadow:0 -4px 14px rgba(20,30,60,.06)}
+@media (max-width:800px){.esgm{grid-template-columns:repeat(6,1fr)}}
