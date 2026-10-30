@@ -209,5 +209,5 @@ function alignHeads(root){
       const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];if(!best)return;
       const cur=getComputedStyle(th).textAlign.replace('start','left').replace('end','right');if(best[0]!==cur)th.style.textAlign=best[0]})})
 }
-(function(){let q=0;const run=()=>{q=0;try{alignHeads()}catch(e){}};
+typeof MutationObserver!=="undefined"&&(function(){let q=0;const run=()=>{q=0;try{alignHeads()}catch(e){}};
   new MutationObserver(()=>{if(!q)q=requestAnimationFrame(run)}).observe(document.documentElement,{childList:true,subtree:true})})();
