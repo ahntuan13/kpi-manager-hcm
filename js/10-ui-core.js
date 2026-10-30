@@ -193,3 +193,21 @@ function reportHTML(){
   printClean(clone,t);
   return `<div class="rpt-doc"><div class="rpt-hd"><div class="co">${typeof LOGO_DATA!=='undefined'?`<img class="slip-logo" src="${LOGO_DATA}" alt="Logo">`:''}<div><b>${esc(c.name||'')}</b><div>${esc(c.note||'')}</div></div></div><div>Ngày in: ${fmtDate(todayStr())}</div></div><h2>${esc(PAGE.t)}</h2>${PAGE.sub?`<div class="sub">${PAGE.sub()}</div>`:''}${clone.innerHTML}${PAGE.sign?SIGN_HTML:''}<div style="margin-top:14px;font-size:11px;color:#777;text-align:right">${esc(CREDIT)}</div></div>`;
 }
+
+/* Tiêu đề cột canh theo nội dung cột: cột số canh phải thì tiêu đề cũng canh phải, cột giữa thì giữa… (mọi bảng, tự chạy sau mỗi lần vẽ) */
+const TH_SKIP='.slip,.kxm';
+function alignHeads(root){
+  (root||document).querySelectorAll('table').forEach(tb=>{
+    if(tb.closest(TH_SKIP)||tb.matches(TH_SKIP)||!tb.tHead||!tb.tBodies[0])return;
+    const hr=tb.tHead.rows[tb.tHead.rows.length-1],brs=[...tb.tBodies[0].rows].slice(0,25);if(!hr||!brs.length)return;
+    const sig=hr.cells.length+':'+brs.length+':'+(brs[0].cells.length);if(tb.dataset.ah===sig)return;tb.dataset.ah=sig;
+    const pos=[];let x=0;[...hr.cells].forEach(th=>{pos.push([th,x,th.colSpan||1]);x+=th.colSpan||1});
+    if(tb.tHead.rows.length>1&&hr.cells.length<x)return;   /* tiêu đề nhiều tầng có cột gộp: để nguyên */
+    const col=brs.map(r=>{const m=[];let i=0;[...r.cells].forEach(td=>{const s=td.colSpan||1;if(s===1)m[i]=td;i+=s});return m});
+    pos.forEach(([th,i,s])=>{if(s>1||th.style.textAlign)return;
+      const cnt={};col.forEach(m=>{const td=m[i];if(!td)return;const inp=td.querySelector('input:not([type=checkbox]):not([type=hidden]),select'),el=td.textContent.trim()?td:inp;if(!el)return;let a=getComputedStyle(el).textAlign;a=a==='end'?'right':a==='start'||a==='justify'?'left':a;cnt[a]=(cnt[a]||0)+1});
+      const best=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];if(!best)return;
+      const cur=getComputedStyle(th).textAlign.replace('start','left').replace('end','right');if(best[0]!==cur)th.style.textAlign=best[0]})})
+}
+(function(){let q=0;const run=()=>{q=0;try{alignHeads()}catch(e){}};
+  new MutationObserver(()=>{if(!q)q=requestAnimationFrame(run)}).observe(document.documentElement,{childList:true,subtree:true})})();

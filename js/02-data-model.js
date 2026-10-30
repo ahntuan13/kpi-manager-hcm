@@ -146,10 +146,10 @@ function monthStats(m,ym,kc){
     st.lateList=[...((m&&m.late)||[])].sort((a,b)=>a.d<b.d?-1:1);st.ncList=[...((m&&m.nc)||[])].sort((a,b)=>a.d<b.d?-1:1);
     /* Khung 1 – việc quản lý giao: ${mgrMax} điểm chia đều cho số việc giao trong tháng (10 việc → 1 điểm/việc, 5 việc → 2, 8 việc → 1,25) */
     st.bmPer=st.bmN?P.mgrMax/st.bmN:0;
-    st.pMgr=st.bmN?r2(Math.min(P.mgrMax,st.bmPer*st.bmOk)):0;   /* chưa có việc quản lý giao hoàn thành: 0 điểm */
+    st.pMgr=st.bmN?r2(Math.min(P.mgrMax,st.bmPer*st.bmOk)):P.mgrMax;   /* tháng không có việc quản lý giao: giữ đủ điểm (giống ô Kết quả để trống trong Excel) */
     st.pComp=Math.max(0,P.compMax-P.latePen*st.lateList.length-P.ncPen*st.ncList.length);
     st.p20=st.pMgr+st.pComp;
-    const mgrSelf=st.bmN?Math.min(P.mgrMax,st.bmPer*(st.bmOk+st.bmPend)):0;
+    const mgrSelf=st.bmN?Math.min(P.mgrMax,st.bmPer*(st.bmOk+st.bmPend)):P.mgrMax;
     /* Khung 2 – KRI theo danh mục chỉ tiêu */
     const lines=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[];let k2Self=st.rawSelf;
     if(lines.length){
