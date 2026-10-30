@@ -77,7 +77,7 @@ function kpiAuto(ref,o){const me=session&&session.empId;if(!me||!empOf(me)||!/^\
   db.sheets.filter(x=>x.empId===me).forEach(x=>Object.values(x.months).forEach(mo=>{if(mo===m)return;const i=mo.tasks.findIndex(t=>t.auto===ref);if(i>=0)mo.tasks.splice(i,1)}));
   const line=kpiRows(kpiOf(me,y)).find(r=>+r.w>0&&KPI_MATCH[o.match](r));
   let t=m.tasks.find(t=>t.auto===ref);const before=t?JSON.stringify(t):'';if(!t){t={id:uid('t'),weight:1,approval:'',auto:ref,src:'auto'};m.tasks.push(t)}
-  Object.assign(t,{title:o.title,deadline:o.deadline||o.done,submitted:o.keep&&t.submitted?t.submitted:o.done,note:o.note||''});if(line&&!t.kpi)t.kpi=line.id;if(JSON.stringify(t)!==before)sh.updatedAt=todayStr();return true}
+  const dl0=t.deadline;Object.assign(t,{title:o.title,deadline:o.keepDl&&dl0?dl0:(o.deadline||o.done),submitted:o.keep&&t.submitted?t.submitted:(o.done||''),note:o.note||''});if(line&&!t.kpi)t.kpi=line.id;if(JSON.stringify(t)!==before)sh.updatedAt=todayStr();return true}
 function kpiAutoDel(ref){const me=session&&session.empId,all=can('manage');db.sheets.filter(x=>all||x.empId===me).forEach(x=>Object.values(x.months).forEach(mo=>{const i=mo.tasks.findIndex(t=>t.auto===ref);if(i>=0){mo.tasks.splice(i,1);x.updatedAt=todayStr()}}))}
 const grpWord=t=>t==='uni'?'đồng phục':t==='mix'?'PPE & đồng phục':'PPE';
 const whoTxt=ls=>{const n=ls.map(l=>l.name);return n.length===1?`bạn ${n[0]}`:n.length===2?`bạn ${n[0]}, ${n[1]}`:`bạn ${n[0]}, ${n[1]} và ${n.length-2} người khác`};

@@ -146,10 +146,10 @@ function monthStats(m,ym,kc){
     st.lateList=[...((m&&m.late)||[])].sort((a,b)=>a.d<b.d?-1:1);st.ncList=[...((m&&m.nc)||[])].sort((a,b)=>a.d<b.d?-1:1);
     /* Khung 1 – việc quản lý giao: ${mgrMax} điểm chia đều cho số việc giao trong tháng (10 việc → 1 điểm/việc, 5 việc → 2, 8 việc → 1,25) */
     st.bmPer=st.bmN?P.mgrMax/st.bmN:0;
-    st.pMgr=st.bmN?r2(Math.min(P.mgrMax,st.bmPer*st.bmOk)):P.mgrMax;   /* tháng không có việc quản lý giao: giữ đủ điểm (giống ô Kết quả để trống trong Excel) */
+    st.pMgr=st.bmN?r2(Math.min(P.mgrMax,st.bmPer*st.bmOk)):0;   /* chưa có việc quản lý giao hoàn thành: 0 điểm */
     st.pComp=Math.max(0,P.compMax-P.latePen*st.lateList.length-P.ncPen*st.ncList.length);
     st.p20=st.pMgr+st.pComp;
-    const mgrSelf=st.bmN?Math.min(P.mgrMax,st.bmPer*(st.bmOk+st.bmPend)):P.mgrMax;
+    const mgrSelf=st.bmN?Math.min(P.mgrMax,st.bmPer*(st.bmOk+st.bmPend)):0;
     /* Khung 2 – KRI theo danh mục chỉ tiêu */
     const lines=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[];let k2Self=st.rawSelf;
     if(lines.length){
@@ -158,12 +158,12 @@ function monthStats(m,ym,kc){
       st.kri=lines.map(r=>{
         const w=+r.w,o={row:r,w,src:r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
          pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
-        if(o.src==='tasks'){   /* Work B: % đạt theo SỐ LỖI của các việc trong mục (quy ước Excel), mục không có việc = 0 lỗi = đủ điểm */
+        if(o.src==='tasks'){   /* Work B: % đạt theo SỐ LỖI của các việc trong mục (quy ước Excel), chỉ việc đã có ngày hoàn thành mới được điểm */
           const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
           let er=0;o.cnt=0;mine.forEach(x=>{o.n++;if(x.sc.comp!=null)o.done++;if(x.sc.ap==='ok')o.ok++;if(taskCnt(x.t,x.sc))o.cnt++;if(taskErr(x.sc,x.t))er++});
           const v=res[r.id],add=v&&+v.x>0?+v.x:0;o.errT=er;o.errM=add;o.err=er+add;o.note=v&&v.n||'';
-          /* việc chưa có ngày hoàn thành hoặc Re-check: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục không có việc = đủ điểm) */
-          o.share=o.n?o.cnt/o.n:1;o.pErr=kxPct(r.ef||KRI_EF,o.err);o.pct=o.pErr==null?null:o.pErr*o.share;o.pSelf=o.pct;
+          /* việc chưa có ngày hoàn thành hoặc Re-check: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục chưa có việc nào hoàn thành = 0 điểm) */
+          o.share=o.n?o.cnt/o.n:0;o.pErr=kxPct(r.ef||KRI_EF,o.err);o.pct=o.pErr==null?null:o.pErr*o.share;o.pSelf=o.pct;
         }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
         o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
         o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});

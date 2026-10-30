@@ -272,11 +272,11 @@ test('monthStats: Khung 1 + KRI + Thưởng, dòng công việc hằng ngày',()
   ctx.KC={rows:[{id:'a',no:'1',text:'Compliance',w:10,f:'MAX(0,100%-x*10%)',src:'res'},{id:'b',no:'2',text:'L&D',w:40,src:'tasks'},{id:'c',no:'3',text:'Lương',w:30,f:'IF(x=0,100%,IF(x=1,50%,0))',src:'res'}]};
   ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'',{approval:''})],kri:{a:{r:2},c:{r:1}},late:[{id:'l',d:'2026-10-02'}],ga:[{id:'g',d:'2026-10-03'}]};
   const st=run('monthStats(M,"2026-10",KC)');
-  /* KRI: 0.8*10 + (0 lỗi → 100%)*40 + 0.5*30 = 8+40+15 = 63; Khung 1: không có việc giao → 10, tuân thủ 10-1 = 9; Thưởng: 1 lần hỗ trợ = 5 */
-  assert.equal(st.p80,63);assert.equal(st.p20,19);assert.equal(st.p3,5);assert.equal(st.kpi,87);
+  /* KRI: 0.8*10 + (0 lỗi → 100%)*40 + 0.5*30 = 8+40+15 = 63; Khung 1: không có việc giao → 0, tuân thủ 10-1 = 9; Thưởng: 1 lần hỗ trợ = 5 */
+  assert.equal(st.p80,63);assert.equal(st.p20,9);assert.equal(st.p3,5);assert.equal(st.kpi,77);
   ctx.M.kri.b={x:1};assert.equal(run('monthStats(M,"2026-10",KC)').p80,55);   /* quản lý ghi 1 lỗi → 80%*40 */
   ctx.M.kri.b={x:3};assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* ≥3 lỗi → 0 */
-  delete ctx.M.kri.b;ctx.M.tasks=[];assert.equal(run('monthStats(M,"2026-10",KC)').p80,63);   /* mục không có việc vẫn đủ điểm */
+  delete ctx.M.kri.b;ctx.M.tasks=[];assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* mục chưa có việc hoàn thành = 0 điểm */
   /* việc chưa có ngày hoàn thành / Re-check: không tính điểm → mục được phần điểm theo số việc đã tính */
   ctx.M.tasks=[task('t1',5,'b'),task('t2',5,'b',{submitted:null}),task('t3',5,'b',{approval:'Re-check'})];
   assert.equal(run('monthStats(M,"2026-10",KC)').p80,r2t(8+40/3+15));

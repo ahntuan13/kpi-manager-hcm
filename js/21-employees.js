@@ -271,7 +271,7 @@ function kpiFrames(e,y,mm,st){
       ${mg?`<form class="cmpf" data-submit="${add}" ${dA}>${dateIn}<input class="in" name="note" required maxlength="200" placeholder="${ph}" aria-label="Nội dung"><button class="btn sm">＋ Thêm</button></form>`:''}</div>`;
   const wSum=hasKc?r2(st.kri.filter(o=>!o.off).reduce((a,o)=>a+o.w,0)):P.userStd;
   return `<section class="kf kf20"><div class="kfh"><h4>Work A · Quản lý giao &amp; Tuân thủ</h4><span class="kfs"><b>${fmtK(st.p20)}</b> / ${P.mgrMax+P.compMax}</span></div>
-    <div class="kfsub"><div class="kfsh"><b>A.1 · Quản lý giao việc</b><span class="muted">${st.bmN?`${P.mgrMax} điểm chia đều cho ${st.bmN} việc giao = ${fmtK2(st.bmPer)} điểm/việc; cộng khi việc được Duyệt, không trừ khi trễ`:`việc giao bởi quản lý · tháng này chưa có việc giao nên giữ đủ ${P.mgrMax} điểm`}</span><span class="kfs sm">${fmtK(st.pMgr)} / ${P.mgrMax}</span></div>${monthTable(e,y,mm,st,{rows:bmRows,kind:'bm'})}</div>
+    <div class="kfsub"><div class="kfsh"><b>A.1 · Quản lý giao việc</b><span class="muted">${st.bmN?`${P.mgrMax} điểm chia đều cho ${st.bmN} việc giao = ${fmtK2(st.bmPer)} điểm/việc; cộng khi việc được Duyệt, không trừ khi trễ`:`việc giao bởi quản lý · tháng này chưa có việc giao nên chưa có điểm`}</span><span class="kfs sm">${fmtK(st.pMgr)} / ${P.mgrMax}</span></div>${monthTable(e,y,mm,st,{rows:bmRows,kind:'bm'})}</div>
     <div class="kfsub"><div class="kfsh"><b>A.2 · Thái độ &amp; Tuân thủ nội quy và quy định</b><span class="muted">${P.compMax} điểm, trừ ${fmtK(P.ncPen)} mỗi lỗi và ${fmtK(P.latePen)} mỗi lần đi trễ; không vi phạm thì giữ nguyên</span><span class="kfs sm">${fmtK(st.pComp)} / ${P.compMax}</span></div>
       <div class="cmp cmp3">${ncBox(['safety'],'TVE Safety hàng tháng','(lỗi NC khi kiểm tra)','safety')}${ncBox(['audit','iso'],'No NC Audit định kỳ','(lỗi NC khi Audit, ISO / OHSAS)','audit')}${lateBox}</div></div>
   </section>
@@ -395,7 +395,7 @@ ACT['kc-row']=el=>{
 document.addEventListener('input',ev=>{const f=ev.target.closest&&ev.target.closest('form[data-submit="kc-row-save"]');if(f){ev.target.classList.remove('bad');ev.target.removeAttribute('aria-invalid');kxPrev()}});
 /* xem trước Quy ước tính: Kết quả 0, 1, 2… → % đạt */
 function kxPrev(){const el=$('#kx-prev'),f=$('form[data-submit="kc-row-save"] [name=f]');if(!el||!f)return;const v=f.value.trim(),src=$('form[data-submit="kc-row-save"] [name=src]');
-  if(src&&src.value!=='res'){const ef=($('form[data-submit="kc-row-save"] [name=ef]')||{}).value||KRI_EF,er=kxCheck(ef);el.innerHTML=er?`<span class="tag-bad">${esc(er)}</span>`:'Tính từ việc trong mục, theo số lỗi: '+kxTable(ef,[0,1,2,3,4,5]).map(t=>`${t.x}${t.plus?'+':''} lỗi → <b>${pctTxt(t.p)}</b>`).join(' · ')+'. Tháng không có việc = 0 lỗi = đủ điểm.';return}
+  if(src&&src.value!=='res'){const ef=($('form[data-submit="kc-row-save"] [name=ef]')||{}).value||KRI_EF,er=kxCheck(ef);el.innerHTML=er?`<span class="tag-bad">${esc(er)}</span>`:'Tính từ việc trong mục, theo số lỗi: '+kxTable(ef,[0,1,2,3,4,5]).map(t=>`${t.x}${t.plus?'+':''} lỗi → <b>${pctTxt(t.p)}</b>`).join(' · ')+'. Mục chưa có việc hoàn thành = 0 điểm.';return}
   if(!v){el.textContent='Chưa có quy ước tính: dòng này chưa có điểm.';return}
   const er=kxCheck(v);if(er){el.innerHTML=`<span class="tag-bad">${esc(er)}</span>`;return}
   el.innerHTML=`Kết quả trống → <b>${pctTxt(kxPct(v,''))}</b> · `+kxTable(v).map(t=>`${t.x}${t.plus?'+':''} → <b>${pctTxt(t.p)}</b>`).join(' · ')}

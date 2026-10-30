@@ -596,9 +596,9 @@ ACT['esg-itp-save']=()=>{if(!canESG())return;const d=esgDoc(esgYear()),fm=$('#es
     const tot=R.T.c+R.T.b;if(tot){x.ind.print.act[m]=tot;x.ind.print.cost[m]=R.T.cf+R.T.bf;esgAutoTask(d.year,m)}})){refreshTbl();_esgTm();toast(`Đã lưu số liệu in theo phòng ban tháng ${m+1}${R.T.c+R.T.b?' và cập nhật dòng 1.2':''}`)}};
 
 /* ---------- tự ghi việc vào KPI: “Báo cáo ESG tháng 11.2026” (khi nhập số liệu tháng) · “Báo cáo ESG Quý 3.2026” (khi xuất báo cáo quý) ----------
-   Việc nằm ở tháng của số liệu (quý: tháng cuối quý), hạn = ngày 20 tháng sau (hạn gửi báo cáo TMV), ngày hoàn thành = lần nhập / xuất đầu tiên. */
+   Việc nằm ở tháng của số liệu (quý: tháng cuối quý), deadline = ngày lưu / xuất đầu tiên + 1 ngày, ngày hoàn thành để trống cho người làm tự nhập. */
 const p2=n=>String(n).padStart(2,'0');
 function esgDue(y,m){const n=m+1>11?{y:+y+1,m:0}:{y:+y,m:m+1};return `${n.y}-${p2(n.m+1)}-20`}
-function esgAutoTask(y,m){return kpiAuto(`esg-${y}-${p2(m+1)}`,{ym:`${y}-${p2(m+1)}`,title:`Báo cáo ESG tháng ${p2(m+1)}.${y}`,done:todayStr(),deadline:esgDue(y,m),keep:true,match:'esg',note:'Tự ghi khi nhập số liệu ESG (mục ESG văn phòng)'})}
+function esgAutoTask(y,m){return kpiAuto(`esg-${y}-${p2(m+1)}`,{ym:`${y}-${p2(m+1)}`,title:`Báo cáo ESG tháng ${p2(m+1)}.${y}`,done:'',deadline:addDays(todayStr(),1),keepDl:true,keep:true,match:'esg',note:'Tự ghi khi nhập số liệu ESG (mục ESG văn phòng)'})}
 function esgAutoQuarter(y,per){const q=+String(per).slice(1);if(!/^Q[1-4]$/.test(per))return false;const m=q*3-1;
-  return kpiAuto(`esgq-${y}-Q${q}`,{ym:`${y}-${p2(m+1)}`,title:`Báo cáo ESG Quý ${q}.${y}`,done:todayStr(),deadline:esgDue(y,m),keep:true,match:'esg',note:'Tự ghi khi xuất báo cáo ESG quý (Excel / PDF)'})}
+  return kpiAuto(`esgq-${y}-Q${q}`,{ym:`${y}-${p2(m+1)}`,title:`Báo cáo ESG Quý ${q}.${y}`,done:'',deadline:addDays(todayStr(),1),keepDl:true,keep:true,match:'esg',note:'Tự ghi khi xuất báo cáo ESG quý (Excel / PDF)'})}
