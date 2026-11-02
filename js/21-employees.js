@@ -76,7 +76,7 @@ function empPage(e){const P={t:e.name,sign:true,   /* bản in / PDF của trang
     const f=F(),ys=db.sheets.filter(s=>s.empId===e.id).map(s=>+s.year).sort((a,b)=>b-a);
     f.year??=String(ys.includes(+curYear())?curYear():(ys[0]||curYear()));
     const opts=[...new Set([...allYears(),...ys,+f.year])].sort((a,b)=>b-a).map(v=>[String(v),String(v)]);
-    return `${isStaff()?'':'<p class="note" style="padding-top:0"><a href="#/emp/list">← Tất cả nhân viên</a></p>'}<div class="bar"><label class="fl">Năm ${fSel('year','Năm',opts)}</label><div class="sp"></div>${rptBtns('kpi-'+slug(e.code||e.name))}</div>`;
+    return `${isStaff()?'':'<p class="note" style="padding-top:0"><a href="#/emp/list">← Tất cả nhân viên</a></p>'}<div class="bar"><label class="fl">Năm ${fSel('year','Năm',opts)}</label>${countdownHTML()||'<div class="sp"></div>'}${rptBtns('kpi-'+slug(e.code||e.name))}</div>`;
   },
   tbl(){
     e=empOf(e.id)||e;const f=F(),y=f.year,w=canSheet(e.id),mg=can('manage'),adm=can('admin'),sheet=sheetOf(e.id,y),ys=yearStats(sheet);

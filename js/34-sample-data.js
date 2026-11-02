@@ -25,7 +25,7 @@ function loadSample(){
       /* trọng số do nhân viên tự chấm theo thang 1–10; cả tháng cộng lại đúng 100 */
       const mm=pad(m),v2=isV2(`${y}-${mm}`),target=v2?kpi2().userStd:100,n=v2?ri(10,13):ri(12,16),ws=Array.from({length:n},()=>ri(4,10));let sum=ws.reduce((a,b)=>a+b,0);
       while(sum!==target){const k=ri(0,n-1);if(sum>target&&ws[k]>W_MIN){ws[k]--;sum--}else if(sum<target&&ws[k]<W_MAX){ws[k]++;sum++}}
-      if(v2){const L=ei%3===0?ri(1,3):ei===5?1:0,used=new Set();sh.months[mm].late=[];for(let j=0;j<L;j++){let d;do{d=iso(m,ri(1,Math.min(28,+today.slice(8)||28)))}while(used.has(d));used.add(d);sh.months[mm].late.push({id:uid('l')+ei+j,d,t:'08:'+pad(ri(6,40)),by:'Quản lý',at:today})}
+      if(v2){const L=ei%3===0?ri(1,3):ei===5?1:0,used=new Set();sh.months[mm].late=[];const dMax=m<cm?28:Math.min(28,+today.slice(8)||28);for(let j=0;j<Math.min(L,dMax);j++){let d;do{d=iso(m,ri(1,dMax))}while(used.has(d));used.add(d);sh.months[mm].late.push({id:uid('l')+ei+j,d,t:'08:'+pad(ri(6,40)),by:'Quản lý',at:today})}
         sh.months[mm].nc=ei===4?[{id:uid('n')+ei,d:iso(m,3),note:'Hồ sơ 5S khu vực kho chưa cập nhật',by:'Quản lý',at:today}]:[]}
       const titles=[...pool].sort(()=>rnd()-.5);
       ws.forEach((w,i)=>{

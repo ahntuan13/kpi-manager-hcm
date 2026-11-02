@@ -211,3 +211,17 @@ function alignHeads(root){
 }
 typeof MutationObserver!=="undefined"&&(function(){let q=0;const run=()=>{q=0;try{alignHeads()}catch(e){}};
   new MutationObserver(()=>{if(!q)q=requestAnimationFrame(run)}).observe(document.documentElement,{childList:true,subtree:true})})();
+
+/* ---------- Đếm ngược mùa lễ: Giáng sinh 2026 → Năm mới 2027 → Tết Đinh Mùi 2027, hết Tết thì tự tắt ---------- */
+const CD_EVENTS=[
+  {k:'xmas',at:new Date(2026,11,25),end:new Date(2026,11,26),icon:'🎄',to:'Giáng sinh 2026',hi:'Merry Christmas! 🎅',deco:'❄'},
+  {k:'ny',at:new Date(2027,0,1),end:new Date(2027,0,2),icon:'🎆',to:'Năm mới 2027',hi:'Happy New Year 2027! 🥂',deco:'✦'},
+  {k:'tet',at:new Date(2027,1,6),end:new Date(2027,1,9),icon:'🧧',to:'Tết Nguyên đán Đinh Mùi 2027',hi:'Chúc mừng năm mới – Xuân Đinh Mùi 2027 🌸',deco:'🌸'}];
+function cdNow(){const n=new Date();for(const e of CD_EVENTS){if(n<e.at)return{e,left:e.at-n};if(n<e.end)return{e,left:0}}return null}
+function countdownHTML(){const c=cdNow();if(!c)return '';const e=c.e,fl=Array.from({length:9},(_,i)=>`<i style="left:${6+i*11}%;animation-delay:${(i*0.73)%4}s;animation-duration:${5+i%4}s">${e.deco}</i>`).join('');
+  return `<div class="cdw cd-${e.k}" data-cdk="${e.k}" role="timer" aria-live="off"><div class="cdfx" aria-hidden="true">${fl}</div><span class="cdi" aria-hidden="true">${e.icon}</span><div class="cdb">${cdInner(c)}</div></div>`}
+function cdInner(c){if(!c.left)return `<b class="cdhi">${c.e.hi}</b>`;
+  const s=Math.floor(c.left/1000),u=[[Math.floor(s/86400),'ngày'],[Math.floor(s%86400/3600),'giờ'],[Math.floor(s%3600/60),'phút'],[s%60,'giây']];
+  return `<small>Còn đến <b>${c.e.to}</b></small><span class="cdn">${u.map(([v,l])=>`<span><b>${String(v).padStart(2,'0')}</b><em>${l}</em></span>`).join('')}</span>`}
+typeof setInterval!=="undefined"&&setInterval(()=>{if(typeof document==="undefined")return;const els=document.querySelectorAll('.cdw');if(!els.length)return;const c=cdNow();
+  els.forEach(el=>{if(!c||el.dataset.cdk!==c.e.k){el.outerHTML=countdownHTML();return}const b=el.querySelector('.cdb');if(b)b.innerHTML=cdInner(c)})},1000);
