@@ -216,12 +216,20 @@ typeof MutationObserver!=="undefined"&&(function(){let q=0;const run=()=>{q=0;tr
 const CD_EVENTS=[
   {k:'xmas',at:new Date(2026,11,25),end:new Date(2026,11,26),icon:'🎄',to:'Giáng sinh 2026',hi:'Merry Christmas! 🎅',deco:'❄'},
   {k:'ny',at:new Date(2027,0,1),end:new Date(2027,0,2),icon:'🎆',to:'Năm mới 2027',hi:'Happy New Year 2027! 🥂',deco:'✦'},
-  {k:'tet',at:new Date(2027,1,6),end:new Date(2027,1,9),icon:'🧧',to:'Tết Nguyên đán Đinh Mùi 2027',hi:'Chúc mừng năm mới – Xuân Đinh Mùi 2027 🌸',deco:'🌸'}];
-function cdNow(){const n=new Date();for(const e of CD_EVENTS){if(n<e.at)return{e,left:e.at-n};if(n<e.end)return{e,left:0}}return null}
-function countdownHTML(){const c=cdNow();if(!c)return '';const e=c.e,fl=Array.from({length:9},(_,i)=>`<i style="left:${6+i*11}%;animation-delay:${(i*0.73)%4}s;animation-duration:${5+i%4}s">${e.deco}</i>`).join('');
-  return `<div class="cdw cd-${e.k}" data-cdk="${e.k}" role="timer" aria-live="off"><div class="cdfx" aria-hidden="true">${fl}</div><span class="cdi" aria-hidden="true">${e.icon}</span><div class="cdb">${cdInner(c)}</div></div>`}
-function cdInner(c){if(!c.left)return `<b class="cdhi">${c.e.hi}</b>`;
+  {k:'tet',at:new Date(2027,1,6),end:new Date(2027,1,9),icon:'🧧',to:'Tết Nguyên đán Đinh Mùi 2027',hi:'Chúc mừng năm mới – Xuân Đinh Mùi 2027 🌼',deco:'🌼'}];
+let CD_PREV=null;   /* bấm vào khung: xem thử chủ đề kế tiếp trong 12 giây */
+function cdNow(){const n=new Date();if(CD_PREV&&Date.now()<CD_PREV.until){const e=CD_PREV.e;return{e,left:CD_PREV.hi?0:Math.max(1000,e.at-n),prev:1}}CD_PREV=null;
+  for(const e of CD_EVENTS){if(n<e.at)return{e,left:e.at-n};if(n<e.end)return{e,left:0}}return null}
+const cdR=(i,k)=>{const x=Math.sin(i*12.9898+k*78.233)*43758.5453;return x-Math.floor(x)};
+function cdFx(e){const N=e.k==='ny'?22:18;return Array.from({length:N},(_,i)=>{const r=cdR(i,1),sz=e.k==='ny'?8+cdR(i,2)*12:10+cdR(i,2)*10;
+  return `<i style="left:${(i+cdR(i,3)*.8)/N*100}%;${e.k==='ny'?`top:${8+cdR(i,4)*76}%;`:''}font-size:${sz.toFixed(0)}px;animation-delay:-${(r*6).toFixed(2)}s;animation-duration:${e.k==='ny'?(1.6+cdR(i,5)*2.2).toFixed(2):(4+cdR(i,5)*4).toFixed(2)}s">${e.k==='ny'&&i%3===0?'✧':e.deco}</i>`}).join('')}
+function countdownHTML(){const c=cdNow();if(!c)return '';const e=c.e;
+  return `<div class="cdw cd-${e.k}" data-cdk="${e.k}" data-act="cd-peek" role="timer" aria-live="off" title="Bấm để xem thử chủ đề tiếp theo"><div class="cdfx" aria-hidden="true">${cdFx(e)}</div><span class="cdi" aria-hidden="true">${e.icon}</span><div class="cdb">${cdInner(c)}</div></div>`}
+function cdInner(c){if(!c.left)return `<b class="cdhi">${c.e.hi}</b>${c.prev?'<small class="cdpv">xem thử</small>':''}`;
   const s=Math.floor(c.left/1000),u=[[Math.floor(s/86400),'ngày'],[Math.floor(s%86400/3600),'giờ'],[Math.floor(s%3600/60),'phút'],[s%60,'giây']];
-  return `<small>Còn đến <b>${c.e.to}</b></small><span class="cdn">${u.map(([v,l])=>`<span><b>${String(v).padStart(2,'0')}</b><em>${l}</em></span>`).join('')}</span>`}
+  return `<b class="cdt">${c.e.to} còn:</b><span class="cdn">${u.map(([v,l])=>`<span><b>${String(v).padStart(2,'0')}</b><em>${l}</em></span>`).join('')}</span>${c.prev?'<small class="cdpv">xem thử</small>':''}`}
+ACT['cd-peek']=()=>{const cur=cdNow();if(!cur)return;const seq=[];CD_EVENTS.forEach(e=>{seq.push({e,hi:0},{e,hi:1})});
+  let i=seq.findIndex(x=>x.e===cur.e&&!!x.hi===!cur.left);CD_PREV={...seq[(i+1)%seq.length],until:Date.now()+12000};
+  document.querySelectorAll('.cdw').forEach(el=>el.outerHTML=countdownHTML())};
 typeof setInterval!=="undefined"&&setInterval(()=>{if(typeof document==="undefined")return;const els=document.querySelectorAll('.cdw');if(!els.length)return;const c=cdNow();
   els.forEach(el=>{if(!c||el.dataset.cdk!==c.e.k){el.outerHTML=countdownHTML();return}const b=el.querySelector('.cdb');if(b)b.innerHTML=cdInner(c)})},1000);
