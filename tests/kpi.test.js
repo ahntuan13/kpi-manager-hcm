@@ -284,3 +284,16 @@ test('monthStats: Khung 1 + KRI + Thưởng, dòng công việc hằng ngày',()
   ctx.M.tasks=[task('t1',5,'b',{submitted:'2026-10-12'})];assert.equal(run('monthStats(M,"2026-10",KC)').p80,55);   /* hoàn thành trễ: tính, 1 lỗi → 80% */
   ctx.M.fixed={total:101,k1:20,k2:81,k3:0};assert.equal(run('monthStats(M,"2026-10",KC)').kpi,101);   /* điểm chốt từ Excel */
 });
+
+test('Work B · mục giờ làm thêm: tổng ≤ 10 giờ đủ điểm, mỗi giờ vượt trừ 1 điểm',()=>{
+  run(`db.company.kpi2={since:'2026-10'}`);
+  ctx.KC={rows:[{id:'o',no:'1',text:'Số giờ làm thêm trong tháng không vượt quá 10 giờ',w:10,f:'IF(x<8,110%,100%)',src:'res'}]};
+  const ot=hs=>({ot:hs.map((h,i)=>({id:'o'+i,d:'2026-10-0'+(i+1),h})),tasks:[]});
+  const k=M=>{ctx.M=M;const o=run('monthStats(M,"2026-10",KC)').kri[0];return [o.src,o.res,o.score]};
+  assert.deepEqual(k(ot([])),['ot',0,10]);
+  assert.deepEqual(k(ot([4,6])),['ot',10,10]);
+  assert.deepEqual(k(ot([4,6,0.5])),['ot',10.5,9]);   /* vượt 0,5 giờ → làm tròn 1 giờ → −1 */
+  assert.deepEqual(k(ot([8,8])),['ot',16,4]);
+  assert.deepEqual(k(ot([20,20])),['ot',40,0]);   /* không âm */
+  assert.deepEqual(k({tasks:[],kri:{o:{r:12}}}),['ot',12,8]);   /* tháng cũ nhập tổng giờ ở ô Kết quả */
+});

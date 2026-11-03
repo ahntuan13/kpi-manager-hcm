@@ -116,7 +116,9 @@ const KRI_EF='IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))';
 /* Work B: việc chỉ được tính điểm khi đã có ngày hoàn thành và không bị Re-check; việc được tính mà hoàn thành trễ = 1 lỗi */
 const taskCnt=(t,sc)=>sc.state!=='moved'&&!!t.submitted&&sc.ap!=='recheck';
 const taskErr=(sc,t)=>sc.state!=='moved'&&sc.ap!=='recheck'&&(!t||!!t.submitted)&&sc.late!=null&&sc.late>0;
-const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110};
+const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110,otMax:10,otPen:1};
+/* mục Work B "Số giờ làm thêm trong tháng không vượt quá … giờ": ghi từng lần OT như đi trễ, tổng ≤ otMax giờ = đủ điểm, mỗi giờ vượt (làm tròn lên) trừ otPen điểm */
+const isOtRow=r=>!!r&&r.src!=='tasks'&&(r.src==='ot'||/lam them|overtime|(^|[^a-z])ot([^a-z]|$)/.test(norm(r.text||'')));
 const kpi2=()=>({...KPI2_DEF,...((db&&db.company&&db.company.kpi2)||{})});
 const isV2=ym=>!!ym&&ym>=kpi2().since;
 function monthStats(m,ym,kc){
@@ -156,7 +158,7 @@ function monthStats(m,ym,kc){
       const ids=new Set(lines.map(r=>r.id)),tl=lines.filter(r=>r.src!=='res'),only=tl.length===1?tl[0].id:null,res=(m&&m.kri)||{},capT=(+P.taskCap||110)/100;
       let a=0,b=0;
       st.kri=lines.map(r=>{
-        const w=+r.w,o={row:r,w,src:r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
+        const w=+r.w,o={row:r,w,src:isOtRow(r)?'ot':r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
          pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
         if(o.src==='tasks'){   /* Work B: % đạt theo SỐ LỖI của các việc trong mục (quy ước Excel), chỉ việc đã có ngày hoàn thành mới được điểm */
           const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
@@ -164,6 +166,9 @@ function monthStats(m,ym,kc){
           const v=res[r.id],add=v&&+v.x>0?+v.x:0;o.errT=er;o.errM=add;o.err=er+add;o.note=v&&v.n||'';
           /* việc chưa có ngày hoàn thành hoặc Re-check: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục chưa có việc nào hoàn thành = 0 điểm) */
           o.share=o.n?o.cnt/o.n:0;o.pErr=kxPct(r.ef||KRI_EF,o.err);o.pct=o.pErr==null?null:o.pErr*o.share;o.pSelf=o.pct;
+        }else if(o.src==='ot'){o.otList=[...((m&&m.ot)||[])].sort((a,b)=>a.d<b.d?-1:1);const v0=res[r.id];o.res=r2(o.otList.length?o.otList.reduce((a,x)=>a+(+x.h||0),0):v0&&v0.r!=null&&v0.r!==''&&isFinite(+v0.r)?+v0.r:0);o.old=!o.otList.length&&!!o.res;   /* tháng cũ đã nhập tổng giờ ở ô Kết quả: vẫn dùng số đó */
+          o.over=r2(Math.max(0,o.res-P.otMax));
+          o.pen=Math.min(w,Math.ceil(o.over-1e-9)*P.otPen);o.pct=w?(w-o.pen)/w:1;o.pSelf=o.pct;
         }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
         o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
         o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});
@@ -172,7 +177,7 @@ function monthStats(m,ym,kc){
     /* Khung 3 – điểm thưởng */
     st.gaList=[...((m&&m.ga)||[])].sort((x,y)=>x.d<y.d?-1:1);st.mocList=[...((m&&m.moc)||[])].sort((x,y)=>x.d<y.d?-1:1);
     st.pGa=st.gaList.length>=2?P.gaMax:st.gaList.length===1?P.gaMax/2:0;st.pMoc=st.mocList.length?P.mocMax:0;st.p3=st.pGa+st.pMoc;
-    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
+    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
     if(live||st.counted)st.kpi=cap(st.p80+st.p20+st.p3);
     if(live||st.counted+st.pending)st.self=cap(k2Self+mgrSelf+st.pComp+st.p3);
   }else{
