@@ -118,7 +118,8 @@ const taskCnt=(t,sc)=>sc.state!=='moved'&&!!t.submitted&&sc.ap!=='recheck';
 const taskErr=(sc,t)=>sc.state!=='moved'&&sc.ap!=='recheck'&&(!t||!!t.submitted)&&sc.late!=null&&sc.late>0;
 const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110,otMax:10,otPen:1};
 /* mục Work B "Số giờ làm thêm trong tháng không vượt quá … giờ": ghi từng lần OT như đi trễ, tổng ≤ otMax giờ = đủ điểm, mỗi giờ vượt (làm tròn lên) trừ otPen điểm */
-const isOtRow=r=>!!r&&r.src!=='tasks'&&(r.src==='ot'||/lam them|overtime|(^|[^a-z])ot([^a-z]|$)/.test(norm(r.text||'')));
+const isOtRow=r=>{if(!r)return false;if(r.src==='ot')return true;if(r.src==='tasks')return false;   /* nhận theo tên mục: “Số giờ làm thêm … không vượt quá …”; mục báo cáo OT (WTR, Off days…) vẫn tính theo việc */
+  const t=norm(r.text||'');return /gio lam them/.test(t)&&/khong vuot|vuot qua|toi da|duoi/.test(t)||/average (ot|overtime) (hours|of staff)/.test(t)};
 const kpi2=()=>({...KPI2_DEF,...((db&&db.company&&db.company.kpi2)||{})});
 const isV2=ym=>!!ym&&ym>=kpi2().since;
 function monthStats(m,ym,kc){

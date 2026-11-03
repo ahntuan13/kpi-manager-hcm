@@ -297,3 +297,15 @@ test('Work B · mục giờ làm thêm: tổng ≤ 10 giờ đủ điểm, mỗi
   assert.deepEqual(k(ot([20,20])),['ot',40,0]);   /* không âm */
   assert.deepEqual(k({tasks:[],kri:{o:{r:12}}}),['ot',12,8]);   /* tháng cũ nhập tổng giờ ở ô Kết quả */
 });
+
+test('isOtRow: chỉ mục "Số giờ làm thêm … không vượt quá", không dính mục báo cáo OT',()=>{
+  const f=(text,src)=>run(`isOtRow(${JSON.stringify({text,src})})`);
+  assert.equal(f('Số giờ làm thêm trong tháng không vượt quá 10 giờ','res'),true);
+  assert.equal(f('Cập nhật WTR báo cáo OT & Off days hàng tuần',undefined),false);
+  assert.equal(f('Cập nhật WTR báo cáo OT & Off days hàng tuần','res'),false);
+  assert.equal(f('Báo cáo OT tuần cho PMs/HOD','tasks'),false);
+  assert.equal(f('Số giờ làm thêm trong tháng không vượt quá 10 giờ',undefined),true);
+  assert.equal(f('Kiểm soát OT, giờ làm thêm của phòng',undefined),false);
+  assert.equal(f('Số giờ làm thêm trong tháng không vượt quá 10 giờ','tasks'),false);
+  assert.equal(f('Bất kỳ mục nào','ot'),true);
+});
