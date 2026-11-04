@@ -38,7 +38,7 @@ function isoSheet(wb,s,grp){
   const proj=[p?(p.code||p.name):'',s.dept&&!p?s.dept:''].filter(Boolean).join(' ');
   const line2=ppe?`Project/Department ;${proj}${p&&p.pic?' ;'+p.pic:''}${s.job?' ;Job No.: '+s.job:''}`:`Project/Department: ${proj}${s.job?'   Job No.: '+s.job:''}`;
   ws.getRow(1).height=6;
-  const t=ws.getCell(`C2`);t.value=ppe?'PPE ALLOCATION BOOK':'PPE ALLOCATION';t.font={name:'Tahoma',size:10};
+  const t=ws.getCell(`C2`);t.value=s.kind==='ret'?(ppe?'PPE RETURN BOOK':'PPE RETURN'):ppe?'PPE ALLOCATION BOOK':'PPE ALLOCATION';t.font={name:'Tahoma',size:10};
   const d=ws.getCell(`C3`);d.value=line2;d.font={name:'Tahoma',size:10};
   for(let c=3;c<=N-1;c++){const top=ws.getCell(2,c),bot=ws.getCell(3,c);if(!ppe)top.border={top:{style:'thin',color:{argb:BLUE}}};bot.border={bottom:{style:'thin',color:{argb:BLUE}}}}
   ws.getRow(2).height=18;ws.getRow(3).height=18;ws.getRow(4).height=14;
@@ -49,7 +49,7 @@ function isoSheet(wb,s,grp){
   cols.forEach((c,i)=>{if(c.sub){ws.mergeCells(H,3+i,H,4+i)}});   /* Safety Shoes trùm 2 cột: SL + size */
   const ls=slipLines(s),rows=Math.max(15,ls.length);
   for(let r=0;r<rows;r++){const l=ls[r],row=ws.getRow(H+1+r);row.height=ppe?(r===0?26:18):18;
-    const vals=[l?r+1:'',l?l.name:'',l?(l.code||''):'',...cols.map(c=>{if(!l||!c.k)return '';const v=l.q[c.k];if(!v||!(+v.n>0))return '';if(c.sz)return v.sz||'';return c.mix&&v.sz?`${+v.n} (${v.sz})`:+v.n}),l?fmtDate(l.signedAt||s.date):'',''];
+    const vals=[l?r+1:'',l?l.name:'',l?(l.code||''):'',...cols.map(c=>{if(!l||!c.k)return '';const v=l.q[c.k];if(!v||!(+v.n>0))return '';if(c.sz)return v.sz||'';return c.mix&&v.sz?`${+v.n} (${v.sz})`:+v.n}),'',''];   /* cột Date để trống: người nhận / người trả ghi tay khi ký */
     vals.forEach((v,i)=>{const c=row.getCell(i+1);c.value=v;c.font=font;c.border=BOX;c.alignment={vertical:ppe?'bottom':'top',horizontal:i===0||(ppe&&i>2&&i<vals.length-2)?'center':'left'}})}
   /* cam kết ký nhận song ngữ */
   const nr=H+rows+2;ws.mergeCells(nr,1,nr,N);ws.mergeCells(nr+1,1,nr+1,N);
@@ -93,7 +93,7 @@ async function isoBook(s){
   const buf=await wb.xlsx.writeBuffer(),[l,r]=await Promise.all([isoImg(ISO_LOGO.l),isoImg(ISO_LOGO.r)]);
   return isoHeaderLogos(buf,gs.length,l,r);
 }
-ACT['ps-iso']=async el=>{const s=pSlips().find(x=>x.id===el.dataset.id);if(!s)return;
+ACT['ps-iso']=async el=>{const s=findSlip(el.dataset.id);if(!s)return;
   const b=el.closest('button');if(b)b.disabled=true;toast('Đang tạo file Excel theo mẫu ISO…');
   try{const out=await isoBook(s),blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');
     a.href=URL.createObjectURL(blob);a.download=`AZ-PG-440-A05_${s.no}${s.job?'_'+String(s.job).replace(/[^\w-]+/g,''):''}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast('Đã xuất Excel theo mẫu ISO')}
