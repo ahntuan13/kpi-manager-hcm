@@ -1121,3 +1121,7 @@ table.t.est td:first-child{display:flex;align-items:center;height:44px}
 .chip.otc{background:#ecfdf3;color:#166534}
 .chip.otc small{opacity:.8}
 .cmpf .in.oth{width:96px}
+.mgp{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap}
+.mgp .in{width:76px;min-height:32px;padding:4px 8px;text-align:right}
+select.in.aps.info{border-color:#a9c4ee;background-color:#eef4fd;color:#1e4f9a}
+.kf3 .kfsub{margin-top:12px}

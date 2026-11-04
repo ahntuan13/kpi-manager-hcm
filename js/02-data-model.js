@@ -16,9 +16,11 @@ const QN=['Quý I','Quý II','Quý III','Quý IV'], QR=['T01–T03','T04–T06',
 const KPI_CAP=120, LATE_PENALTY=3, BONUS_PER_DAY=3, BONUS_CAP=30, W_MIN=1, W_MAX=10;
 /* Quản lý duyệt: 'ok' = Duyệt → điểm thành phần được tính vào KPI · 'recheck' = Re-check → không tính điểm, báo đỏ · '' = chờ duyệt → chưa tính.
    Dữ liệu cũ / file Excel ghi "Đạt", "Reject" vẫn được hiểu đúng. */
-const apOf=t=>{const a=String((t&&t.approval)||'').normalize('NFC').trim();return /^(duyệt|đạt|approved?)/i.test(a)?'ok':/^(re-?check|reject)/i.test(a)?'recheck':''};
-const AP={'':['mute','Chờ duyệt'],ok:['ok','Duyệt'],recheck:['bad','Re-check']};
-const AP_VAL={'':'',ok:'Duyệt',recheck:'Re-check'};
+const apOf=t=>{const a=String((t&&t.approval)||'').normalize('NFC').trim();return /^(duyệt|đạt|approved?)/i.test(a)?'ok':/^(re-?check|reject)/i.test(a)?'recheck':/^routine/i.test(a)?'routine':''};
+const AP={'':['mute','Chờ duyệt'],ok:['ok','Duyệt'],recheck:['bad','Re-check'],routine:['info','Routine work']};
+const AP_VAL={'':'',ok:'Duyệt',recheck:'Re-check',routine:'Routine work'};
+/* Re-check / Routine work: việc không tính điểm và không làm mục bị trừ điểm (bỏ khỏi cả tử lẫn mẫu) */
+const apSkip=ap=>ap==='recheck'||ap==='routine';
 /* Xếp loại: [ngưỡng, màu badge, nhãn] */
 /* Xếp loại giống file Excel KPI cá nhân: A+ ≥100 · A ≥86 · B ≥75 · C ≥61 · D >41 · E */
 const GRADES=[[100,'ok','A+'],[86,'info','A'],[75,'mute','B'],[61,'warn','C'],[41.0000001,'bad','D'],[-1e9,'bad','E']];
@@ -98,10 +100,11 @@ const tagsOf=t=>((t&&t.tags)||[]).filter(k=>TAGS[k]);
 const mcOf=t=>t&&t.mgrComment&&String(t.mgrComment.text||'').trim()?t.mgrComment:null;
 /* =====================================================================
    QUY CHẾ 80 / 20 (áp dụng từ tháng kpi2().since; các tháng trước giữ cách tính cũ 100% công việc)
-   KPI tháng = Khung 1 (20) + Khung 2 · KRI (~80) + Khung 3 · Điểm thưởng (20), khống chế 0–120 (giống file Excel "Individual KPIs").
-   - Khung 1 · Quản lý giao & Tuân thủ (20):
-       + Việc quản lý giao: 10 điểm chia đều cho số việc By Manager trong tháng, cộng khi việc được Duyệt.
-       + Tuân thủ: 10 điểm, trừ 1 mỗi lần đi trễ (giờ vào sau 08:05) và 1 mỗi lỗi NC (TVE Safety / Audit); thấp nhất 0.
+   KPI tháng = Work A · Tuân thủ + Work B · KRI + Work C · Điểm thưởng, khống chế 0–120.
+   - Work A · Tuân thủ:
+       + A.1 Tuân thủ: 10 điểm, trừ 1 mỗi lần đi trễ (giờ vào sau 08:05) và 1 mỗi lỗi NC (TVE Safety / Audit); thấp nhất 0.
+       + A.2 Số giờ làm thêm: mục OT của danh mục (giữ trọng số), tổng ≤ otMax giờ = đủ điểm, vượt = 0.
+   - Work C còn có Quản lý giao việc: quản lý chấm 0 – mgrMax (m.mgrPts).
    - Khung 2 · KRI: danh mục chỉ tiêu riêng của từng nhân viên (sheet.kpi, nhập từ file Excel). Mỗi dòng: Điểm = % đạt × trọng số.
        + Dòng "Kết quả tháng": % đạt = Quy ước tính (công thức kiểu Excel, 03-kri.js) áp lên Kết quả tháng (m.kri[id].r); để trống như Excel.
        + Dòng "Công việc hằng ngày": % đạt = điểm thành phần các việc đã Duyệt / tổng trọng số các việc gắn vào dòng (tối đa taskCap %).
@@ -114,8 +117,8 @@ const mcOf=t=>t&&t.mgrComment&&String(t.mgrComment.text||'').trim()?t.mgrComment
 const KRI_EF='IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))';
 /* một việc là 1 lỗi khi: hoàn thành trễ hạn, bị Re-check, hoặc quá hạn mà chưa hoàn thành */
 /* Work B: việc chỉ được tính điểm khi đã có ngày hoàn thành và không bị Re-check; việc được tính mà hoàn thành trễ = 1 lỗi */
-const taskCnt=(t,sc)=>sc.state!=='moved'&&!!t.submitted&&sc.ap!=='recheck';
-const taskErr=(sc,t)=>sc.state!=='moved'&&sc.ap!=='recheck'&&(!t||!!t.submitted)&&sc.late!=null&&sc.late>0;
+const taskCnt=(t,sc)=>sc.state!=='moved'&&!!t.submitted&&!apSkip(sc.ap);
+const taskErr=(sc,t)=>sc.state!=='moved'&&!apSkip(sc.ap)&&(!t||!!t.submitted)&&sc.late!=null&&sc.late>0;
 const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110,otMax:10,otPen:1};
 /* mục Work B "Số giờ làm thêm trong tháng không vượt quá … giờ": ghi từng lần OT như đi trễ, tổng ≤ otMax giờ = đủ điểm, mỗi giờ vượt (làm tròn lên) trừ otPen điểm */
 const isOtRow=r=>{if(!r)return false;if(r.src==='ot')return true;if(r.src==='tasks')return false;   /* nhận theo tên mục: “Số giờ làm thêm … không vượt quá …”; mục báo cáo OT (WTR, Off days…) vẫn tính theo việc */
@@ -136,8 +139,9 @@ function monthStats(m,ym,kc){
     if(sc.comp!=null){st.scored++;
       if(sc.ap==='ok'){st.counted++;if(bm)st.bmOk++;else{st.raw+=sc.comp;st.bonus+=sc.bonus}}
       else if(sc.ap==='recheck'){st.recheck++;if(bm)st.bmRe++}
+      else if(sc.ap==='routine'){st.routine=(st.routine||0)+1}
       else{st.pending++;if(bm)st.bmPend++}
-      if(sc.ap!=='recheck'&&!bm)st.rawSelf+=sc.comp}
+      if(!apSkip(sc.ap)&&!bm)st.rawSelf+=sc.comp}
   }
   st.weight=r2(st.weight);
   const cap=v=>Math.min(KPI_CAP,Math.max(0,v));
@@ -147,29 +151,30 @@ function monthStats(m,ym,kc){
   if(v2){
     st.lock=m&&m.lock||null;
     st.lateList=[...((m&&m.late)||[])].sort((a,b)=>a.d<b.d?-1:1);st.ncList=[...((m&&m.nc)||[])].sort((a,b)=>a.d<b.d?-1:1);
-    /* Khung 1 – việc quản lý giao: ${mgrMax} điểm chia đều cho số việc giao trong tháng (10 việc → 1 điểm/việc, 5 việc → 2, 8 việc → 1,25) */
-    st.bmPer=st.bmN?P.mgrMax/st.bmN:0;
-    st.pMgr=st.bmN?r2(Math.min(P.mgrMax,st.bmPer*st.bmOk)):P.mgrMax;   /* tháng không có việc quản lý giao: giữ đủ điểm (giống ô Kết quả để trống trong Excel) */
+    /* Work A – A.1 Tuân thủ: compMax, trừ mỗi lần đi trễ / lỗi NC */
     st.pComp=Math.max(0,P.compMax-P.latePen*st.lateList.length-P.ncPen*st.ncList.length);
-    st.p20=st.pMgr+st.pComp;
-    const mgrSelf=st.bmN?Math.min(P.mgrMax,st.bmPer*(st.bmOk+st.bmPend)):P.mgrMax;
-    /* Khung 2 – KRI theo danh mục chỉ tiêu */
-    const lines=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[];let k2Self=st.rawSelf;
+    /* Work A – A.2 Số giờ làm thêm: mục "Số giờ làm thêm … không vượt quá" của danh mục chuyển lên đây (giữ trọng số của mục).
+       Tổng giờ trong tháng ≤ otMax = đủ điểm, vượt = 0 điểm */
+    const all=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[],otRow=all.find(isOtRow)||null,res0=(m&&m.kri)||{};
+    st.otList=[...((m&&m.ot)||[])].sort((a,b)=>a.d<b.d?-1:1);st.otRow=otRow;st.otW=otRow?+otRow.w:0;
+    {const v0=otRow&&res0[otRow.id];st.otH=r2(st.otList.length?st.otList.reduce((a,x)=>a+(+x.h||0),0):v0&&v0.r!=null&&v0.r!==''&&isFinite(+v0.r)?+v0.r:0);st.otOld=!st.otList.length&&!!st.otH}   /* tháng cũ nhập tổng giờ ở ô Kết quả: vẫn dùng */
+    st.otOver=st.otH>P.otMax;st.pOt=otRow?(st.otOver?0:st.otW):0;
+    st.p20=r2(st.pComp+st.pOt);st.aMax=P.compMax+st.otW;
+    /* Work B – KRI theo danh mục chỉ tiêu (không gồm mục giờ làm thêm) */
+    const lines=all.filter(r=>r!==otRow);let k2Self=st.rawSelf;
     if(lines.length){
       const ids=new Set(lines.map(r=>r.id)),tl=lines.filter(r=>r.src!=='res'),only=tl.length===1?tl[0].id:null,res=(m&&m.kri)||{},capT=(+P.taskCap||110)/100;
       let a=0,b=0;
       st.kri=lines.map(r=>{
-        const w=+r.w,o={row:r,w,src:isOtRow(r)?'ot':r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
+        const w=+r.w,o={row:r,w,src:r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
          pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
         if(o.src==='tasks'){   /* Work B: % đạt theo SỐ LỖI của các việc trong mục (quy ước Excel), chỉ việc đã có ngày hoàn thành mới được điểm */
           const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
-          let er=0;o.cnt=0;mine.forEach(x=>{o.n++;if(x.sc.comp!=null)o.done++;if(x.sc.ap==='ok')o.ok++;if(taskCnt(x.t,x.sc))o.cnt++;if(taskErr(x.sc,x.t))er++});
+          let er=0;o.cnt=0;o.skip=0;mine.forEach(x=>{o.n++;if(apSkip(x.sc.ap)){o.skip++;o.cnt++;return}if(x.sc.comp!=null)o.done++;if(x.sc.ap==='ok')o.ok++;if(taskCnt(x.t,x.sc))o.cnt++;if(taskErr(x.sc,x.t))er++});
           const v=res[r.id],add=v&&+v.x>0?+v.x:0;o.errT=er;o.errM=add;o.err=er+add;o.note=v&&v.n||'';
-          /* việc chưa có ngày hoàn thành hoặc Re-check: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục chưa có việc nào hoàn thành = 0 điểm) */
+          /* việc chưa có ngày hoàn thành: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục chưa có việc nào hoàn thành = 0 điểm).
+             Re-check / Routine work: không tính lỗi, coi như phần việc đã đủ → không làm mục bị trừ điểm */
           o.share=o.n?o.cnt/o.n:0;o.pErr=kxPct(r.ef||KRI_EF,o.err);o.pct=o.pErr==null?null:o.pErr*o.share;o.pSelf=o.pct;
-        }else if(o.src==='ot'){o.otList=[...((m&&m.ot)||[])].sort((a,b)=>a.d<b.d?-1:1);const v0=res[r.id];o.res=r2(o.otList.length?o.otList.reduce((a,x)=>a+(+x.h||0),0):v0&&v0.r!=null&&v0.r!==''&&isFinite(+v0.r)?+v0.r:0);o.old=!o.otList.length&&!!o.res;   /* tháng cũ đã nhập tổng giờ ở ô Kết quả: vẫn dùng số đó */
-          o.over=r2(Math.max(0,o.res-P.otMax));
-          o.pen=Math.min(w,Math.ceil(o.over-1e-9)*P.otPen);o.pct=w?(w-o.pen)/w:1;o.pSelf=o.pct;
         }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
         o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
         o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});
@@ -177,10 +182,13 @@ function monthStats(m,ym,kc){
     }else st.p80=r2(st.raw);
     /* Khung 3 – điểm thưởng */
     st.gaList=[...((m&&m.ga)||[])].sort((x,y)=>x.d<y.d?-1:1);st.mocList=[...((m&&m.moc)||[])].sort((x,y)=>x.d<y.d?-1:1);
-    st.pGa=st.gaList.length>=2?P.gaMax:st.gaList.length===1?P.gaMax/2:0;st.pMoc=st.mocList.length?P.mocMax:0;st.p3=st.pGa+st.pMoc;
-    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
+    st.pGa=st.gaList.length>=2?P.gaMax:st.gaList.length===1?P.gaMax/2:0;st.pMoc=st.mocList.length?P.mocMax:0;
+    /* Work C – Quản lý giao việc: quản lý tự chấm 0 – mgrMax (chưa chấm = 0) */
+    st.mgrPts=m&&m.mgrPts!=null&&m.mgrPts!==''&&isFinite(+m.mgrPts)?Math.min(P.mgrMax,Math.max(0,+m.mgrPts)):null;st.pMgr=st.mgrPts||0;
+    st.p3=r2(st.pGa+st.pMoc+st.pMgr);st.cMax=P.gaMax+P.mocMax+P.mgrMax;
+    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||(m&&m.mgrPts!=null&&m.mgrPts!=='')||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
     if(live||st.counted)st.kpi=cap(st.p80+st.p20+st.p3);
-    if(live||st.counted+st.pending)st.self=cap(k2Self+mgrSelf+st.pComp+st.p3);
+    if(live||st.counted+st.pending)st.self=cap(k2Self+st.p20+st.p3);
   }else{
     if(st.counted)st.kpi=cap(st.raw);
     if(st.counted+st.pending)st.self=cap(st.rawSelf);
