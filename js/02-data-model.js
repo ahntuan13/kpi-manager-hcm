@@ -124,6 +124,12 @@ const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePe
 /* mục Work B "Số giờ làm thêm trong tháng không vượt quá … giờ": ghi từng lần OT như đi trễ, tổng ≤ otMax giờ = đủ điểm, mỗi giờ vượt (làm tròn lên) trừ otPen điểm */
 const isOtRow=r=>{if(!r)return false;if(r.src==='ot')return true;if(r.src==='tasks')return false;   /* nhận theo tên mục: “Số giờ làm thêm … không vượt quá …”; mục báo cáo OT (WTR, Off days…) vẫn tính theo việc */
   const t=norm(r.text||'');return /gio lam them/.test(t)&&/khong vuot|vuot qua|toi da|duoi/.test(t)||/average (ot|overtime) (hours|of staff)/.test(t)};
+/* mục "Những công việc khác" của danh mục: thuộc Work C · Quản lý giao việc → không tính ở Work B, việc gắn vào mục này hiện ở bảng việc giao của Work C */
+const OTHER_RX=/^(\d+[.)]?\s*)?(nhung |cac )?(cong viec|viec) khac\b|^other( works?| tasks?| jobs?)?$/;
+const isOtherTxt=r=>!!r&&OTHER_RX.test(norm(r.text||''));
+/* id các mục thuộc "Những công việc khác": chính mục đó, hoặc các mục con nếu nó là nhóm tiêu đề */
+function otherIdsOf(kc){const s=new Set(),rows=(kc&&kc.rows)||[];
+  rows.forEach((r,i)=>{if(!isOtherTxt(r))return;if(r.w!=null){s.add(r.id);return}for(let j=i+1;j<rows.length&&!rows[j].no&&rows[j].w!=null;j++)s.add(rows[j].id)});return s}
 const kpi2=()=>({...KPI2_DEF,...((db&&db.company&&db.company.kpi2)||{})});
 const isV2=ym=>!!ym&&ym>=kpi2().since;
 function monthStats(m,ym,kc){
@@ -162,7 +168,7 @@ function monthStats(m,ym,kc){
     st.otOver=st.otH>P.otMax;st.pOt=st.otOver?0:st.otW;
     st.p20=r2(st.pComp+st.pOt);st.aMax=P.compMax+st.otW;
     /* Work B – KRI theo danh mục chỉ tiêu (không gồm mục giờ làm thêm) */
-    const lines=all.filter(r=>r!==otRow);let k2Self=st.rawSelf;
+    const oth=otherIdsOf(kc),lines=all.filter(r=>r!==otRow&&!oth.has(r.id));st.otherIds=oth;let k2Self=st.rawSelf;
     if(lines.length){
       const ids=new Set(lines.map(r=>r.id)),tl=lines.filter(r=>r.src!=='res'),only=tl.length===1?tl[0].id:null,res=(m&&m.kri)||{},capT=(+P.taskCap||110)/100;
       let a=0,b=0;
@@ -170,7 +176,7 @@ function monthStats(m,ym,kc){
         const w=+r.w,o={row:r,w,src:r.src==='res'?'res':'tasks',   /* mặc định: mục tính từ các việc nhân viên tạo trong mục */
          pct:null,pSelf:null,res:'',n:0,done:0,ok:0,den:0};
         if(o.src==='tasks'){   /* Work B: % đạt theo SỐ LỖI của các việc trong mục (quy ước Excel), chỉ việc đã có ngày hoàn thành mới được điểm */
-          const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
+          const mine=rows.filter(x=>x.sc.state!=='moved'&&!byMgr(x.t)&&!oth.has(x.t.kpi)&&(x.t.kpi===r.id||(only===r.id&&!ids.has(x.t.kpi))));
           let er=0;o.cnt=0;o.skip=0;mine.forEach(x=>{o.n++;if(apSkip(x.sc.ap)){o.skip++;o.cnt++;return}if(x.sc.comp!=null)o.done++;if(x.sc.ap==='ok')o.ok++;if(taskCnt(x.t,x.sc))o.cnt++;if(taskErr(x.sc,x.t))er++});
           const v=res[r.id],add=v&&+v.x>0?+v.x:0;o.errT=er;o.errM=add;o.err=er+add;o.note=v&&v.n||'';
           /* việc chưa có ngày hoàn thành: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục chưa có việc nào hoàn thành = 0 điểm).

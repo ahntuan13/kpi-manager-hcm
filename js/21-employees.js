@@ -141,17 +141,19 @@ const KPI_ICO='<svg class="kico" viewBox="0 0 16 16" width="14" height="14" aria
 const kpiTtl=(text,pre='',rule='')=>{const s=String(text||''),rest=s.split('\n').slice(1).join('\n').trim();return `<span class="tt"${rule?` title="${esc('Quy ước đánh giá (file Excel): '+rule)}"`:''}>${pre}${esc(kpiLabel(s))}</span>${rest?`<small class="kpx">${esc(rest)}</small>`:''}`};
 /* ô chọn chỉ tiêu KPI: nhóm có tiêu đề → optgroup, nhóm một dòng → option; luôn có dòng trống đầu để không tự chọn thay người dùng */
 /* Mã mục Work B theo cấp: mục có số nhóm = B.1, B.2…; chỉ tiêu con dưới một nhóm tiêu đề = B.2.1, B.2.2… */
-function wbCodes(kc){const m=new Map();let top=0,sub=0,grp=false;
+function wbCodes(kc){const m=new Map(),oth=otherIdsOf(kc);let top=0,sub=0,grp=false;
   for(const r of (kc&&kc.rows)||[]){
-    if(r.w!=null&&isOtRow(r)){m.set(r.id,'A.2');continue}   /* mục giờ làm thêm đã chuyển lên Work A */
+    if(r.w!=null&&isOtRow(r)){m.set(r.id,'A.2');continue}
+    if(oth.has(r.id)||(r.w==null&&isOtherTxt(r))){m.set(r.id,'C');continue}   /* Những công việc khác → Work C · Quản lý giao việc */   /* mục giờ làm thêm đã chuyển lên Work A */
     if(r.no||r.w==null){top++;sub=0;grp=r.w==null;m.set(r.id,'B.'+top)}
     else if(grp){sub++;m.set(r.id,`B.${top}.${sub}`)}
     else{top++;m.set(r.id,'B.'+top)}}
   return m}
 const wbCode=(kc,id)=>wbCodes(kc).get(id)||'';
 /* ô chọn mục Work B (giống mã và tên trên khung Work B): nhóm tiêu đề → optgroup; luôn có dòng trống đầu để không tự chọn thay người dùng */
-function kpiSel(k,cur,attrs=''){let h='',open=false;const C=wbCodes(k),opt=r=>`<option value="${esc(r.id)}" ${r.id===cur?'selected':''}>${esc(C.get(r.id)+' '+kpiLabel(r.text))}</option>`,close=()=>{if(open){h+='</optgroup>';open=false}};
+function kpiSel(k,cur,attrs=''){let h='',open=false;const oth=otherIdsOf(k);const C=wbCodes(k),opt=r=>`<option value="${esc(r.id)}" ${r.id===cur?'selected':''}>${esc(C.get(r.id)+' '+kpiLabel(r.text))}</option>`,close=()=>{if(open){h+='</optgroup>';open=false}};
   for(const r of (k&&k.rows)||[]){
+    if(r.w!=null&&(isOtRow(r)||oth.has(r.id))||r.w==null&&isOtherTxt(r))continue;   /* không gắn việc vào mục giờ làm thêm / Những công việc khác */
     if(r.w==null){close();h+=`<optgroup label="${esc(C.get(r.id)+' '+kpiLabel(r.text))}">`;open=true}
     else if(r.no){close();h+=opt(r)}
     else h+=opt(r);
@@ -263,7 +265,7 @@ function workB(e,y,mm,st,kc,usRows){
 }
 function kpiFrames(e,y,mm,st){
   const P=kpi2(),mg=can('manage'),dA=`data-e="${e.id}" data-y="${y}" data-mm="${mm}"`,dmin=`${y}-${mm}-01`,dmax=isoOf(dayNum(`${nextOf(y,mm).year}-${nextOf(y,mm).mm}-01`)-1);
-  const bmRows=st.rows.filter(r=>byMgr(r.t)),usRows=st.rows.filter(r=>!byMgr(r.t)),k=mVal(st),kc=kpiOf(e.id,y),hasKc=!!(st.kri&&st.kri.length);
+  const oth=otherIdsOf(kpiOf(e.id,y)),isC=r=>byMgr(r.t)||oth.has(r.t.kpi),bmRows=st.rows.filter(isC),usRows=st.rows.filter(r=>!isC(r)),k=mVal(st),kc=kpiOf(e.id,y),hasKc=!!(st.kri&&st.kri.length);
   const dateIn=`<input class="in" type="date" name="d" required min="${dmin}" max="${dmax}" aria-label="Ngày">`;
   const lateBox=`<div class="cmpc"><div class="cmph"><span>Đi trễ <small class="muted">(giờ vào sau ${esc(P.lateAfter)})</small></span><b class="${st.lateList.length?'tag-bad':''}">${st.lateList.length} lần</b></div>
       <div class="chips">${st.lateList.length?st.lateList.map(x=>lateChip(x,mg,dA)).join(''):'<span class="muted">Không đi trễ ngày nào.</span>'}</div>

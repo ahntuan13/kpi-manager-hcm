@@ -311,3 +311,14 @@ test('isOtRow: chỉ mục "Số giờ làm thêm … không vượt quá", khô
   assert.equal(f('Số giờ làm thêm trong tháng không vượt quá 10 giờ','tasks'),false);
   assert.equal(f('Bất kỳ mục nào','ot'),true);
 });
+
+test('Những công việc khác: không tính ở Work B (thuộc Work C · Quản lý giao việc)',()=>{
+  run(`db.company.kpi2={since:'2026-10'}`);
+  ctx.KC={rows:[{id:'b',no:'1',text:'L&D',w:40,src:'tasks'},{id:'x',no:'2',text:'Những công việc khác',w:10}]};
+  ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'x',{submitted:null})]};
+  let s=run('monthStats(M,"2026-10",KC)');assert.deepEqual([s.kri.length,s.p80],[1,40]);
+  ctx.KC={rows:[{id:'b',no:'1',text:'L&D',w:40,src:'tasks'},{id:'g',no:'3',text:'3. Những công việc khác',w:null},{id:'x1',no:'',text:'Hỗ trợ phòng ban',w:5},{id:'x2',no:'',text:'Việc phát sinh',w:5}]};
+  ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'x1',{submitted:null})]};
+  s=run('monthStats(M,"2026-10",KC)');assert.deepEqual([s.kri.length,s.p80],[1,40]);
+  assert.equal(run("isOtherTxt({text:'Các công việc khác được giao'})"),true);assert.equal(run("isOtherTxt({text:'Kiểm tra công việc khác phòng'})"),false);
+});
