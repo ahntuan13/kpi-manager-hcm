@@ -1125,3 +1125,5 @@ table.t.est td:first-child{display:flex;align-items:center;height:44px}
 .mgp .in{width:76px;min-height:32px;padding:4px 8px;text-align:right}
 select.in.aps.info{border-color:#a9c4ee;background-color:#eef4fd;color:#1e4f9a}
 .kf3 .kfsub{margin-top:12px}
+.wbg.wbn{background:transparent;border:1px dashed var(--line)}
+.wbg.wbn .wbt small{display:block;margin-top:2px;font-weight:400}

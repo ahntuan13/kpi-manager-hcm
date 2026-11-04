@@ -256,9 +256,14 @@ function workB(e,y,mm,st,kc,usRows){
   rows.forEach((r,i)=>{
     if(r.w==null){   /* nhóm tiêu đề: tổng trọng số và điểm các mục con */
       const kids=[];for(let j=i+1;j<rows.length&&!rows[j].no&&rows[j].w!=null;j++){const o=O.get(rows[j].id);if(o)kids.push(o)}
-      if(!kids.length)return;const code=C.get(r.id);
+      const code=C.get(r.id);
+      if(!kids.length){const n=rows.slice(i+1).findIndex(x=>x.no||x.w==null),ch=rows.slice(i+1,n<0?rows.length:i+1+n);   /* nhóm chưa có mục con tính điểm: vẫn hiện để quản lý thấy */
+        out+=`<div class="wbg wbn"><span class="wbc">${code==='C'?'C':code}</span><div class="wbt">${kpiTtl(r.text,'',r.rule)}<small class="muted">${code==='C'?'Thuộc Work C · Quản lý giao việc, không tính ở Work B':ch.length?'Các mục con tính ở Work A / Work C':'Chưa có mục con có trọng số: bấm Chỉ tiêu KPI, thêm dòng ngay dưới nhóm này và nhập trọng số'}</small></div><div class="wbs"><span class="wbp">–<small> / 0</small></span><span class="wba">${edB(r.id,code)}</span></div></div>`;return}
       out+=`<div class="wbg"><span class="wbc">${code}</span><div class="wbt">${kpiTtl(r.text,'',r.rule)}</div><div class="wbs"><span class="wbp" title="Điểm đạt / Trọng số">${fmtK2(r2(kids.reduce((a,o)=>a+o.score,0)))}<small> / ${fmtK(r2(kids.filter(o=>!o.off).reduce((a,o)=>a+o.w,0)))}</small></span><span class="wba">${edB(r.id,code)}</span></div></div>`;return}
-    const o=O.get(r.id);if(o)out+=block(o,!r.no&&(C.get(r.id)||'').split('.').length>2);
+    const o=O.get(r.id);if(o){out+=block(o,!r.no&&(C.get(r.id)||'').split('.').length>2);return}
+    /* mục không tính ở Work B: vẫn hiện một dòng ghi rõ lý do, không để “biến mất” */
+    const code=C.get(r.id)||'',why=isOtRow(r)?'Tính ở Work A · A.2 Số giờ làm thêm':code==='C'?'Thuộc Work C · Quản lý giao việc, không tính ở Work B':!(+r.w>0)?'Trọng số 0: chưa tính điểm. Bấm Sửa để nhập trọng số':'';
+    if(why)out+=`<div class="wbg wbn"><span class="wbc">${esc(code)}</span><div class="wbt">${kpiTtl(r.text,'',r.rule)}<small class="muted">${why}</small></div><div class="wbs"><span class="wbp">–</span><span class="wba">${edB(r.id,code)}</span></div></div>`;
   });
   const loose=only?[]:usRows.filter(x=>!ids.has(x.t.kpi));
   return out+(loose.length?`<section class="wb wbx"><div class="wbh"><span class="wbc">?</span><div class="wbt"><b>Chưa phân loại</b><small>Chọn mục Work B cho từng việc rồi bấm Gắn; việc chưa gắn không được tính điểm.</small></div></div>${monthTable(e,y,mm,st,{rows:loose,kind:'user',flat:true})}</section>`:'');
