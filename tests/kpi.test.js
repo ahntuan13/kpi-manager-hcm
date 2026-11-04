@@ -273,8 +273,10 @@ test('monthStats: Work A (Tuân thủ) + KRI + Work C (Thưởng + quản lý ch
   ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'',{approval:''})],kri:{a:{r:2},c:{r:1}},late:[{id:'l',d:'2026-10-02'}],ga:[{id:'g',d:'2026-10-03'}]};
   const st=run('monthStats(M,"2026-10",KC)');
   /* KRI: 0.8*10 + (0 lỗi → 100%)*40 + 0.5*30 = 8+40+15 = 63; Work A: tuân thủ 10-1 = 9 (không có mục OT); Work C: 1 lần hỗ trợ = 5, quản lý chưa chấm = 0 */
-  assert.equal(st.p80,63);assert.equal(st.p20,19);assert.equal(st.p3,5);assert.equal(st.kpi,87);
-  ctx.M.mgrPts=3;assert.equal(run('monthStats(M,"2026-10",KC)').p3,8);ctx.M.mgrPts=8;assert.equal(run('monthStats(M,"2026-10",KC)').p3,10);delete ctx.M.mgrPts;   /* Work C tổng tối đa 10 */
+  assert.equal(st.p80,63);assert.equal(st.p20,19);assert.equal(st.p3,0);assert.equal(st.kpi,82);   /* Work C bỏ Hỗ trợ việc phát sinh */
+  ctx.M.mgrPts=3;assert.equal(run('monthStats(M,"2026-10",KC)').p3,3);ctx.M.mgrPts=8;assert.equal(run('monthStats(M,"2026-10",KC)').p3,5);   /* giao việc tối đa 5 */
+  ctx.M.moc=[{id:'m',d:'2026-10-05'}];assert.equal(run('monthStats(M,"2026-10",KC)').p3,10);delete ctx.M.moc;delete ctx.M.mgrPts;   /* MOC 5 + giao việc 5 = 10 */
+  run(`db.company.kpi2={since:'2026-10',mocMax:10,mgrMax:10,gaMax:10}`);assert.deepEqual(run('[kpi2().mocMax,kpi2().mgrMax,kpi2().cCap]'),[5,5,10]);run(`db.company.kpi2={since:'2026-10'}`);   /* quy chế cũ lưu trước: dùng số mới */
   ctx.M.kri.b={x:1};assert.equal(run('monthStats(M,"2026-10",KC)').p80,43);   /* 2 việc, quản lý ghi 1 lỗi → 1/2 × 40 */
   ctx.M.kri.b={x:3};assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* lỗi nhiều hơn số việc → 0, không âm */
   delete ctx.M.kri.b;ctx.M.tasks=[];assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* mục chưa có việc hoàn thành = 0 điểm */

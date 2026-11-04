@@ -45,7 +45,7 @@ const kpiBands={id:'kpiBands',
     c.data.datasets.forEach((ds,di)=>{if(!ds.showVal)return;const meta=c.getDatasetMeta(di);if(meta.hidden)return;const n=ds.data.filter(v=>v!=null).length,few=c.chartArea.width/Math.max(1,ds.data.length)<44;
       const vals=ds.data.map(v=>v==null?-1:v),mx=vals.indexOf(Math.max(...vals)),last=ds.data.reduce((a,v,i)=>v==null?a:i,-1);
       meta.data.forEach((el,i)=>{const v=ds.data[i];if(v==null)return;if(ds.showVal==='last'?i!==last:(few&&n>4&&i!==mx&&i!==last))return;const t=fmtK(v);x.strokeStyle='#fff';x.lineWidth=3;x.strokeText(t,el.x,el.y-5);x.fillStyle=CC.ink;x.fillText(t,el.x,el.y-5)})});x.restore()}};
-const kpiScale=()=>({min:0,max:KPI_CAP,afterBuildTicks:s=>{s.ticks=[0,20,40,61,75,86,100,120].map(value=>({value}))},grid:{display:false},border:{display:false},ticks:{callback:v=>v}});
+const kpiScale=()=>({min:0,max:KPI_CAP_OLD,afterBuildTicks:s=>{s.ticks=[0,20,40,61,75,86,100,120].map(value=>({value}))},grid:{display:false},border:{display:false},ticks:{callback:v=>v}});
 const kpiOpt=(extra={})=>baseOpt({layout:{padding:{right:86,top:22}},scales:{y:kpiScale(),x:{grid:{display:false}}},...extra});
 const barColors=d=>d.map(v=>v!=null&&v<75?CC.low:CC.bar);
 /* đếm số người theo xếp loại (khoá = nhãn A+ / A / B / C / D / E) */
