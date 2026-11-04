@@ -321,4 +321,5 @@ test('Những công việc khác: không tính ở Work B (thuộc Work C · Qu�
   ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'x1',{submitted:null})]};
   s=run('monthStats(M,"2026-10",KC)');assert.deepEqual([s.kri.length,s.p80],[1,40]);
   assert.equal(run("isOtherTxt({text:'Các công việc khác được giao'})"),true);assert.equal(run("isOtherTxt({text:'Kiểm tra công việc khác phòng'})"),false);
+  assert.equal(run("isOtherTxt({text:'Những việc khác'})"),false);assert.equal(run("isOtherTxt({text:'Other: hỗ trợ việc ngoài giờ'})"),false);
 });

@@ -125,7 +125,7 @@ const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePe
 const isOtRow=r=>{if(!r)return false;if(r.src==='ot')return true;if(r.src==='tasks')return false;   /* nhận theo tên mục: “Số giờ làm thêm … không vượt quá …”; mục báo cáo OT (WTR, Off days…) vẫn tính theo việc */
   const t=norm(r.text||'');return /gio lam them/.test(t)&&/khong vuot|vuot qua|toi da|duoi/.test(t)||/average (ot|overtime) (hours|of staff)/.test(t)};
 /* mục "Những công việc khác" của danh mục: thuộc Work C · Quản lý giao việc → không tính ở Work B, việc gắn vào mục này hiện ở bảng việc giao của Work C */
-const OTHER_RX=/^(\d+[.)]?\s*)?(nhung |cac )?(cong viec|viec) khac\b|^other( works?| tasks?| jobs?)?$/;
+const OTHER_RX=/^(\d+[.)]?\s*)?(nhung |cac )?cong viec khac\b/;   /* chỉ “Những công việc khác”; “Những việc khác”, “Other…” vẫn thuộc Work B */
 const isOtherTxt=r=>!!r&&OTHER_RX.test(norm(r.text||''));
 /* id các mục thuộc "Những công việc khác": chính mục đó, hoặc các mục con nếu nó là nhóm tiêu đề */
 function otherIdsOf(kc){const s=new Set(),rows=(kc&&kc.rows)||[];
