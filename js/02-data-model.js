@@ -181,7 +181,8 @@ function monthStats(m,ym,kc){
           const v=res[r.id],add=v&&+v.x>0?+v.x:0;o.errT=er;o.errM=add;o.err=er+add;o.note=v&&v.n||'';
           /* việc chưa có ngày hoàn thành: không tính điểm → mục chỉ được phần điểm của các việc đã tính (mục chưa có việc nào hoàn thành = 0 điểm).
              Re-check / Routine work: không tính lỗi, coi như phần việc đã đủ → không làm mục bị trừ điểm */
-          o.share=o.n?o.cnt/o.n:0;o.pErr=kxPct(r.ef||KRI_EF,o.err);o.pct=o.pErr==null?null:o.pErr*o.share;o.pSelf=o.pct;
+          /* chia đều trọng số cho số việc trong mục: mỗi việc = trọng số / số việc; việc hoàn thành đúng hạn được phần của nó, việc trễ / lỗi quản lý ghi thêm trừ 1 phần */
+          o.share=o.n?o.cnt/o.n:0;o.per=o.n?w/o.n:0;o.good=Math.max(0,o.cnt-o.err);o.pct=o.n?o.good/o.n:0;o.pSelf=o.pct;
         }else{const v=res[r.id];o.res=v&&v.r!=null?v.r:'';o.note=v&&v.n||'';o.pct=kxPct(r.f,o.res);o.pSelf=o.pct}
         o.off=o.src==='res'&&!r.f;   /* chưa có quy ước tính: không tính điểm (giống Excel không có công thức) */
         o.score=r2((o.pct||0)*w);o.sSelf=(o.pSelf||0)*w;a+=o.score;b+=o.sSelf;return o});

@@ -275,15 +275,18 @@ test('monthStats: Work A (Tuân thủ) + KRI + Work C (Thưởng + quản lý ch
   /* KRI: 0.8*10 + (0 lỗi → 100%)*40 + 0.5*30 = 8+40+15 = 63; Work A: tuân thủ 10-1 = 9 (không có mục OT); Work C: 1 lần hỗ trợ = 5, quản lý chưa chấm = 0 */
   assert.equal(st.p80,63);assert.equal(st.p20,19);assert.equal(st.p3,5);assert.equal(st.kpi,87);
   ctx.M.mgrPts=3;assert.equal(run('monthStats(M,"2026-10",KC)').p3,8);ctx.M.mgrPts=8;assert.equal(run('monthStats(M,"2026-10",KC)').p3,10);delete ctx.M.mgrPts;   /* Work C tổng tối đa 10 */
-  ctx.M.kri.b={x:1};assert.equal(run('monthStats(M,"2026-10",KC)').p80,55);   /* quản lý ghi 1 lỗi → 80%*40 */
-  ctx.M.kri.b={x:3};assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* ≥3 lỗi → 0 */
+  ctx.M.kri.b={x:1};assert.equal(run('monthStats(M,"2026-10",KC)').p80,43);   /* 2 việc, quản lý ghi 1 lỗi → 1/2 × 40 */
+  ctx.M.kri.b={x:3};assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* lỗi nhiều hơn số việc → 0, không âm */
   delete ctx.M.kri.b;ctx.M.tasks=[];assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* mục chưa có việc hoàn thành = 0 điểm */
   /* việc chưa có ngày hoàn thành: mục được phần điểm theo số việc đã tính; Re-check / Routine work: bỏ ra, không trừ điểm */
   ctx.M.tasks=[task('t1',5,'b'),task('t2',5,'b',{submitted:null}),task('t3',5,'b',{approval:'Re-check'}),task('t4',5,'b',{approval:'Routine work',submitted:'2026-10-20'})];
   assert.equal(run('monthStats(M,"2026-10",KC)').p80,r2t(8+40*3/4+15));
   ctx.M.tasks=[task('t3',5,'b',{approval:'Re-check'}),task('t4',5,'b',{approval:'Routine work'})];assert.equal(run('monthStats(M,"2026-10",KC)').p80,63);   /* chỉ có Re-check / Routine: không bị trừ */
   ctx.M.tasks=[task('t2',5,'b',{submitted:null})];assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* mục có việc nhưng chưa xong: 0 */
-  ctx.M.tasks=[task('t1',5,'b',{submitted:'2026-10-12'})];assert.equal(run('monthStats(M,"2026-10",KC)').p80,55);   /* hoàn thành trễ: tính, 1 lỗi → 80% */
+  ctx.M.tasks=[task('t1',5,'b',{submitted:'2026-10-12'})];assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* 1 việc, trễ → mất phần của việc đó */
+  ctx.KC={rows:[{id:'b',no:'1',text:'Chứng từ thanh toán',w:10,src:'tasks'}]};
+  ctx.M={tasks:Array.from({length:10},(_,i)=>task('x'+i,1,'b',i===0?{submitted:'2026-10-12'}:{}))};assert.equal(run('monthStats(M,"2026-10",KC)').p80,9);   /* 10 việc, 1 trễ → 9/10 */
+  ctx.M={tasks:Array.from({length:8},(_,i)=>task('x'+i,1,'b',i===0?{submitted:'2026-10-12'}:{}))};assert.equal(run('monthStats(M,"2026-10",KC)').p80,8.75);   /* 8 việc → mỗi việc 1,25; 1 trễ → 8,75 */
   ctx.M.fixed={total:101,k1:20,k2:81,k3:0};assert.equal(run('monthStats(M,"2026-10",KC)').kpi,101);   /* điểm chốt từ Excel */
 });
 
