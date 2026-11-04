@@ -103,7 +103,8 @@ const mcOf=t=>t&&t.mgrComment&&String(t.mgrComment.text||'').trim()?t.mgrComment
    KPI tháng = Work A · Tuân thủ + Work B · KRI + Work C · Điểm thưởng, khống chế 0–120.
    - Work A · Tuân thủ:
        + A.1 Tuân thủ: 10 điểm, trừ 1 mỗi lần đi trễ (giờ vào sau 08:05) và 1 mỗi lỗi NC (TVE Safety / Audit); thấp nhất 0.
-       + A.2 Số giờ làm thêm: mục OT của danh mục (giữ trọng số), tổng ≤ otMax giờ = đủ điểm, vượt = 0.
+       + A.2 Số giờ làm thêm: cố định otPts (10) cho mọi nhân viên, tổng ≤ otMax giờ = đủ điểm, vượt = 0 (mục OT trong danh mục, nếu có, bỏ khỏi Work B).
+   - Work C tổng tối đa cCap (10).
    - Work C còn có Quản lý giao việc: quản lý chấm 0 – mgrMax (m.mgrPts).
    - Khung 2 · KRI: danh mục chỉ tiêu riêng của từng nhân viên (sheet.kpi, nhập từ file Excel). Mỗi dòng: Điểm = % đạt × trọng số.
        + Dòng "Kết quả tháng": % đạt = Quy ước tính (công thức kiểu Excel, 03-kri.js) áp lên Kết quả tháng (m.kri[id].r); để trống như Excel.
@@ -119,7 +120,7 @@ const KRI_EF='IF(x=0,100%,IF(x=1,80%,IF(x=2,60%,0)))';
 /* Work B: việc chỉ được tính điểm khi đã có ngày hoàn thành và không bị Re-check; việc được tính mà hoàn thành trễ = 1 lỗi */
 const taskCnt=(t,sc)=>sc.state!=='moved'&&!!t.submitted&&!apSkip(sc.ap);
 const taskErr=(sc,t)=>sc.state!=='moved'&&!apSkip(sc.ap)&&(!t||!!t.submitted)&&sc.late!=null&&sc.late>0;
-const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110,otMax:10,otPen:1};
+const KPI2_DEF={since:'2026-10',userStd:80,mgrMax:10,perTask:2,compMax:10,latePen:1,ncPen:1,lateAfter:'08:05',gaMax:10,mocMax:10,taskCap:110,otMax:10,otPen:1,otPts:10,cCap:10};
 /* mục Work B "Số giờ làm thêm trong tháng không vượt quá … giờ": ghi từng lần OT như đi trễ, tổng ≤ otMax giờ = đủ điểm, mỗi giờ vượt (làm tròn lên) trừ otPen điểm */
 const isOtRow=r=>{if(!r)return false;if(r.src==='ot')return true;if(r.src==='tasks')return false;   /* nhận theo tên mục: “Số giờ làm thêm … không vượt quá …”; mục báo cáo OT (WTR, Off days…) vẫn tính theo việc */
   const t=norm(r.text||'');return /gio lam them/.test(t)&&/khong vuot|vuot qua|toi da|duoi/.test(t)||/average (ot|overtime) (hours|of staff)/.test(t)};
@@ -156,9 +157,9 @@ function monthStats(m,ym,kc){
     /* Work A – A.2 Số giờ làm thêm: mục "Số giờ làm thêm … không vượt quá" của danh mục chuyển lên đây (giữ trọng số của mục).
        Tổng giờ trong tháng ≤ otMax = đủ điểm, vượt = 0 điểm */
     const all=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[],otRow=all.find(isOtRow)||null,res0=(m&&m.kri)||{};
-    st.otList=[...((m&&m.ot)||[])].sort((a,b)=>a.d<b.d?-1:1);st.otRow=otRow;st.otW=otRow?+otRow.w:0;
+    st.otList=[...((m&&m.ot)||[])].sort((a,b)=>a.d<b.d?-1:1);st.otRow=otRow;st.otW=+P.otPts;   /* cố định cho mọi nhân viên */
     {const v0=otRow&&res0[otRow.id];st.otH=r2(st.otList.length?st.otList.reduce((a,x)=>a+(+x.h||0),0):v0&&v0.r!=null&&v0.r!==''&&isFinite(+v0.r)?+v0.r:0);st.otOld=!st.otList.length&&!!st.otH}   /* tháng cũ nhập tổng giờ ở ô Kết quả: vẫn dùng */
-    st.otOver=st.otH>P.otMax;st.pOt=otRow?(st.otOver?0:st.otW):0;
+    st.otOver=st.otH>P.otMax;st.pOt=st.otOver?0:st.otW;
     st.p20=r2(st.pComp+st.pOt);st.aMax=P.compMax+st.otW;
     /* Work B – KRI theo danh mục chỉ tiêu (không gồm mục giờ làm thêm) */
     const lines=all.filter(r=>r!==otRow);let k2Self=st.rawSelf;
@@ -185,7 +186,7 @@ function monthStats(m,ym,kc){
     st.pGa=st.gaList.length>=2?P.gaMax:st.gaList.length===1?P.gaMax/2:0;st.pMoc=st.mocList.length?P.mocMax:0;
     /* Work C – Quản lý giao việc: quản lý tự chấm 0 – mgrMax (chưa chấm = 0) */
     st.mgrPts=m&&m.mgrPts!=null&&m.mgrPts!==''&&isFinite(+m.mgrPts)?Math.min(P.mgrMax,Math.max(0,+m.mgrPts)):null;st.pMgr=st.mgrPts||0;
-    st.p3=r2(st.pGa+st.pMoc+st.pMgr);st.cMax=P.gaMax+P.mocMax+P.mgrMax;
+    st.p3=r2(Math.min(P.cCap,st.pGa+st.pMoc+st.pMgr));st.cMax=P.cCap;   /* Work C tổng tối đa cCap */
     const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||(m&&m.mgrPts!=null&&m.mgrPts!=='')||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
     if(live||st.counted)st.kpi=cap(st.p80+st.p20+st.p3);
     if(live||st.counted+st.pending)st.self=cap(k2Self+st.p20+st.p3);

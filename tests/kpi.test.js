@@ -273,8 +273,8 @@ test('monthStats: Work A (Tuân thủ) + KRI + Work C (Thưởng + quản lý ch
   ctx.M={tasks:[task('t1',5,'b'),task('t2',5,'',{approval:''})],kri:{a:{r:2},c:{r:1}},late:[{id:'l',d:'2026-10-02'}],ga:[{id:'g',d:'2026-10-03'}]};
   const st=run('monthStats(M,"2026-10",KC)');
   /* KRI: 0.8*10 + (0 lỗi → 100%)*40 + 0.5*30 = 8+40+15 = 63; Work A: tuân thủ 10-1 = 9 (không có mục OT); Work C: 1 lần hỗ trợ = 5, quản lý chưa chấm = 0 */
-  assert.equal(st.p80,63);assert.equal(st.p20,9);assert.equal(st.p3,5);assert.equal(st.kpi,77);
-  ctx.M.mgrPts=8;assert.equal(run('monthStats(M,"2026-10",KC)').p3,13);ctx.M.mgrPts=15;assert.equal(run('monthStats(M,"2026-10",KC)').p3,15);delete ctx.M.mgrPts;   /* quản lý chấm, tối đa 10 */
+  assert.equal(st.p80,63);assert.equal(st.p20,19);assert.equal(st.p3,5);assert.equal(st.kpi,87);
+  ctx.M.mgrPts=3;assert.equal(run('monthStats(M,"2026-10",KC)').p3,8);ctx.M.mgrPts=8;assert.equal(run('monthStats(M,"2026-10",KC)').p3,10);delete ctx.M.mgrPts;   /* Work C tổng tối đa 10 */
   ctx.M.kri.b={x:1};assert.equal(run('monthStats(M,"2026-10",KC)').p80,55);   /* quản lý ghi 1 lỗi → 80%*40 */
   ctx.M.kri.b={x:3};assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* ≥3 lỗi → 0 */
   delete ctx.M.kri.b;ctx.M.tasks=[];assert.equal(run('monthStats(M,"2026-10",KC)').p80,23);   /* mục chưa có việc hoàn thành = 0 điểm */
@@ -296,7 +296,8 @@ test('Work A · giờ làm thêm: mục OT rời Work B lên Work A; ≤ 10 gi�
   assert.deepEqual(k(ot([4,6])),[10,10,20,20,1,40]);
   assert.deepEqual(k(ot([4,6,0.5])),[10.5,0,10,20,1,40]);
   assert.deepEqual(k({tasks:[task('t1',5,'b')],kri:{o:{r:12}}}),[12,0,10,20,1,40]);   /* tháng cũ nhập tổng giờ ở ô Kết quả */
-  ctx.KC={rows:[{id:'b',no:'1',text:'L&D',w:40,src:'tasks'}]};ctx.M=ot([3]);const s=run('monthStats(M,"2026-10",KC)');assert.deepEqual([s.otW,s.pOt,s.aMax],[0,0,10]);   /* danh mục không có mục OT: không áp dụng */
+  ctx.KC={rows:[{id:'b',no:'1',text:'L&D',w:40,src:'tasks'}]};ctx.M=ot([3]);let s=run('monthStats(M,"2026-10",KC)');assert.deepEqual([s.otW,s.pOt,s.aMax],[10,10,20]);   /* cố định 10 điểm cho mọi nhân viên */
+  ctx.M=ot([6,6]);s=run('monthStats(M,"2026-10",KC)');assert.deepEqual([s.pOt,s.p20],[0,10]);
 });
 
 test('isOtRow: chỉ mục "Số giờ làm thêm … không vượt quá", không dính mục báo cáo OT',()=>{
