@@ -230,7 +230,7 @@ function monthTable(e,y,mm,st,opt={}){
 const lateChip=(x,mg,dA)=>`<span class="chip late" title="${x.t?'Giờ vào '+esc(x.t):''}">${fmtDate(x.d).slice(0,5)}${x.t?` <small>${esc(x.t)}</small>`:''}${mg?` <button type="button" class="x" data-act="late-x" ${dA} data-id="${x.id}" aria-label="Bỏ ngày đi trễ ${fmtDate(x.d)}">✕</button>`:''}</span>`;
 const NC_KIND={safety:'TVE Safety',audit:'Audit định kỳ',iso:'Tiêu chuẩn ISO / OHSAS'};
 const pctTxt=p=>p==null?'–':fmtK(r2(p*100))+'%';
-const entryChips=(list,act,mg,dA,lb)=>list.length?`<ul class="ncl">${list.map(x=>`<li><span>${fmtDate(x.d).slice(0,5)}</span> ${x.k&&NC_KIND[x.k]?`<b>${NC_KIND[x.k]}</b> · `:''}${esc(x.note||'')}${mg?` <button type="button" class="x" data-act="${act}" ${dA} data-id="${x.id}" aria-label="Bỏ ${lb} ngày ${fmtDate(x.d)}">✕</button>`:''}</li>`).join('')}</ul>`:'';
+const entryChips=(list,act,mg,dA,lb)=>list.length?`<ul class="ncl">${list.map(x=>`<li>${x.d?`<span>${fmtDate(x.d).slice(0,5)}</span> `:''}${x.k&&NC_KIND[x.k]?`<b>${NC_KIND[x.k]}</b> · `:''}${esc(x.note||'')}${mg?` <button type="button" class="x" data-act="${act}" ${dA} data-id="${x.id}" aria-label="Bỏ ${lb}${x.d?' ngày '+fmtDate(x.d):''}">✕</button>`:''}</li>`).join('')}</ul>`:'';
 /* mã mục Work B: B.1, B.2… theo thứ tự các dòng có trọng số trong danh mục */
 /* Work B: mỗi mục một khối – dòng "Công việc hằng ngày" có danh sách việc riêng (thêm việc ngay vào mục), dòng "Kết quả tháng" nhập kết quả */
 /* Work A · A.2 Số giờ làm thêm: ghi từng lần làm thêm (ngày, số giờ) giống đi trễ; tổng ≤ otMax giờ = đủ điểm, vượt = 0 điểm */
@@ -280,7 +280,7 @@ function kpiFrames(e,y,mm,st){
       ${mg?`<form class="cmpf" data-submit="nc-add" ${dA}><input type="hidden" name="k" value="${k}">${dateIn}<input class="in" name="note" required maxlength="200" placeholder="Nội dung lỗi" aria-label="Nội dung lỗi ${esc(ttl)}"><button class="btn sm">＋ Thêm lỗi</button></form>`:''}</div>`};
   const bonusBox=(list,act,add,ttl,sub,pts,max,ph)=>`<div class="cmpc"><div class="cmph"><span>${ttl} <small class="muted">${sub}</small></span><b class="${pts?'pos':''}">${fmtK(pts)} / ${max}</b></div>
       ${entryChips(list,act,mg,dA,ttl.toLowerCase())||'<div class="chips"><span class="muted">Chưa có.</span></div>'}
-      ${mg?`<form class="cmpf" data-submit="${add}" ${dA}>${dateIn}<input class="in" name="note" required maxlength="200" placeholder="${ph}" aria-label="Nội dung"><button class="btn sm">＋ Thêm</button></form>`:''}</div>`;
+      ${mg?`<form class="cmpf" data-submit="${add}" ${dA}>${add==='moc-add'?'':dateIn}<input class="in" name="note" required maxlength="200" placeholder="${ph}" aria-label="Nội dung"><button class="btn sm">＋ Thêm</button></form>`:''}</div>`;
   const wSum=hasKc?r2(st.kri.filter(o=>!o.off).reduce((a,o)=>a+o.w,0)):P.userStd;
   return `<section class="kf kf20"><div class="kfh"><h4>Work A · Tuân thủ</h4><span class="kfs"><b>${fmtK(st.p20)}</b> / ${fmtK(st.aMax)}</span></div>
     <div class="kfsub"><div class="kfsh"><b>A.1 · Thái độ &amp; Tuân thủ nội quy và quy định</b><span class="muted">${P.compMax} điểm, trừ ${fmtK(P.ncPen)} mỗi lần lỗi (đi trễ, lỗi NC Safety, lỗi NC Audit); không lỗi thì giữ nguyên</span><span class="kfs sm">${fmtK(st.pComp)} / ${P.compMax}</span></div>
@@ -351,7 +351,7 @@ ACT['late-x']=el=>{if(confirm('Bỏ ngày đi trễ này?'))cmpEdit(el,m=>{m.lat
 ACT['nc-x']=el=>{if(confirm('Bỏ lỗi NC này?'))cmpEdit(el,m=>{m.nc=(m.nc||[]).filter(x=>x.id!==el.dataset.id)})};
 /* Work C · Điểm thưởng: hỗ trợ việc phát sinh, sáng kiến MOC (quản lý nhập) */
 const bonusAdd=(key,lb,pts)=>form=>{const d=fd(form);if(!String(d.note||'').trim())return toast('Nhập nội dung.','error');
-  cmpEdit(form,m=>{(m[key]=m[key]||[]).push({id:uid(key),d:d.d,note:d.note.trim(),by:session?.name||'',at:todayStr()})})&&(toast('Đã ghi '+lb),notifyEmp(form.dataset.e,{ic:'🎁',title:'Điểm thưởng: '+lb,body:`Ngày ${fmtDate(d.d)}: ${d.note.trim()}`,e:form.dataset.e,y:form.dataset.y,mm:form.dataset.mm}))};
+  cmpEdit(form,m=>{const o={id:uid(key),note:d.note.trim(),by:session?.name||'',at:todayStr()};if(d.d)o.d=d.d;(m[key]=m[key]||[]).push(o)})&&(toast('Đã ghi '+lb),notifyEmp(form.dataset.e,{ic:'🎁',title:'Điểm thưởng: '+lb,body:`${d.d?'Ngày '+fmtDate(d.d)+': ':''}${d.note.trim()}`,e:form.dataset.e,y:form.dataset.y,mm:form.dataset.mm}))};
 SUB['ga-add']=bonusAdd('ga','hỗ trợ việc phát sinh');SUB['moc-add']=bonusAdd('moc','sáng kiến MOC');
 ACT['ga-x']=el=>{if(confirm('Bỏ dòng này?'))cmpEdit(el,m=>{m.ga=(m.ga||[]).filter(x=>x.id!==el.dataset.id)})};
 ACT['moc-x']=el=>{if(confirm('Bỏ dòng này?'))cmpEdit(el,m=>{m.moc=(m.moc||[]).filter(x=>x.id!==el.dataset.id)})};
