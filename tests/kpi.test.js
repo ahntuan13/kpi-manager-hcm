@@ -332,3 +332,15 @@ test('Những công việc khác: không tính ở Work B (thuộc Work C · Qu�
   assert.equal(run("isOtherTxt({text:'Các công việc khác được giao'})"),true);assert.equal(run("isOtherTxt({text:'Kiểm tra công việc khác phòng'})"),false);
   assert.equal(run("isOtherTxt({text:'Những việc khác'})"),false);assert.equal(run("isOtherTxt({text:'Other: hỗ trợ việc ngoài giờ'})"),false);
 });
+
+test('Work A nhập số: A.1 số lần lỗi, A.2 số giờ làm thêm',()=>{
+  run(`db.company.kpi2={since:'2026-10'}`);
+  ctx.KC={rows:[{id:'b',no:'1',text:'L&D',w:40,src:'tasks'}]};
+  const s=M=>{ctx.M={tasks:[task('t1',5,'b')],...M};const o=run('monthStats(M,"2026-10",KC)');return [o.pComp,o.pOt,o.p20]};
+  assert.deepEqual(s({}),[10,10,20]);
+  assert.deepEqual(s({a1Err:3,otH:9.5}),[7,10,17]);
+  assert.deepEqual(s({a1Err:12,otH:10.5}),[0,0,0]);
+  assert.deepEqual(s({late:[{id:'l',d:'2026-10-02'}],nc:[{id:'n',d:'2026-10-03'}]}),[8,10,18]);   /* tháng cũ ghi từng lần: vẫn đếm */
+  assert.deepEqual(s({late:[{id:'l',d:'2026-10-02'}],a1Err:0}),[10,10,20]);   /* đã nhập số thì dùng số */
+  assert.deepEqual(s({ot:[{id:'o',d:'2026-10-02',h:12}],otH:4}),[10,10,20]);
+});

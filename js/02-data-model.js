@@ -160,12 +160,15 @@ function monthStats(m,ym,kc){
     st.lock=m&&m.lock||null;
     st.lateList=[...((m&&m.late)||[])].sort((a,b)=>a.d<b.d?-1:1);st.ncList=[...((m&&m.nc)||[])].sort((a,b)=>a.d<b.d?-1:1);
     /* Work A – A.1 Tuân thủ: compMax, trừ mỗi lần đi trễ / lỗi NC */
-    st.pComp=Math.max(0,P.compMax-P.latePen*st.lateList.length-P.ncPen*st.ncList.length);
+    /* A.1: quản lý nhập số lần lỗi trong tháng (m.a1Err); tháng cũ chưa nhập số thì đếm các lần đi trễ / lỗi NC đã ghi */
+    const nOk=v=>v!=null&&v!==''&&isFinite(+v);
+    st.a1Err=nOk(m&&m.a1Err)?Math.max(0,+m.a1Err):st.lateList.length+st.ncList.length;st.a1Set=nOk(m&&m.a1Err);
+    st.pComp=Math.max(0,P.compMax-P.ncPen*st.a1Err);
     /* Work A – A.2 Số giờ làm thêm: mục "Số giờ làm thêm … không vượt quá" của danh mục chuyển lên đây (giữ trọng số của mục).
        Tổng giờ trong tháng ≤ otMax = đủ điểm, vượt = 0 điểm */
     const all=kc?((kc.rows)||[]).filter(r=>r.w!=null&&+r.w>0):[],otRow=all.find(isOtRow)||null,res0=(m&&m.kri)||{};
     st.otList=[...((m&&m.ot)||[])].sort((a,b)=>a.d<b.d?-1:1);st.otRow=otRow;st.otW=+P.otPts;   /* cố định cho mọi nhân viên */
-    {const v0=otRow&&res0[otRow.id];st.otH=r2(st.otList.length?st.otList.reduce((a,x)=>a+(+x.h||0),0):v0&&v0.r!=null&&v0.r!==''&&isFinite(+v0.r)?+v0.r:0);st.otOld=!st.otList.length&&!!st.otH}   /* tháng cũ nhập tổng giờ ở ô Kết quả: vẫn dùng */
+    {const v0=otRow&&res0[otRow.id];st.otSet=nOk(m&&m.otH);st.otH=r2(st.otSet?Math.max(0,+m.otH):st.otList.length?st.otList.reduce((a,x)=>a+(+x.h||0),0):v0&&v0.r!=null&&v0.r!==''&&isFinite(+v0.r)?+v0.r:0);st.otOld=false}   /* tháng cũ nhập tổng giờ ở ô Kết quả: vẫn dùng */
     st.otOver=st.otH>P.otMax;st.pOt=st.otOver?0:st.otW;
     st.p20=r2(st.pComp+st.pOt);st.aMax=P.compMax+st.otW;
     /* Work B – KRI theo danh mục chỉ tiêu (không gồm mục giờ làm thêm) */
@@ -195,7 +198,7 @@ function monthStats(m,ym,kc){
     /* Work C – Quản lý giao việc: quản lý tự chấm 0 – mgrMax (chưa chấm = 0) */
     st.mgrPts=m&&m.mgrPts!=null&&m.mgrPts!==''&&isFinite(+m.mgrPts)?Math.min(P.mgrMax,Math.max(0,+m.mgrPts)):null;st.pMgr=st.mgrPts||0;
     st.p3=r2(Math.min(P.cCap,st.pGa+st.pMoc+st.pMgr));st.cMax=P.cCap;   /* Work C tổng tối đa cCap */
-    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||(m&&m.mgrPts!=null&&m.mgrPts!=='')||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
+    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||nOk(m&&m.a1Err)||nOk(m&&m.otH)||(m&&m.mgrPts!=null&&m.mgrPts!=='')||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
     if(live||st.counted)st.kpi=cap(st.p80+st.p20+st.p3);
     if(live||st.counted+st.pending)st.self=cap(k2Self+st.p20+st.p3);
   }else{
