@@ -138,7 +138,7 @@ test('ktSave: chỉ tiêu KPI bắt buộc với việc mới / khi nhân viên 
   assert.equal(run("by(sheetOf('e6',2026).months['10'].tasks,'old').kpi"),'k_mo_coi');   /* id cũ (lạ) không bị xoá, nhập lại danh mục vẫn gắn lại được */
 });
 
-test('Gắn chỉ tiêu ngay trên bảng: được cả với việc đã Duyệt chưa gắn, không đổi điểm / duyệt; nhân viên không đổi việc đã Duyệt đã gắn',()=>{
+test('Gắn chỉ tiêu ngay trên bảng: được cả với việc đã Duyệt, không đổi duyệt; chỉ khoá khi quản lý đã chốt điểm tháng',()=>{
   const fire=(id,val)=>ctx.ACT['kpi-set']({dataset:{e:'e6',y:'2026',mm:'10',id},parentElement:{querySelector:s=>s==='select[data-kpi]'?{value:val}:null}});   /* bấm nút Gắn */
   run(`session={role:'staff',empId:'e6',name:'E'};sheetOf('e6',2026).months['10'].tasks.push({id:'ap',title:'Đã duyệt',weight:4,deadline:'2026-10-06',submitted:'2026-10-06',approval:'Duyệt',note:''})`);
   const p0=run("monthStats(sheetOf('e6',2026).months['10'],'2026-10').p80");
@@ -147,7 +147,11 @@ test('Gắn chỉ tiêu ngay trên bảng: được cả với việc đã Duy�
   assert.equal(run("by(sheetOf('e6',2026).months['10'].tasks,'ap').approval"),'Duyệt');
   assert.equal(run("monthStats(sheetOf('e6',2026).months['10'],'2026-10').p80"),p0);
   run("sheetOf('e6',2026).kpi.rows.push({id:'b',no:'2',text:'Khác',w:5})");fire('ap','b');
-  assert.equal(run("by(sheetOf('e6',2026).months['10'].tasks,'ap').kpi"),'a');   /* đã Duyệt + đã có chỉ tiêu: nhân viên không đổi được */
+  assert.equal(run("by(sheetOf('e6',2026).months['10'].tasks,'ap').kpi"),'b');   /* nhân viên chỉnh lại mục khi gắn nhầm, vẫn giữ Duyệt */
+  assert.equal(run("by(sheetOf('e6',2026).months['10'].tasks,'ap').approval"),'Duyệt');
+  run("sheetOf('e6',2026).months['10'].lock={by:'Q',at:'2026-10-31'}");fire('ap','a');
+  assert.equal(run("by(sheetOf('e6',2026).months['10'].tasks,'ap').kpi"),'b');   /* tháng đã chốt điểm: nhân viên không đổi được */
+  run("delete sheetOf('e6',2026).months['10'].lock");
 });
 
 test('Bảng sửa danh mục: lưu không đổi gì thì không ghi; chèn dòng giữ id các dòng khác; trọng số sai báo ngay tại ô',()=>{

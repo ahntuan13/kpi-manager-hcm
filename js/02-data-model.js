@@ -320,7 +320,8 @@ const isStaff=()=>session?.role==='staff';
 const mine=e=>!isStaff()||(!!e&&e.id===session.empId);
 const canSheet=empId=>can('manage')||(isStaff()&&!!empId&&empId===session.empId);
 const approved=t=>apOf(t)==='ok';
-const canTask=(empId,t)=>can('manage')||(canSheet(empId)&&!approved(t));
+/* nhân viên sửa được việc của mình kể cả đã Duyệt (để chỉnh lại khi nhập sai); chỉ khoá khi quản lý đã Chốt điểm tháng */
+const canTask=(empId,t,lk)=>can('manage')||(canSheet(empId)&&!lk);
 const canDelTask=(empId,t)=>can('manage')||(canSheet(empId)&&t&&!t.submitted&&!t.approval&&!byMgr(t));   /* việc By Manager: nhân viên không xoá được */
 const empHref=e=>isStaff()?'#/dash/me':'#/emp/'+e.id;
 const homeHash=()=>isStaff()?'dash/me':'dash/overview';

@@ -213,7 +213,7 @@ function monthTable(e,y,mm,st,opt={}){
     {h:'Ghi chú / Link',c:'ntc',f:r=>{const fs=filesOf(r.t);return r.t.note||fs.length?`<button type="button" class="ntb" data-act="note-view" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" title="Xem ghi chú / file bằng chứng${fs.length?' ('+fs.length+' file)':''}" aria-label="Xem ghi chú việc ${r.i+1}">${fs.length?'📎':'📄'}${fs.length?`<em class="ntn">${fs.length}</em>`:''}</button><span class="ntp" hidden>${linkify(r.t.note||'')}${fs.length?`${r.t.note?'\n':''}📎 ${fs.map(f=>esc(f.name)).join(', ')}`:''}</span>`:''},x:r=>[r.t.note||'',...filesOf(r.t).map(f=>f.url)].filter(Boolean).join('\n')},
     {h:'Comment by Manager',c:'mcc',f:r=>mcCell(e,y,mm,r),x:mcX},
     Object.assign(actCol(r=>!w?'':r.sc.state==='moved'?`<button class="btn sm" data-act="kt-undo" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" aria-label="Hoàn tác chuyển việc ${r.i+1}">Hoàn tác</button>`
-      :canTask(e.id,r.t)?`<button class="btn sm" data-act="kt-edit" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" aria-label="Sửa việc ${r.i+1}">Sửa</button>`:'<span class="muted" title="Việc đã được quản lý Duyệt, chỉ quản lý sửa được">Đã duyệt</span>'),
+      :canTask(e.id,r.t,st.lock)?`<button class="btn sm" data-act="kt-edit" data-e="${e.id}" data-y="${y}" data-mm="${mm}" data-id="${r.t.id}" aria-label="Sửa việc ${r.i+1}">Sửa</button>`:'<span class="muted" title="Quản lý đã chốt điểm tháng này, chỉ quản lý sửa được">Đã chốt</span>'),
       /* dòng mục I / nhóm / tiêu đề / chỉ tiêu: quản lý sửa ngay dòng đó */
       {hf:h=>!mg||h.lv==='none'?'':`<button class="btn sm" data-act="kc-row" data-e="${e.id}" data-y="${y}" data-id="${esc(h.lv==='sec'?'':h.lv==='line'?h.row.id:h.id)}" aria-label="${esc('Sửa '+(h.lv==='sec'?'mục I':kpiLabel(h.lv==='line'?h.row.text:h.text)))}">Sửa</button>`})
   ].filter(Boolean);
@@ -486,7 +486,7 @@ ACT['kpi-set']=el=>{
   if(transact(()=>{const sh=sheetOf(e,y),t=sh&&by(sh.months[mm].tasks,id),k=kpiOf(e,y);
     if(!t||byMgr(t))throw new Error('Việc này không còn tồn tại.');
     if(!kpiHas(k,v))throw new Error('Chỉ tiêu này không còn trong danh mục.');
-    if(kpiHas(k,t.kpi)&&!canTask(e,t))throw new Error('Việc đã được Duyệt và đã có chỉ tiêu KPI; nhờ quản lý đổi nếu cần.');
+    if(kpiHas(k,t.kpi)&&!canTask(e,t,sh.months[mm].lock))throw new Error('Quản lý đã chốt điểm tháng này; nhờ quản lý đổi nếu cần.');
     t.kpi=v;sh.updatedAt=todayStr()})){ui.kjust=id;refreshTbl();toast('Đã gắn chỉ tiêu KPI');kpiJust()}else refreshTbl();
 };
 /* việc vừa gắn chỉ tiêu chuyển lên dòng chỉ tiêu của nó: cuộn tới, giữ con trỏ bàn phím ở dòng đó, hiện dấu "vừa chuyển" một lần */
@@ -511,7 +511,7 @@ function taskForm(empId,y,mm,id,opt={}){
   if(!t)return toast('Việc này không còn tồn tại.','error');
   if(assign&&!can('manage'))return toast('Chỉ quản lý được giao việc.','error');
   const ap=apOf(t),mg=can('manage'),legacy=!!id&&!wOk(+t.weight),nx=nextOf(y,mm),nxL=mLbl(nx.mm,nx.year,y),mv=!!id&&canSheet(empId)&&canCarry(t,scoreTask(t));
-  if(!assign&&!canTask(empId,id?t:null))return toast(canSheet(empId)?'Việc đã được quản lý Duyệt, chỉ quản lý sửa được.':'Bạn không có quyền sửa việc này.','error');
+  if(!assign&&!canTask(empId,id?t:null,sh&&sh.months[mm].lock))return toast(canSheet(empId)?'Quản lý đã chốt điểm tháng này, chỉ quản lý sửa được.':'Bạn không có quyền sửa việc này.','error');
   const g=grpOfT(t),glock=!mg&&!!(g&&g.locked),lock=!mg&&byMgr(t)||glock,c=mcOf(t),tg=tagsOf(t);
   const dlock=lock||(!mg&&!!id&&!!t.deadline);
   /* Khung 2: việc By User chọn chỉ tiêu KPI theo danh mục; bắt buộc với việc mới và khi nhân viên lưu (quản lý sửa việc cũ thì không bắt buộc) */
@@ -585,7 +585,7 @@ function ktSave(form){
   }
   const cur=id?by((sheetOf(e,y)||{months:{[mm]:{tasks:[]}}}).months[mm].tasks,id):null,g0=grpOfT(cur);
   if(id&&!cur)return fail('Việc này không còn tồn tại. Hãy đóng hộp thoại và thử lại.');
-  if(!assign&&!canTask(e,cur))return fail('Bạn không có quyền sửa việc này.');
+  if(!assign&&!canTask(e,cur,(sheetOf(e,y)||{months:{}}).months[mm]?.lock))return fail(canSheet(e)?'Quản lý đã chốt điểm tháng này, chỉ quản lý sửa được.':'Bạn không có quyền sửa việc này.');
   if(!mg&&byMgr(cur)){d.title=cur.title;d.deadline=cur.deadline||null}
   if(!mg&&cur&&cur.deadline)d.deadline=cur.deadline;   /* deadline đã khoá với nhân viên */
   if(!mg&&g0&&g0.locked){d.title=g0.title||cur.title;d.submitted=g0.submitted||null;if(!cur.carriedFrom)d.deadline=g0.deadline||null}
@@ -603,7 +603,9 @@ function ktSave(form){
         t.approval=d.approval;if(d.tags.length)t.tags=d.tags;else delete t.tags;
         /* Comment by Manager: quản lý ghi bất cứ lúc nào; sửa nội dung = comment mới; xoá trống = bỏ comment */
         const c=mcOf(t);if(d.mc){if(!c||c.text!==d.mc)t.mgrComment=mcNew(d.mc)}else if(c)delete t.mgrComment;
-      }else{if(apOf(t)==='recheck'&&t.mgrComment)t.mgrComment.done=true;t.approval=''}};   /* nhân viên cập nhật lại việc Re-check → về Chờ duyệt, comment của quản lý mờ và gạch đi */
+      }else{const a0=apOf(t);if(a0==='recheck'&&t.mgrComment)t.mgrComment.done=true;
+        /* việc đã Duyệt / Routine: nhân viên chỉ sửa nội dung, mục, ghi chú thì giữ duyệt; đổi ngày hoàn thành (ảnh hưởng đúng hạn / trễ) thì về Chờ duyệt */
+        if(!((a0==='ok'||a0==='routine')&&cur&&(cur.submitted||null)===(d.submitted||null)))t.approval=''}};   /* nhân viên cập nhật lại việc Re-check → về Chờ duyệt, comment của quản lý mờ và gạch đi */
     if(assign){
       /* giao cho nhiều người: mỗi người một bản việc, cùng một nhóm làm chung */
       const g=targets.length>1?newGroup({title:d.title,deadline:d.deadline,submitted:d.submitted,members:targets,y,mm,by:'manager'}):null;
