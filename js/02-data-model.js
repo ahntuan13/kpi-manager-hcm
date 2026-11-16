@@ -162,10 +162,10 @@ function monthStats(m,ym,kc){
     /* Work A – A.1 Tuân thủ: compMax, trừ mỗi lần đi trễ / lỗi NC */
     /* A.1: quản lý nhập số lần lỗi trong tháng (m.a1Err); tháng cũ chưa nhập số thì đếm các lần đi trễ / lỗi NC đã ghi */
     const nOk=v=>v!=null&&v!==''&&isFinite(+v);
-    /* A.1 chia 3 ô: đi trễ, vi phạm nội quy, lỗi NC Safety / Audit — mỗi ô quản lý nhập số lần; ô chưa nhập thì đếm các lần đã ghi trước đây */
-    const nv=k=>nOk(m&&m[k])?Math.max(0,+m[k]):null;
-    st.a1={late:nv('a1Late')??st.lateList.length,rule:nv('a1Rule')??(nOk(m&&m.a1Err)?Math.max(0,+m.a1Err):0),nc:nv('a1Nc')??st.ncList.length};
-    st.a1Err=st.a1.late+st.a1.rule+st.a1.nc;
+    /* A.1 chia 3 ô: Đi trễ, Lỗi NC Safety, Lỗi NC Audit — mỗi ô quản lý nhập số lần; ô chưa nhập thì đếm các lần đã ghi trước đây */
+    const nv=k=>nOk(m&&m[k])?Math.max(0,+m[k]):null,ncK=ks=>st.ncList.filter(x=>ks.includes(x.k||'audit')).length;
+    st.a1={late:nv('a1Late')??st.lateList.length,safe:nv('a1Safe')??ncK(['safety']),audit:nv('a1Audit')??ncK(['audit','iso'])};
+    st.a1Err=st.a1.late+st.a1.safe+st.a1.audit;
     st.pComp=Math.max(0,P.compMax-P.ncPen*st.a1Err);
     /* Work A – A.2 Số giờ làm thêm: mục "Số giờ làm thêm … không vượt quá" của danh mục chuyển lên đây (giữ trọng số của mục).
        Tổng giờ trong tháng ≤ otMax = đủ điểm, vượt = 0 điểm */
@@ -201,7 +201,7 @@ function monthStats(m,ym,kc){
     /* Work C – Quản lý giao việc: quản lý tự chấm 0 – mgrMax (chưa chấm = 0) */
     st.mgrPts=m&&m.mgrPts!=null&&m.mgrPts!==''&&isFinite(+m.mgrPts)?Math.min(P.mgrMax,Math.max(0,+m.mgrPts)):null;st.pMgr=st.mgrPts||0;
     st.p3=r2(Math.min(P.cCap,st.pGa+st.pMoc+st.pMgr));st.cMax=P.cCap;   /* Work C tổng tối đa cCap */
-    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||['a1Err','a1Late','a1Rule','a1Nc','otH'].some(k=>nOk(m&&m[k]))||(m&&m.mgrPts!=null&&m.mgrPts!=='')||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
+    const live=lines.length&&(st.n||st.lateList.length||st.ncList.length||st.gaList.length||st.mocList.length||Object.keys((m&&m.kri)||{}).length||((m&&m.ot)||[]).length||['a1Late','a1Safe','a1Audit','otH'].some(k=>nOk(m&&m[k]))||(m&&m.mgrPts!=null&&m.mgrPts!=='')||(ym&&ym<=todayStr().slice(0,7)));   /* tháng chưa tới, chưa có gì: chưa có điểm */
     if(live||st.counted)st.kpi=cap(st.p80+st.p20+st.p3);
     if(live||st.counted+st.pending)st.self=cap(k2Self+st.p20+st.p3);
   }else{
