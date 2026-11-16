@@ -513,7 +513,7 @@ function taskForm(empId,y,mm,id,opt={}){
   const ap=apOf(t),mg=can('manage'),legacy=!!id&&!wOk(+t.weight),nx=nextOf(y,mm),nxL=mLbl(nx.mm,nx.year,y),mv=!!id&&canSheet(empId)&&canCarry(t,scoreTask(t));
   if(!assign&&!canTask(empId,id?t:null,sh&&sh.months[mm].lock))return toast(canSheet(empId)?'Quản lý đã chốt điểm tháng này, chỉ quản lý sửa được.':'Bạn không có quyền sửa việc này.','error');
   const g=grpOfT(t),glock=!mg&&!!(g&&g.locked),lock=!mg&&byMgr(t)||glock,c=mcOf(t),tg=tagsOf(t);
-  const dlock=lock||(!mg&&!!id&&!!t.deadline);
+  const dself=!mg&&byMgr(t)&&(!t.deadline||!!t.dlSelf),dlock=glock||(!mg&&!!id&&!!t.deadline&&!dself);   /* việc quản lý giao: quản lý để trống deadline thì nhân viên tự nhập / sửa để theo dõi */
   /* Khung 2: việc By User chọn chỉ tiêu KPI theo danh mục; bắt buộc với việc mới và khi nhân viên lưu (quản lý sửa việc cũ thì không bắt buộc) */
   const kc=!assign&&!byMgr(t)&&isV2(`${y}-${mm}`)&&empId?kpiOf(empId,y):null,kreq=kpiRows(kc).length>0&&(!mg||!id);
   const bmV2=(assign||byMgr(t))&&isV2(`${y}-${mm}`);   /* quy chế 80/20: việc quản lý giao tính điểm cố định, không cần trọng số */   /* deadline đã nhập thì nhân viên không đổi được nữa; cần dời thì nhờ quản lý */   /* việc By Manager / nhóm đã được duyệt: nhân viên không đổi nội dung, deadline */
@@ -534,7 +534,7 @@ function taskForm(empId,y,mm,id,opt={}){
     ${kpiRows(kc).length?`<label class="f full"><span>Mục Work B${kreq?' <i style="color:var(--bad);font-style:normal">*</i>':''} <small class="muted">(việc thuộc mục nào trong khung Work B)</small></span>${kpiSel(kc,t.kpi,kreq?'required':'')}<small class="muted" id="kt-rule"></small></label>`:''}
     ${kpiRows(kc).length?`<input type="hidden" name="weight" value="${esc(wOk(+t.weight)?t.weight:(t.weight||1))}">`:bmV2?`<div class="f"><span>Điểm</span><div class="hint">Việc quản lý giao: không dùng trọng số; điểm giao việc do quản lý chấm ở Work C (tối đa ${kpi2().mgrMax}).</div><input type="hidden" name="weight" value="${esc(wOk(+t.weight)?t.weight:(t.weight||1))}"></div>`:inp('weight',`Trọng số – nhân viên tự chấm (${W_MIN}–${W_MAX})`,t.weight,{type:'number',step:legacy?'any':'1',req:1,attrs:legacy?'':`min="${W_MIN}" max="${W_MAX}" inputmode="numeric"`})}${mg?sel('approval','Quản lý duyệt',[['','Chờ duyệt'],[AP_VAL.ok,'Duyệt – tính điểm vào KPI'],[AP_VAL.recheck,'Re-check – không tính điểm']],AP_VAL[ap]):`<div class="f"><span>Quản lý duyệt</span><div>${apBd(ap)}</div></div>`}
     ${legacy?`<p class="hint full">Trọng số đang lưu là ${esc(t.weight)}, nằm ngoài thang ${W_MIN}–${W_MAX}. Có thể giữ nguyên; nếu sửa, hãy nhập số nguyên từ ${W_MIN} đến ${W_MAX}.</p>`:''}
-    ${inp('deadline',dlock?'Deadline <small class="muted">🔒 đã khoá, cần dời thì nhờ quản lý</small>':`Deadline${!mg?' <small class="muted">(lưu xong sẽ khoá, không sửa được)</small>':''}`,t.deadline||'',{type:'date',attrs:dlock?'readonly aria-readonly="true"':''})}${inp('submitted',g?'Ngày hoàn thành <small class="muted">(áp dụng cho cả nhóm)</small>':'Ngày hoàn thành',t.submitted||'',{type:'date',attrs:glock?'readonly':''})}
+    ${inp('deadline',dlock?'Deadline <small class="muted">🔒 đã khoá, cần dời thì nhờ quản lý</small>':`Deadline${dself?' <small class="muted">(tự nhập để theo dõi việc được giao)</small>':!mg?' <small class="muted">(lưu xong sẽ khoá, không sửa được)</small>':''}`,t.deadline||'',{type:'date',attrs:dlock?'readonly aria-readonly="true"':''})}${inp('submitted',g?'Ngày hoàn thành <small class="muted">(áp dụng cho cả nhóm)</small>':'Ngày hoàn thành',t.submitted||'',{type:'date',attrs:glock?'readonly':''})}
     ${mateBlk}
     <div class="f full"><span>${kpiRows(kc).length?'Tình trạng':'Điểm (tự động tính)'}</span><div class="hint scp" id="kt-prev" aria-live="polite" ${kpiRows(kc).length?'data-err="1"':''}>–</div></div>
     ${txa('note','Ghi chú / Link bằng chứng <small class="muted">(nhân viên nhập)</small>',t.note||'',{full:1,rows:3})}
@@ -586,8 +586,9 @@ function ktSave(form){
   const cur=id?by((sheetOf(e,y)||{months:{[mm]:{tasks:[]}}}).months[mm].tasks,id):null,g0=grpOfT(cur);
   if(id&&!cur)return fail('Việc này không còn tồn tại. Hãy đóng hộp thoại và thử lại.');
   if(!assign&&!canTask(e,cur,(sheetOf(e,y)||{months:{}}).months[mm]?.lock))return fail(canSheet(e)?'Quản lý đã chốt điểm tháng này, chỉ quản lý sửa được.':'Bạn không có quyền sửa việc này.');
-  if(!mg&&byMgr(cur)){d.title=cur.title;d.deadline=cur.deadline||null}
-  if(!mg&&cur&&cur.deadline)d.deadline=cur.deadline;   /* deadline đã khoá với nhân viên */
+  const dSelf=!mg&&byMgr(cur)&&(!cur.deadline||!!cur.dlSelf);   /* việc quản lý giao, quản lý để trống deadline: nhân viên tự nhập / sửa */
+  if(!mg&&byMgr(cur)){d.title=cur.title;if(!dSelf)d.deadline=cur.deadline||null}
+  if(!mg&&cur&&cur.deadline&&!dSelf)d.deadline=cur.deadline;   /* deadline đã khoá với nhân viên */
   if(!mg&&g0&&g0.locked){d.title=g0.title||cur.title;d.submitted=g0.submitted||null;if(!cur.carriedFrom)d.deadline=g0.deadline||null}
   if(!d.title)return fail('Nhập nội dung công việc.');
   /* Khung 2: chỉ tiêu KPI bắt buộc với việc mới và khi nhân viên lưu; để trống thì giữ nguyên chỉ tiêu đang gắn (không xoá id cũ) */
@@ -612,7 +613,7 @@ function ktSave(form){
       targets.forEach((x,i)=>{const sh=sheetOf(x,y,true),t={id:uid('t'),by:'manager',byName:session?.name||'',byAt:todayStr()};fill(t);if(g)t.gid=g.id;sh.months[mm].tasks.push(t);sh.updatedAt=todayStr();if(!i)tid=t.id});
     }else{
       const sh=sheetOf(e,y,true),list=sh.months[mm].tasks;let t=id?by(list,id):null;if(!t){t={id:uid('t')};list.push(t);tid=t.id}
-      fill(t);
+      fill(t);if(dSelf){if(t.deadline)t.dlSelf=true;else delete t.dlSelf}else if(mg&&cur&&(cur.deadline||null)!==(d.deadline||null))delete t.dlSelf;   /* quản lý đặt lại deadline: khoá với nhân viên */
       let g=grpOfT(t);
       if(g){g.title=t.title;if(!t.carriedFrom)g.deadline=t.deadline||null;
         if((g.submitted||null)!==(t.submitted||null)){g.submitted=t.submitted||null;g.doneBy=t.submitted?{empId:e,name:nameOf(e)||session?.name||'',at:todayStr()}:null}}
