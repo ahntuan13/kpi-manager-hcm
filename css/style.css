@@ -1128,3 +1128,5 @@ select.in.aps.info{border-color:#a9c4ee;background-color:#eef4fd;color:#1e4f9a}
 .wbg.wbn{background:transparent;border:1px dashed var(--line)}
 .wbg.wbn .wbt small{display:block;margin-top:2px;font-weight:400}
 .anum{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 2px 2px}
+.anum.a1g{gap:10px 18px}
+.a1c{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff)}
