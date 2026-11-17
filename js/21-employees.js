@@ -80,7 +80,7 @@ function empPage(e){const P={t:e.name,sign:true,   /* bản in / PDF của trang
   },
   tbl(){
     e=empOf(e.id)||e;const f=F(),y=f.year,w=canSheet(e.id),mg=can('manage'),adm=can('admin'),sheet=sheetOf(e.id,y),ys=yearStats(sheet);
-    if(!MM.includes(f.mm)){const lp=ys.months.reduce((a,m,i)=>m.n?i:a,-1);f.mm=ys.last!=null?MM[ys.last]:(String(y)===curYear()?curMonth():lp>=0?MM[lp]:'01')}
+    if(!MM.includes(f.mm)){const lp=ys.months.reduce((a,m,i)=>m.n?i:a,-1);f.mm=String(y)===curYear()?curMonth():ys.last!=null?MM[ys.last]:lp>=0?MM[lp]:'01'   /* năm hiện tại: mở đúng tháng hiện tại */}
     f.mode=MODES[f.mode]?f.mode:'thang';
     const mm=f.mm,mi=+mm-1,st=ys.months[mi],nx=nextOf(y,mm),nxL=mLbl(nx.mm,nx.year,y),lq=ys.last!=null?Math.floor(ys.last/3):null;
     const comment=(sheet&&sheet.months[mm].comment)||'';

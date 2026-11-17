@@ -13,7 +13,7 @@
 'use strict';
 (self.__mods=self.__mods||[]).push('40-ppe');
 
-const SZ_CLOTH='S, M, L, XL, 2XL, 3XL',SZ_SHOE='36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46',SZ_GLOVE='S, M, L, XL';
+const SZ_CLOTH='S, M, L, XL, 2XL, 3XL, 4XL',SZ_SHOE='36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46',SZ_GLOVE='S, M, L, XL';
 const PITEM_DEF=[
   {id:'pi_helm',type:'ppe',name:'Mũ bảo hộ',en:'Helmet',unit:'Cái',sizes:'',ord:1},
   {id:'pi_harn',type:'ppe',name:'Dây an toàn',en:'Safety Belt',unit:'Bộ',sizes:'',ord:2},
@@ -24,7 +24,8 @@ const PITEM_DEF=[
   {id:'pi_vest',type:'ppe',name:'Áo phản quang',en:'Safety Vest',unit:'Cái',sizes:SZ_CLOTH,szKey:'shirt',ord:7},
   {id:'pi_uni',type:'uni',name:'Áo đồng phục',en:'Áo',unit:'Cái',sizes:SZ_CLOTH,szKey:'shirt',ord:11},
   {id:'pi_pant',type:'uni',name:'Quần đồng phục',en:'Quần',unit:'Cái',sizes:SZ_CLOTH,szKey:'pant',ord:12},
-  {id:'pi_ushoe',type:'uni',name:'Giày đồng phục',en:'Giày',unit:'Đôi',sizes:SZ_SHOE,szKey:'shoe',ord:13}
+  {id:'pi_ushoe',type:'uni',name:'Giày đồng phục',en:'Giày',unit:'Đôi',sizes:SZ_SHOE,szKey:'shoe',ord:13},
+  {id:'pi_jack',type:'uni',name:'Áo khoác đồng phục',en:'Áo khoác',unit:'Cái',sizes:SZ_CLOTH,szKey:'jacket',ord:14}
 ];
 const PTYPE={ppe:{icon:'⛑️',book:'PPE ALLOCATION BOOK',grp:'PPE',sub:'bảo hộ lao động'},
   uni:{icon:'👕',book:'PPE ALLOCATION · ĐỒNG PHỤC',grp:'Đồng phục',sub:'đồng phục'},
@@ -39,7 +40,7 @@ function pStock(){const m=new Map(),g=(id,sz)=>{const k=id+'|'+(sz||'');if(!m.ha
 const stockOf=(st,id)=>[...st.values()].filter(o=>o.id===id);
 const stockTxt=(st,id)=>{const rs=stockOf(st,id),t=rs.reduce((a,o)=>a+o.inn-o.out,0);return{t,inn:rs.reduce((a,o)=>a+o.inn,0),rcv:rs.reduce((a,o)=>a+o.rcv,0),ret:rs.reduce((a,o)=>a+o.ret,0),out:rs.reduce((a,o)=>a+o.out,0),
   sz:rs.filter(o=>o.sz&&(o.inn||o.out)).sort((a,b)=>{const it=pItem(id),ss=splitSz(it?.sizes);return ss.indexOf(a.sz)-ss.indexOf(b.sz)}).map(o=>`<span class="chip ${o.inn-o.out<0?'bad':''}">${esc(o.sz)}: <b>${o.inn-o.out}</b></span>`).join(' ')}};
-const SZK={shirt:'Size áo',pant:'Size quần',shoe:'Size giày',glove:'Size găng tay'};
+const SZK={shirt:'Size áo',pant:'Size quần',jacket:'Size áo khoác',shoe:'Size giày',glove:'Size găng tay'};
 const canPPE=()=>{if(!session){toast('Cần đăng nhập.','error');return false}return true};   /* mọi người dùng đều xem và nhập */
 const ppeSave=fn=>transact(()=>{if(!Array.isArray(db.ppe))db.ppe=[];fn()});
 const pDocs=k=>(db.ppe||[]).filter(x=>x.kind===k);
@@ -236,7 +237,7 @@ PAGES['ppe/cat']={t:'Danh mục PPE & đồng phục',
   sub(){return 'Dữ liệu dùng chung để nhập phiếu nhanh và đồng nhất'},
   head(){const f=F(),tab=f.tab||'emp',tb=(k,l)=>`<button class="btn ${tab===k?'primary':''}" data-act="pc-tab" data-k="${k}">${l}</button>`;
     return `<div class="bar">${tb('emp',`👷 Nhân viên (${pDocs('pemp').length})`)}${tb('org',`🏗 Dự án & phòng ban (${pProjs().length}/${pDepts().length})`)}${tb('item',`🦺 Vật tư PPE & đồng phục (${pItems().length})`)}</div>`+
-      (tab==='emp'?`<div class="bar">${fSearch('Tìm tên, mã NV…')}<label class="fl">Dự án ${fSel('proj','Dự án',projOptsP('Tất cả'))}</label><label class="fl">Phòng ban ${fSel('dept','Phòng ban',deptOptsP('Tất cả'))}</label><div class="sp"></div>${can('manage')&&pDocs('pemp').length?`<button class="btn danger" data-act="pe-delall" title="Xoá toàn bộ danh sách nhân viên để nhập lại (phiếu đã lập vẫn giữ tên, mã NV)">🗑 Xoá tất cả nhân viên</button>`:''}<button class="btn" data-act="pe-fromapp" title="Thêm các nhân viên đang có trong app (mã, tên, phòng ban)">⇩ Lấy từ danh sách NV của app</button><label class="btn" title="File Excel có các cột: Mã NV, Họ tên, Phòng ban, Dự án, Size áo, Size quần, Size giày, Size găng tay">⬆ Nhập Excel<input type="file" id="pe-file" accept=".xlsx,.xls,.csv" hidden></label><button class="btn primary" data-act="pe-edit">＋ Thêm nhân viên</button></div>`:'')},
+      (tab==='emp'?`<div class="bar">${fSearch('Tìm tên, mã NV…')}<label class="fl">Dự án ${fSel('proj','Dự án',projOptsP('Tất cả'))}</label><label class="fl">Phòng ban ${fSel('dept','Phòng ban',deptOptsP('Tất cả'))}</label><div class="sp"></div>${can('manage')&&pDocs('pemp').length?`<button class="btn danger" data-act="pe-delall" title="Xoá toàn bộ danh sách nhân viên để nhập lại (phiếu đã lập vẫn giữ tên, mã NV)">🗑 Xoá tất cả nhân viên</button>`:''}<button class="btn" data-act="pe-fromapp" title="Thêm các nhân viên đang có trong app (mã, tên, phòng ban)">⇩ Lấy từ danh sách NV của app</button><label class="btn" title="File Excel có các cột: Mã NV, Họ tên, Phòng ban, Dự án, Size áo, Size quần, Size giày, Size găng tay">⬆ Nhập Excel<input type="file" id="pe-file" accept=".xlsx,.xls,.csv" hidden></label><label class="btn" title="File “Danh sách đăng ký đồng phục”: cột Tên, Code, Site, Áo / Size, Quần / Size, Áo khoác / Size, Ghi chú và bảng TỔNG CỘNG theo size">👕 Nhập DS đồng phục<input type="file" id="pu-file" accept=".xlsx,.xls" hidden></label><button class="btn primary" data-act="pe-edit">＋ Thêm nhân viên</button></div>`:'')},
   tbl(){const f=F(),tab=f.tab||'emp';
     if(tab==='org')return `<div class="grid g2">${card(`Dự án <button class="btn sm primary" data-act="pp-edit" style="float:right">＋ Thêm dự án</button>`,miniTable(['Mã','Tên dự án','PIC','Trạng thái','Nhân viên','Phiếu',''],pProjs().map(p=>`<tr><td><b>${esc(p.code||'')}</b></td><td>${esc(p.name||'')}</td><td>${esc(p.pic||'')}</td><td>${p.status==='done'?badge('mute','Đã xong'):badge('ok','Đang chạy')}</td><td class="num">${pEmps().filter(e=>e.proj===p.id).length}</td><td class="num">${pSlips().filter(s=>s.proj===p.id).length}</td><td class="act"><button class="btn sm" data-act="pp-edit" data-id="${p.id}">Sửa</button></td></tr>`),'Chưa có dự án. Bấm “＋ Thêm dự án”.'))}
       ${card(`Phòng ban <button class="btn sm primary" data-act="pdp-add" style="float:right">＋ Thêm phòng ban</button>`,miniTable(['Phòng ban','Nhân viên','Phiếu',''],pDepts().map(d=>{const doc=pDocs('dept').find(x=>x.name===d);return `<tr><td><b>${esc(d)}</b></td><td class="num">${pEmps().filter(e=>e.dept===d).length}</td><td class="num">${pSlips().filter(s=>s.dept===d).length}</td><td class="act">${doc?`<button class="btn sm" data-act="pdp-del" data-id="${doc.id}">Xoá</button>`:'<small class="muted">từ hồ sơ NV</small>'}</td></tr>`}),'Chưa có phòng ban.'))}</div>`;
@@ -249,6 +250,7 @@ PAGES['ppe/cat']={t:'Danh mục PPE & đồng phục',
       {h:'Phòng ban',f:e=>esc(e.dept||''),x:e=>e.dept||''},
       {h:'Dự án',f:e=>esc(projName(e.proj)||''),x:e=>projName(e.proj)},
       ...Object.entries(SZK).map(([k,l])=>({h:l,c:'c',f:e=>esc(e['sz_'+k]||'–'),x:e=>e['sz_'+k]||''})),
+      {h:'Đăng ký đồng phục',f:e=>e.uniReg?`<small>${[['ao','Áo'],['quan','Quần'],['khoac','Khoác']].filter(([k])=>+e.uniReg[k]).map(([k,l])=>`${l} ${e.uniReg[k]}`).join(' · ')||'–'}${e.uniReg.y?` <span class="muted">(${e.uniReg.y})</span>`:''}${e.uniReg.note?`<br><span class="muted">${esc(e.uniReg.note)}</span>`:''}</small>`:'<small class="muted">–</small>',x:e=>e.uniReg?`Áo ${e.uniReg.ao||0}, Quần ${e.uniReg.quan||0}, Khoác ${e.uniReg.khoac||0}${e.uniReg.note?' – '+e.uniReg.note:''}`:''},
       {h:'Lần cấp gần nhất',f:e=>{const s=pSlips().filter(s=>(s.lines||[]).some(l=>l.pid===e.id)).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];return s?`<small>${fmtDate(s.date)} · ${esc(s.no)}</small>`:'<small class="muted">–</small>'},x:e=>''},
       actCol(e=>`<button class="btn sm" data-act="pe-edit" data-id="${e.id}">Sửa</button>`)
     ],rows,{empty:'Chưa có nhân viên nào. Bấm “＋ Thêm nhân viên”, “Nhập Excel” hoặc “Lấy từ danh sách NV của app”.'})}};
@@ -357,6 +359,68 @@ document.addEventListener('input',ev=>{const el=ev.target;if(!RDRAFT||!el.closes
   if(el.dataset.rd){RDRAFT[el.dataset.rd]=el.value;return}
   if(el.dataset.rq){const [i,k]=el.dataset.rq.split('|'),l=RDRAFT.lines[+i];if(!l)return;l[k]=k==='n'?Math.max(0,+el.value||0):el.value;if(k==='item'){l.sz='';redrawR()}}});
 ACT['rd-new']=()=>{if(!canPPE())return;RDRAFT={no:'',reqDate:'',puDate:todayStr(),pr:'',note:'',lines:[{item:'pi_helm',sz:'',n:0,detail:''},{item:'pi_shoe',sz:'',n:0,detail:''},{item:'pi_uni',sz:'',n:0,detail:''}]};rerender()};
+/* ---------- nhập file “Danh sách đăng ký đồng phục” (chỉ đồng phục, không phải PPE) ----------
+   Bảng chính: No. · Tên · Code · Site · Áo · Size · Quần · Size · Áo khoác · Size · Ghi chú
+   Bảng phụ bên phải: TỔNG CỘNG (staff + dự phòng) theo size của Áo / Quần / Áo khoác → phiếu nhập kho đồng phục */
+const UNI_COLS=[['ao','pi_uni','shirt','Áo'],['quan','pi_pant','pant','Quần'],['khoac','pi_jack','jacket','Áo khoác']];
+const szNorm=v=>String(v??'').trim().toUpperCase().replace(/\s+/g,'').replace(/^XXL$/,'2XL').replace(/^XXXL$/,'3XL');
+const isSz=v=>/^([2-5]?XL|XS|S|M|L)$/.test(szNorm(v));
+function uniParse(aoa){const N=v=>norm(String(v??'')).trim();
+  const hi=aoa.findIndex(r=>r.some(c=>/^(ho )?ten$|^ho va ten$/.test(N(c)))&&r.some(c=>/^(code|ma nv|ma)$/.test(N(c))));
+  if(hi<0)throw new Error('Không thấy dòng tiêu đề có cột “Tên” và “Code”.');
+  const H=aoa[hi].map(N),col=re=>H.findIndex(h=>re.test(h));
+  const C={no:col(/^(no\.?|stt)$/),name:col(/^(ho )?ten$|^ho va ten$/),code:col(/^(code|ma nv|ma)$/),site:col(/^(site|du an|cong trinh)$/),note:col(/^ghi chu/),ao:col(/^ao$/),quan:col(/^quan$/),khoac:col(/^ao khoac$/)};
+  if(C.ao<0&&C.quan<0)throw new Error('Không thấy cột “Áo” / “Quần”.');
+  const emps=[];for(const r of aoa.slice(hi+1)){const name=String(r[C.name]??'').trim();if(!name)continue;if(C.no>=0&&!isFinite(parseFloat(r[C.no])))continue;
+    const e={name,code:C.code>=0?String(r[C.code]??'').trim():'',site:C.site>=0?String(r[C.site]??'').trim():'',note:C.note>=0?String(r[C.note]??'').trim():'',q:{},sz:{}};
+    UNI_COLS.forEach(([k])=>{if(C[k]<0)return;const n=parseFloat(r[C[k]])||0,sz=szNorm(r[C[k]+1]);if(n>0)e.q[k]=n;if(isSz(sz))e.sz[k]=sz});emps.push(e)}
+  /* bảng TỔNG CỘNG: nhãn ÁO / QUẦN / ÁO KHOÁC, dòng size, dòng số lượng */
+  const tot={};let ti=aoa.findIndex(r=>r.some(c=>N(c)==='tong cong'));
+  if(ti>=0)for(let i=ti+1;i<aoa.length&&i<ti+40;i++){const r=aoa[i];r.forEach((c,ci)=>{const k=N(c)==='ao'?'ao':N(c)==='quan'?'quan':N(c)==='ao khoac'?'khoac':null;if(!k||tot[k])return;
+      for(let j=i+1;j<=i+3&&j<aoa.length;j++){const sr=aoa[j];if(!isSz(sr[ci]))continue;const nr=aoa[j+1]||[],m={};for(let x=ci;x<ci+10&&x<sr.length;x++){if(!isSz(sr[x]))break;const n=parseFloat(nr[x])||0;if(n>0)m[szNorm(sr[x])]=n}tot[k]=m;break}})}
+  const fromEmp=!Object.keys(tot).length;if(fromEmp)emps.forEach(e=>UNI_COLS.forEach(([k])=>{if(e.q[k]&&e.sz[k]){(tot[k]=tot[k]||{})[e.sz[k]]=(tot[k][e.sz[k]]||0)+e.q[k]}}));
+  const yr=(String((aoa[0]||[]).join(' ')).match(/20\d\d/)||[])[0]||curYear();
+  return{emps,tot,fromEmp,yr}}
+let UNI_IMP=null;
+document.addEventListener('change',async ev=>{const el=ev.target;if(el.id!=='pu-file'||!el.files||!el.files[0])return;if(!canPPE())return;
+  if(!window.XLSX){toast('Chưa tải được thư viện Excel.','error');return}
+  try{const wb=XLSX.read(await el.files[0].arrayBuffer()),ws=wb.Sheets[wb.SheetNames[0]],aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    const u=uniParse(aoa);if(!u.emps.length)throw new Error('Không có dòng nhân viên nào.');UNI_IMP={...u,file:el.files[0].name};uniPreview()}
+  catch(e){toast('Không đọc được file: '+e.message,'error')}finally{el.value=''}});
+function uniPreview(){const u=UNI_IMP,ex=new Map(pDocs('pemp').filter(e=>e.code).map(e=>[norm(e.code),e])),byName=new Map(pDocs('pemp').map(e=>[norm(e.name),e]));
+  const upd=u.emps.filter(e=>(e.code&&ex.has(norm(e.code)))||(!e.code&&byName.has(norm(e.name)))).length,sites=[...new Set(u.emps.map(e=>e.site).filter(Boolean))],newP=sites.filter(s=>!pDocs('proj').some(p=>norm(p.code)===norm(s)||norm(p.name)===norm(s)));
+  const src='uni-'+u.yr,dup=pDocs('rcv').find(r=>r.src===src);
+  const szs=[...new Set(['S','M','L','XL','2XL','3XL','4XL',...Object.values(u.tot).flatMap(m=>Object.keys(m))])];
+  const stockRows=UNI_COLS.filter(([k])=>u.tot[k]).map(([k,,,l])=>`<tr><td><b>${l}</b></td>${szs.map(s=>`<td class="num">${u.tot[k][s]||''}</td>`).join('')}<td class="num"><b>${Object.values(u.tot[k]).reduce((a,b)=>a+b,0)}</b></td></tr>`).join('');
+  modal('Nhập danh sách đăng ký đồng phục',`<form id="mf" data-submit="uni-imp">
+    <p>File <b>${esc(u.file)}</b> · năm ${esc(u.yr)} · chỉ đồng phục (không phải PPE).</p>
+    <ul style="margin:6px 0 0;padding-left:18px;line-height:1.7"><li><b>${u.emps.length}</b> nhân viên: thêm mới <b>${u.emps.length-upd}</b>, cập nhật <b>${upd}</b> (mã, tên, dự án theo cột Site, size áo / quần / áo khoác, số lượng đăng ký, ghi chú)</li>
+      <li><b>${sites.length}</b> dự án (Site)${newP.length?`, tạo mới <b>${newP.length}</b>: ${newP.map(esc).join(', ')}`:''}</li></ul>
+    ${(()=>{const c={};u.emps.forEach(e=>{if(e.code)(c[norm(e.code)]=c[norm(e.code)]||[]).push(e)});const dd=Object.values(c).filter(x=>x.length>1),nc=u.emps.filter(e=>!e.code);
+      return dd.length||nc.length?`<p class="note tag-warn">${dd.map(x=>`Mã ${esc(x[0].code)} trùng ${x.length} dòng (${x.map(e=>esc(e.name+' – '+e.site)).join('; ')}): chỉ giữ dòng cuối.`).join(' ')}${nc.length?` ${nc.length} dòng không có mã NV (${nc.map(e=>esc(e.name)).join(', ')}): ghép theo tên.`:''}</p>`:''})()}
+    <h4 style="margin:12px 0 6px">Tồn kho: ${u.fromEmp?'tổng theo số lượng đăng ký của nhân viên':'bảng TỔNG CỘNG (staff + dự phòng)'}</h4>
+    <div class="tblw"><table class="t"><thead><tr><th>Đồng phục</th>${szs.map(s=>`<th class="num">${s}</th>`).join('')}<th class="num">Tổng</th></tr></thead><tbody>${stockRows||`<tr><td colspan="${szs.length+2}" class="muted">Không có số lượng.</td></tr>`}</tbody></table></div>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" name="rcv" ${dup?'':'checked'} ${stockRows?'':'disabled'}> Tạo phiếu nhập kho đồng phục theo bảng trên</label>
+    ${dup?`<p class="note tag-warn">Đã có phiếu nhập ${esc(dup.no)} từ danh sách đồng phục ${esc(u.yr)}. Chỉ tick nếu muốn nhập kho thêm lần nữa.</p>`:''}
+    <div class="fg">${inp('date','Ngày nhập kho (PU giao)',todayStr(),{type:'date',req:1})}${inp('pr','Số PR / PO (nếu có)','',{})}</div>
+  </form>`,{size:'mid',footer:`<button class="btn" data-act="close">Huỷ</button><button class="btn primary" form="mf">Nhập vào Danh mục</button>`})}
+SUB['uni-imp']=form=>{if(!canPPE()||!UNI_IMP)return;const d=fd(form),u=UNI_IMP;
+  if(d.rcv&&!/^\d{4}-\d{2}-\d{2}$/.test(d.date||''))return toast('Chọn ngày nhập kho.','error');
+  let add=0,upd=0,no='',rid='';
+  const ok=ppeSave(()=>{
+    /* vật tư đồng phục: thêm size còn thiếu (VD 4XL) */
+    UNI_COLS.forEach(([k,id])=>{const sz=[...new Set([...Object.keys(u.tot[k]||{}),...u.emps.map(e=>e.sz[k]).filter(Boolean)])];const it=pItem(id);if(!it)return;const have=splitSz(it.sizes),miss=sz.filter(s=>!have.includes(s));
+      if(miss.length){const x=db.ppe.find(z=>z.id===id),sizes=[...have,...miss].join(', ');if(x){x.sizes=sizes;delete x.deleted}else db.ppe.push({id,kind:'item',sizes})}
+      else{const x=db.ppe.find(z=>z.id===id&&z.deleted);if(x&&(u.tot[k]||u.emps.some(e=>e.q[k])))delete x.deleted}});
+    const projOf=s=>{if(!s)return '';const p=pDocs('proj').find(p=>norm(p.code)===norm(s)||norm(p.name)===norm(s));if(p)return p.id;const id=uid('pj');db.ppe.push({id,kind:'proj',code:s,name:s,pic:'',status:'run'});return id};
+    u.emps.forEach(e=>{const v={code:e.code,name:e.name,proj:projOf(e.site),active:true,uniReg:{y:u.yr,ao:e.q.ao||0,quan:e.q.quan||0,khoac:e.q.khoac||0,note:e.note||''}};
+      UNI_COLS.forEach(([k,,sk])=>{if(e.sz[k])v['sz_'+sk]=e.sz[k]});
+      const x=db.ppe.find(z=>z.kind==='pemp'&&(e.code?norm(z.code)===norm(e.code):norm(z.name)===norm(e.name)));
+      if(x){Object.keys(v).forEach(k=>{if(v[k]!==''&&v[k]!=null)x[k]=v[k]});upd++}else{db.ppe.push({id:uid('pe'),kind:'pemp',dept:'',...v});add++}});
+    if(d.rcv){const lines=UNI_COLS.flatMap(([k,id])=>Object.entries(u.tot[k]||{}).map(([sz,n])=>({item:id,sz,n:+n,detail:''})));
+      if(lines.length){no=nextNo('NK',d.date);rid=uid('rc');db.ppe.push({id:rid,kind:'rcv',no,src:'uni-'+u.yr,reqDate:'',puDate:d.date,pr:String(d.pr||'').trim(),note:`Đồng phục ${u.yr} theo danh sách đăng ký (${u.file})`,lines,by:session?.name||'',at:new Date().toISOString()});
+        const qty=lines.reduce((a,l)=>a+l.n,0);kpiAuto(rid,{ym:d.date,title:`Nhập đồng phục ${no} – ${qty} món`,done:d.date,deadline:d.date,match:'ppe',note:`Tự ghi từ phiếu nhập ${no} (Quản lý PPE & Đồng phục)`})}}});
+  if(ok){UNI_IMP=null;closeModal();rerender();toast(`Đã nhập: thêm ${add}, cập nhật ${upd} nhân viên${no?` · phiếu nhập kho ${no}`:''}`)}};
 ACT['rd-add']=()=>{const last=RDRAFT.lines[RDRAFT.lines.length-1];RDRAFT.lines.push({item:last?last.item:'pi_helm',sz:'',n:0,detail:last?last.detail:''});redrawR()};
 ACT['rd-del']=el=>{RDRAFT.lines.splice(+el.dataset.i,1);redrawR()};
 ACT['rd-cancel']=()=>{RDRAFT=null;rerender()};
