@@ -549,6 +549,11 @@ function esgRecalc(){const box=document.querySelector('.esgs');if(!box)return;co
   tmp.innerHTML=ESG_SHEETS[sec].blocks(d).map(b=>esgGridHTML(d,b,curM(d))).join('')+`<div class="t2">${esgSheetTiles(d,sec)}</div>`;
   box.querySelectorAll('[data-c]').forEach(el=>{const n=tmp.querySelector(`[data-c="${CSS.escape(el.dataset.c)}"]`);if(n&&n.innerHTML!==el.innerHTML)el.innerHTML=n.innerHTML});
   const k=box.querySelector('.kpis'),k2=tmp.querySelector('.t2 .kpis');if(k&&k2)k.innerHTML=k2.innerHTML}
+/* người khác vừa nhập (nhận realtime) trong lúc mình đang gõ ở bảng: cập nhật tại chỗ các ô mình không đang sửa, không vẽ lại cả trang */
+function esgLive(){const box=document.querySelector('.esgs');if(!box)return false;const d=esgDoc(esgYear());if(!d)return false;const ae=document.activeElement;let n=0;
+  box.querySelectorAll('input.gin[data-g]').forEach(el=>{if(el===ae)return;const [k,a,ms]=el.dataset.g.split('|'),arr=(d.ind[k]||{})[a],v=arr?arr[+ms]:null,txt=a==='note'?(v||''):fmtE(v,el.dataset.nf);
+    if(el.value!==txt){el.value=txt;el.dataset.old=txt;el.classList.add('remote');setTimeout(()=>el.classList.remove('remote'),1600);n++}});
+  esgRecalc();return true}
 document.addEventListener('focusin',ev=>{const el=ev.target;if(el.classList&&el.classList.contains('gin')&&!el.dataset.nf)setTimeout(()=>el.select(),0);if(el.classList&&el.classList.contains('gin')&&el.dataset.nf){const v=parseE(el.value,el.dataset.nf);el.dataset.old=el.value;if(v!=null&&!Number.isNaN(v))el.value=String(v).replace('.',',');setTimeout(()=>el.select(),0)}});
 document.addEventListener('focusout',ev=>{const el=ev.target;if(el.classList&&el.classList.contains('gin')&&el.dataset.nf&&el.dataset.g&&el.value===String(parseE(el.dataset.old,el.dataset.nf)??'').replace('.',','))el.value=el.dataset.old});
 document.addEventListener('change',ev=>{const el=ev.target;if(!el.closest||!el.closest('.esgs'))return;if(!canESG())return;const d=esgDoc(esgYear());if(!d)return;

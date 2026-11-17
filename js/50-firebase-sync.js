@@ -130,7 +130,8 @@ function scheduleRender(){
   clearTimeout(renderTimer);
   renderTimer=setTimeout(()=>{
     if(!session||!$('#content'))return;
-    const ae=document.activeElement;if(ae&&ae.closest&&ae.closest('#pform,#rform,.esgs')&&ae.matches('input,select,textarea')){scheduleRender();return}   /* đang gõ phiếu PPE: chờ rời ô rồi mới vẽ lại */
+    const ae=document.activeElement;if(ae&&ae.closest&&ae.closest('.esgs')&&ae.matches('input,select,textarea')&&typeof esgLive==='function'){esgLive();$('#side').innerHTML=sideHTML();return}   /* bảng ESG: cập nhật tại chỗ số người khác vừa nhập */
+    if(ae&&ae.closest&&ae.closest('#pform,#rform,.esgs')&&ae.matches('input,select,textarea')){scheduleRender();return}   /* đang gõ phiếu PPE: chờ rời ô rồi mới vẽ lại */
     $('#side').innerHTML=sideHTML();
     if(PAGE&&PAGE.tbl&&$('#tbl'))refreshTbl();else rerender();
   },150);
@@ -144,7 +145,7 @@ function cloudPush(){
   SYNC.forEach(col=>{
     if(col==='employees'&&session.role!=='admin')return;   /* danh sách nhân viên: chỉ Admin ghi */
     const cur={};db[col].forEach(r=>{cur[r.id]=canon(r)});const old=remote[col];
-    for(const id in cur)if(old[id]!==cur[id])ops.push({col,id,data:JSON.parse(cur[id])});
+    for(const id in cur)if(old[id]!==cur[id])ops.push({col,id,data:JSON.parse(cur[id]),base:col==='ppe'&&old[id]?JSON.parse(old[id]):null});
     if(session.role==='admin'||col==='ppe')for(const id in old)if(!(id in cur))ops.push({col,id,del:true});   /* xoá: chỉ Admin (PPE: mọi người dùng) */
     remote[col]=cur;
   });
@@ -161,7 +162,23 @@ async function syncDirectory(){
   try{const s=await fbStore.doc('config/directory').get(),cur=s.exists&&Array.isArray(s.data().list)?canon([...s.data().list].sort((a,b)=>a.id<b.id?-1:1)):null,dd=dirCanon();remoteCfg.dir=cur;
     if(cur!==dd){await fbStore.doc('config/directory').set({list:JSON.parse(dd)});remoteCfg.dir=dd}}catch(e){console.warn('directory',e)}
 }
+/* gộp 3 chiều: chỉ đưa lên những ô mình đã đổi so với bản gốc, giữ các ô người khác vừa lưu trên máy chủ */
+const _jeq=(a,b)=>canon(a)===canon(b);
+function merge3(base,mine,srv){
+  if(_jeq(mine,base))return srv===undefined?mine:srv;
+  const obj=x=>x&&typeof x==='object';
+  if(!obj(mine)||!obj(base)||!obj(srv)||Array.isArray(mine)!==Array.isArray(srv)||Array.isArray(mine)!==Array.isArray(base))return mine;
+  const out=Array.isArray(srv)?[...srv]:{...srv};
+  for(const k of Object.keys(mine))out[k]=merge3(base[k],mine[k],srv[k]);
+  for(const k of Object.keys(base))if(!(k in mine)){if(Array.isArray(out))out[k]=undefined;else delete out[k]}
+  if(Array.isArray(out)){if(mine.length<base.length)out.length=Math.max(mine.length,0);for(let i=0;i<out.length;i++)if(out[i]===undefined)out[i]=null}
+  return out}
 async function commitOps(ops){
+  /* PPE / ESG dùng chung nhiều người: ghi bằng transaction + gộp 3 chiều để không đè số người khác vừa nhập */
+  const shared=ops.filter(o=>o.col==='ppe'&&!o.del&&o.base);ops=ops.filter(o=>!shared.includes(o));
+  for(const o of shared){const ref=fbStore.collection(o.col).doc(o.id);
+    await fbStore.runTransaction(async tx=>{const s=await tx.get(ref);const srv=s.exists?s.data():null;
+      const data=srv?merge3(o.base,o.data,{...srv,id:o.id}):o.data;tx.set(ref,JSON.parse(canon(data)))})}
   for(let i=0;i<ops.length;i+=400){
     const b=fbStore.batch();
     ops.slice(i,i+400).forEach(o=>{const ref=o.path?fbStore.doc(o.path):fbStore.collection(o.col).doc(o.id);o.del?b.delete(ref):b.set(ref,o.data)});
