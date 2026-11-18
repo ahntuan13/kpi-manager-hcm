@@ -340,7 +340,7 @@ const ECC={ok:'#18a37a',bad:'#dc4f47',tgt:'#e0a32e',base:'#a3abc4',el:'#0f6b5a',
 function esgChartCfg(d,x,opt={}){
   const lg={...baseOpt().plugins,legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:10,boxHeight:10}}},f=fac(d),ms=ESG_PER[opt.per]||[];
   if(x==='itp'){const it=d.itp||[],used=MON.map((_,i)=>it.some(o=>o.m[i])?i:-1).filter(i=>i>=0),pal=['#2f7de1','#0e9f8b','#e0a32e','#8e6ad8','#dc4f47','#4aa3df','#7a8aa6','#c46aa0'];
-    return{type:'bar',data:{labels:used.map(i=>MON[i]),datasets:it.map((o,j)=>({label:o.d,data:used.map(i=>o.m[i]?o.m[i].b+o.m[i].c:0),backgroundColor:pal[j%pal.length],stack:'s'}))},options:{...baseOpt(),scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}}}
+    return{type:'bar',data:{labels:used.map(i=>MON[i]),datasets:it.map((o,j)=>({label:o.d,data:used.map(i=>o.m[i]?o.m[i].b+o.m[i].c:0),backgroundColor:pal[j%pal.length],stack:'s'}))},options:{...baseOpt({datasets:{bar:{borderRadius:3,maxBarThickness:56}}}),scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}}}
   if(x==='km2'){const k=d.ind.km.act,t=d.ind.km.tgt,l=esgL100(d);
     return{type:'bar',data:{labels:MON,datasets:[{type:'bar',label:'Km',data:k,backgroundColor:k.map((v,i)=>v==null?ECC.na:t[i]!=null&&v>t[i]?ECC.bad:ECC.ok),order:2,yAxisID:'y'},
       {type:'line',label:'Chỉ tiêu km',data:t,borderColor:ECC.tgt,backgroundColor:ECC.tgt,borderDash:[6,4],borderWidth:2,pointRadius:0,order:1,yAxisID:'y'},

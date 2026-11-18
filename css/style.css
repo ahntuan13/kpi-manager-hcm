@@ -1042,6 +1042,7 @@ table.t tr.etot td{font-weight:700;background:var(--mute-s,#f1f3f7)}table.t tr.e
 .elv{display:inline-block;border-radius:6px;padding:0 7px;font-size:11.5px;font-weight:700}.elv.eh{background:#fde4e4;color:#a3271f}.elv.em{background:#fff1cc;color:#8a5a00}.elv.el{background:#e3f5ec;color:#0b6e47}
 .egrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
 .ech{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}.ech h5{margin:0 0 6px;font-size:13px}.echc{height:250px;position:relative}.ech img{width:100%;height:auto;display:block}
+.egrid>.ech:last-child:nth-child(odd),.eass>div:only-child{grid-column:1/-1}.egrid>.ech:only-child .echc{height:300px}
 .ecm{margin-top:12px;display:flex;flex-direction:column;gap:6px}.ecm label{display:flex;flex-direction:column;gap:4px;font-size:13px}.ecm .btn{align-self:flex-start}
 table.t.erk td{vertical-align:top;font-size:13px}
 .esg-doc{padding:18px 22px;background:#fff}.esg-doc .esh{margin:6px 0 10px;font-size:18px;color:#1f4e3d}
