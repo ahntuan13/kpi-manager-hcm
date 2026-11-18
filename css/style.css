@@ -1080,9 +1080,9 @@ table.kzt{min-width:0}table.kzt td.gk{padding:6px 10px;line-height:1.4;font-size
 table.itpt{min-width:900px}table.itpt col.i-l{width:150px}
 
 /* ESG: bảng tổng quan thẳng hàng, các dòng cao bằng nhau */
-table.t.est{table-layout:fixed;min-width:980px}
+table.t.est{table-layout:fixed;min-width:1180px}
 table.t.est th,table.t.est td{height:44px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-top:0;padding-bottom:0}
-table.t.est th:nth-child(1){width:240px}table.t.est th:nth-child(2){width:70px}table.t.est th:nth-child(3){width:170px}table.t.est th:nth-child(4),table.t.est th:nth-child(5){width:110px}table.t.est th:nth-child(6){width:150px}table.t.est th:nth-child(7){width:140px}table.t.est th:nth-child(8){width:190px}
+table.t.est th:nth-child(1){width:230px}table.t.est th:nth-child(2){width:78px}table.t.est th:nth-child(3){width:150px}table.t.est th:nth-child(4){width:120px}table.t.est th:nth-child(5){width:100px}table.t.est th:nth-child(6){width:220px}table.t.est th:nth-child(7){width:120px}table.t.est th:nth-child(8){width:210px}
 .eic{display:inline-flex;justify-content:center;width:22px;margin-right:6px;flex:none}
 table.t.est td:first-child{display:flex;align-items:center;height:44px}
 /* đếm ngược mùa lễ */
@@ -1131,3 +1131,24 @@ select.in.aps.info{border-color:#a9c4ee;background-color:#eef4fd;color:#1e4f9a}
 .anum.a1g{gap:10px 18px}
 .a1c{padding:6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card,#fff)}
 .gin.remote{background:#fff7d6!important;transition:background .6s}
+/* ESG báo cáo: thanh mức đạt, bảng O/X, hướng xử lý */
+.ebul{display:flex;align-items:center;gap:8px;min-width:150px}
+.ebt{position:relative;flex:1;height:14px;border-radius:5px;background:linear-gradient(90deg,#e3f4ea 0 66.6%,#fbf0d6 66.6% 83.3%,#fde4dc 83.3% 100%)}
+.ebt i{position:absolute;left:0;top:3px;height:8px;border-radius:4px}
+.ebt i.g{background:#18a37a}.ebt i.w{background:#d39a1c}.ebt i.b{background:#dc4f47}
+.ebt s{position:absolute;left:83.3%;top:-3px;bottom:-3px;width:2px;background:#1f2a37}
+.ebul b{min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
+table.t.est td:nth-child(6){overflow:visible}
+.ebul b{min-width:48px;white-space:nowrap}
+table.eheat td,table.eheat th{text-align:center;padding:6px 4px;font-size:12px}
+table.eheat td:first-child,table.eheat th:first-child{text-align:left;white-space:nowrap}
+table.eheat .hx-o{background:#e3f4ea;color:#11804f;font-weight:700}
+table.eheat .hx-x{background:#fde4dc;color:#c23b2a;font-weight:700}
+table.eheat .hx-n{color:#9aa3b5}
+table.eheat .hcur{border-bottom:3px solid #2f7de1}
+.esg-doc table.t.est{min-width:0;width:100%}.esg-doc table.t.est th:nth-child(1){width:180px}.esg-doc table.t.est th:nth-child(3){width:110px}.esg-doc table.t.est th:nth-child(6){width:190px}.esg-doc table.t.est th:nth-child(8){width:200px}
+.eacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:6px 0 12px}
+.eact{border:1px solid var(--line,#e3e6ee);border-left-width:4px;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;min-width:0;background:var(--card,#fff)}
+.eact.hi{border-left-color:#dc4f47}.eact.md{border-left-color:#d39a1c}.eact.lo{border-left-color:#18a37a}
+.eact .eaa{font-size:13px}
+@media (max-width:860px){.eacts{grid-template-columns:1fr}}
