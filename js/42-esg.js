@@ -400,7 +400,8 @@ document.addEventListener('submit',ev=>{const fm=ev.target.closest&&ev.target.cl
   const k=fm.dataset.esgcm,v=String(fm.c.value||'').trim();if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id);x.cmt={...(x.cmt||{}),[k]:v}}))toast('Đã lưu nhận xét')},true);
 
 /* ======================= PDF ======================= */
-const ESG_PRINT=['sum','elec','paper','fuel','itp','dept','plan','calc','risk','qa'];
+const ESG_PRINT=['sum','elec','paper','fuel','itp'];   /* báo cáo PDF / Excel: không in các sheet ghi nhận 1, 2, 3, Rủi ro, Kiểm tra số liệu */
+const ESG_XL_FULL=false;
 function esgDocHead(d,per,title,i,n){const c=db.company||{};return `<div class="ehd"><img src="assets/iso/logo-left.png" alt="" class="ehl"><div class="eht"><b>BÁO CÁO ESG – SỬ DỤNG TÀI NGUYÊN &amp; NĂNG LƯỢNG VĂN PHÒNG ${d.year}</b><span>${esc(ESG_PER_L[per])} · dữ liệu đến T${esgLast(d)+1} · ${esc(title)}</span></div><img src="assets/iso/logo-right.png" alt="" class="ehr"></div>`}
 ACT['esg-pdf']=async el=>{const {f,d}=esgF();if(!d)return;const b=el.closest('button');if(b)b.disabled=true;toast('Đang tạo PDF…');
   try{const img=await esgChartImgs(d,Object.values(ESG_CH).flat(),900,330,f.per);
@@ -482,16 +483,16 @@ async function esgXlsx(d,per){
     xImgs(wb,ws,img,ESG_CH.sum.map(x=>x[0]));
     {const rs=[...A.risk].sort((a,b)=>LV[a.lvl]-LV[b.lvl]).slice(0,6);if(rs.length){xNote(ws,'Hướng xử lý (tham khảo, tự sinh theo số liệu)',{b:true,color:XC.hd});xRisk(ws,rs)}}}
   /* 1. Các chỉ tiêu */
-  if((d.plan||[]).length){const ws=xSheet(wb,'1. CÁC CHỈ TIÊU',`CHỈ TIÊU KIỂM SOÁT ESG – SỬ DỤNG TÀI NGUYÊN VÀ NĂNG LƯỢNG ${d.year}`,d,per,[5,40,8,8,10,30,13,40,30]);
+  if(ESG_XL_FULL&&(d.plan||[]).length){const ws=xSheet(wb,'1. CÁC CHỈ TIÊU',`CHỈ TIÊU KIỂM SOÁT ESG – SỬ DỤNG TÀI NGUYÊN VÀ NĂNG LƯỢNG ${d.year}`,d,per,[5,40,8,8,10,30,13,40,30]);
     xTable(ws,['STT','Hoạt động giảm thiểu','Duy trì','Chưa thực hiện','Dept/PIC','Mục tiêu','Thời gian áp dụng','Phương pháp định lượng','Ghi chú'],d.plan.map(p=>({cls:p.stt?'g':'',v:[p.stt,p.act,p.done?'✓':'',p.todo?'✓':'',p.dept,p.tgt,p.time,p.method,p.note],st:[{h:'center'},{},{h:'center',color:XC.okT,bold:true},{h:'center',color:'FF9C5700',bold:true}],h:Math.max(18,Math.ceil(Math.max(p.act.length/45,p.method.length/45,p.tgt.length/33,p.note.length/33))*12)})),{hh:30})}
   /* 2. Bảng tính chỉ tiêu */
-  {const ws=xSheet(wb,'2. BẢNG TÍNH CHỈ TIÊU',`BẢNG TÍNH CHỈ TIÊU HOẠT ĐỘNG CẮT GIẢM TẠI VĂN PHÒNG ${d.year}`,d,per,[30,7,10,...Array(12).fill(9),11]);
+  if(ESG_XL_FULL){const ws=xSheet(wb,'2. BẢNG TÍNH CHỈ TIÊU',`BẢNG TÍNH CHỈ TIÊU HOẠT ĐỘNG CẮT GIẢM TẠI VĂN PHÒNG ${d.year}`,d,per,[30,7,10,...Array(12).fill(9),11]);
     xTable(ws,['Nhân sự năm trước','Nhân sự năm nay','Doanh thu năm trước','Doanh thu ước tính','Tỷ lệ tăng chỉ tiêu','Hệ số CO2 (kg/kWh)'],[{v:[d.staff?.prev??null,d.staff?.cur??null,d.rev?.prev||'',d.rev?.cur||'',d.rev?.grow??null,+d.factor||0.72],st:[{},{},{h:'center'},{h:'center'},{fmt:'0%'},{fmt:'0.00'}]}],{hh:30});
     const rows=[];ESG_IND.forEach(i=>{const x=d.ind[i.k],sum=a=>a.reduce((s,v)=>s+(+v||0),0);if(x.base.some(v=>v!=null))rows.push({cls:'a',v:[i.n,i.u,'2025',...x.base,sum(x.base)]});if(x.tgt.some(v=>v!=null))rows.push({cls:'t',v:[x.base.some(v=>v!=null)?'':i.n,i.u,'Chỉ tiêu 2026',...x.tgt,sum(x.tgt)]})});
     xTable(ws,['Chỉ tiêu','ĐVT','',...MON,'Cả năm'],rows,{title:'Số liệu 2025 và chỉ tiêu tháng 2026',hh:20});
     xNote(ws,'Chỉ tiêu Q1 = giữ mức trung bình Q1/2025; Q2–Q4 = (tổng 2025 × (1 + tỷ lệ tăng theo doanh thu)) ÷ 11 tháng, theo cách tính trong file.',{i:true})}
   /* 3. Tiêu chí phòng ban */
-  if((d.dept||[]).length){const mx=Math.max(...d.dept.map(t=>t.cols.length));const ws=xSheet(wb,'3. TIÊU CHÍ PHÒNG BAN','TIÊU CHÍ CHO CÁC PHÒNG BAN',d,per,[12,...Array(Math.max(mx,8)).fill(14)]);
+  if(ESG_XL_FULL&&(d.dept||[]).length){const mx=Math.max(...d.dept.map(t=>t.cols.length));const ws=xSheet(wb,'3. TIÊU CHÍ PHÒNG BAN','TIÊU CHÍ CHO CÁC PHÒNG BAN',d,per,[12,...Array(Math.max(mx,8)).fill(14)]);
     d.dept.forEach(t=>xTable(ws,['Phòng ban',...t.cols],dRows(t).map(r=>({cls:/total/i.test(r[0])?'t':'',v:r.map(v=>v==null?'':v),st:r.map(v=>typeof v==='number'&&v>0&&v<=1&&v%1?{fmt:'0%'}:{})})),{title:t.title,hh:42}));
     const it=d.itp||[];if(it.length){const t=d.dept.find(x=>/muc in/.test(norm(x.title)));if(t){const box=document.createElement('div');box.innerHTML=esgDeptPrint(d,per);const tb=box.querySelector('table');if(tb){const rows=[...tb.tBodies[0].rows].map(tr=>[...tr.cells].map(c=>{const s=c.textContent.trim().replace(/\./g,'');return /^\d+$/.test(s)?+s:c.textContent.trim()}));const hd=[...tb.tHead.rows[0].cells].map(c=>c.textContent.trim());
       xTable(ws,hd,rows.map(r=>({v:r})),{title:'Bản in thực tế theo phòng ban so với hạn mức AD đề xuất (trang / tháng)',hh:20})}}}}
@@ -506,15 +507,15 @@ async function esgXlsx(d,per){
   {const ws=xSheet(wb,'6. XĂNG','BÁO CÁO GHI NHẬN SỐ KM SỬ DỤNG XE HÀNG THÁNG TẠI VĂN PHÒNG',d,per,W15);
     xMonth(ws,d,['km','fuel'],ms,{title:'Theo dõi km xe và lít xăng hàng tháng'});xImgs(wb,ws,img,ESG_CH.fuel.map(x=>x[0]));xKz(ws,d,'fuel');xAssess(ws,d,'fuel',A)}
   /* 7. In theo phòng ban */
-  if((d.itp||[]).length){const it=d.itp,used=MON.map((_,i)=>it.some(o=>o.m[i])?i:-1).filter(i=>i>=0);const ws=xSheet(wb,'7. REF-IT-PRINT',`SỐ LIỆU MỰC IN ${d.year} THEO PHÒNG BAN`,d,per,[10,...used.flatMap(()=>[8,8]),11,13]);
+  if((d.itp||[]).some(o=>o.m&&o.m.some(Boolean))){const it=d.itp.filter(o=>o.m&&o.m.some(Boolean)),used=MON.map((_,i)=>it.some(o=>o.m[i])?i:-1).filter(i=>i>=0);const ws=xSheet(wb,'7. IN THEO PHÒNG BAN',`SỐ BẢN IN ${d.year} THEO PHÒNG BAN`,d,per,[10,...used.flatMap(()=>[8,8]),11,13]);
     const row=o=>[o.d,...used.flatMap(i=>{const x=o.m[i];return[x?x.b:null,x?x.c:null]}),o.m.reduce((a,x)=>a+(x?x.b+x.c:0),0),o.m.reduce((a,x)=>a+(x?x.bf+x.cf:0),0)];
     const T={d:'TỔNG',m:MON.map((_,i)=>it.some(o=>o.m[i])?it.reduce((a,o)=>{const x=o.m[i];return x?{b:a.b+x.b,c:a.c+x.c,bf:a.bf+x.bf,cf:a.cf+x.cf}:a},{b:0,c:0,bf:0,cf:0}):null)};
     xTable(ws,['Phòng ban',...used.flatMap(i=>[MON[i]+' T.đen',MON[i]+' Màu']),'Tổng bản in','Chi phí (VND)'],[...it.map(o=>({v:row(o)})),{cls:'t',v:row(T)}],{hh:30});xImgs(wb,ws,img,['ec-itp']);xAssess(ws,d,'itp',A)}
   /* Rủi ro & khuyến nghị */
-  {const ws=xSheet(wb,'8. RỦI RO & KHUYẾN NGHỊ','ĐÁNH GIÁ RỦI RO & KHUYẾN NGHỊ',d,per,[14,14,16,16,16,9,14,16,16,16,14,10]);xRisk(ws,A.risk);
+  if(ESG_XL_FULL){const ws=xSheet(wb,'8. RỦI RO & KHUYẾN NGHỊ','ĐÁNH GIÁ RỦI RO & KHUYẾN NGHỊ',d,per,[14,14,16,16,16,9,14,16,16,16,14,10]);xRisk(ws,A.risk);
     xNote(ws,'Mức độ: Cao – ảnh hưởng trực tiếp tới việc đạt / chứng minh chỉ tiêu, cần xử lý trong tháng · TB – cần kế hoạch · Thấp – theo dõi, cải tiến.',{i:true});if((d.cmt||{}).risk)xNote(ws,'Nhận xét: '+d.cmt.risk,{b:true})}
   /* Kiểm tra số liệu */
-  {const QA=esgQaAll(d);if(QA.length){const ws=xSheet(wb,'9. KIỂM TRA SỐ LIỆU','KIỂM TRA CÔNG THỨC & SỐ LIỆU TRONG FILE ESG',d,per,[5,22,9,60,50,10]);
+  {const QA=esgQaAll(d);if(ESG_XL_FULL&&QA.length){const ws=xSheet(wb,'9. KIỂM TRA SỐ LIỆU','KIỂM TRA CÔNG THỨC & SỐ LIỆU TRONG FILE ESG',d,per,[5,22,9,60,50,10]);
     xTable(ws,['#','Sheet','Ô','Vấn đề','Cách sửa','Mức độ'],QA.map((x,i)=>({v:[i+1,x.sheet,x.cell||'',x.issue,x.fix,x.lvl],st:[{h:'center'},{},{h:'center'},{},{},{h:'center',bold:true,fill:x.lvl==='Cao'?XC.bad:x.lvl==='TB'?XC.warn:XC.ok}],h:Math.max(30,Math.ceil(Math.max(x.issue.length/70,x.fix.length/58))*13)})),{hh:22})}}
   wb.worksheets.forEach(ws=>{ws.pageSetup.printArea=`A1:${ws.getColumn(ws.__N).letter}${ws.__r}`});
   const buf=await wb.xlsx.writeBuffer(),[l,r]=await Promise.all([isoImg(ISO_LOGO.l),isoImg(ISO_LOGO.r)]);
@@ -650,33 +651,129 @@ document.addEventListener('keydown',ev=>{const el=ev.target;if(ev.key!=='Enter'|
   let n=tr.nextElementSibling;while(n&&!(n.children[idx]&&n.children[idx].querySelector('input')))n=n.nextElementSibling;const nx=n&&n.children[idx].querySelector('input');if(nx)nx.focus();else el.blur()});
 
 /* ---------- 4) Số liệu in theo phòng ban (REF-IT-PRINT) trong trang Giấy, in ---------- */
-function esgItpBlock(d){const m=ui.esgIpm!=null?+ui.esgIpm:curM(d),it=(d.itp&&d.itp.length?d.itp:ESG_DEPTS.map(x=>({d:x,m:Array(12).fill(null)}))),pr=+d.price||2000;
-  const row=(o,j)=>{const x=(o.m||[])[m]||{};const c=(k,f)=>`<td class="gi"><input class="gin" data-ip="${j}" data-ik="${k}" data-nf="int" value="${x[k]!=null&&x[k]!==''?fmtE(x[k],'int'):''}" inputmode="numeric" aria-label="${esc(o.d+' '+k)}"></td>`;
-    return `<tr><th class="gl" scope="row">${esc(o.d)}</th>${c('c')}${c('cf')}${c('b')}${c('bf')}<td class="gc" data-it="${j}">${x.c!=null||x.b!=null?fmtE((+x.c||0)+(+x.b||0),'int'):''}</td><td class="gc" data-itf="${j}">${x.c!=null||x.b!=null?fmtE((+x.cf||0)+(+x.bf||0),'int'):''}</td></tr>`};
-  const used=MON.map((_,i)=>it.some(o=>o.m&&o.m[i])?i:-1).filter(i=>i>=0);
-  return `<section class="card esb"><h4>4) Số liệu mực in theo phòng ban (REF-IT-PRINT)</h4>
-    <div class="bar" style="margin:4px 0 8px"><label class="fl">Tháng <select class="in" id="esg-ipm">${MON.map((x,i)=>`<option value="${i}" ${i===m?'selected':''}>${x}${used.includes(i)?' ✓':''}</option>`).join('')}</select></label><label class="fl">Đơn giá <input class="in gin" id="esg-price" data-nf="int" value="${fmtE(pr,'int')}" style="width:90px"> đ / bản</label><div class="sp"></div><button type="button" class="btn sm" data-act="esg-itp-add">＋ Thêm phòng ban</button><button type="button" class="btn sm primary" data-act="esg-itp-save">💾 Lưu tháng ${m+1} và cập nhật dòng 1.2</button></div>
-    <form id="esg-itp" data-m="${m}"><div class="gw"><table class="gt-tbl itpt"><colgroup><col class="i-l"><col><col><col><col><col><col></colgroup><thead><tr><th class="gl">Phòng ban</th><th>Bản màu</th><th>Phí màu (VND)</th><th>Bản trắng đen</th><th>Phí trắng đen (VND)</th><th>Tổng bản in</th><th>Tổng phí (VND)</th></tr></thead><tbody>${it.map(row).join('')}</tbody>
-    <tfoot><tr><th class="gl">Tổng</th><td class="gt" id="itp-c"></td><td class="gt" id="itp-cf"></td><td class="gt" id="itp-b"></td><td class="gt" id="itp-bf"></td><td class="gt" id="itp-t"></td><td class="gt" id="itp-tf"></td></tr></tfoot></table></div></form>
-    <p class="note">Để trống ô phí thì app tự tính = số bản × đơn giá. Bấm Lưu: số liệu phòng ban được lưu và dòng 1.2 (số bản in, số tiền mực in) của tháng ${m+1} lấy theo tổng bảng này.</p></section>`}
-function esgItpTotals(){const fm=$('#esg-itp');if(!fm)return null;const pr=parseE($('#esg-price')?.value,'int')||2000,T={c:0,cf:0,b:0,bf:0},rows={};
+/* ======================= IN THEO PHÒNG BAN (mục riêng) =======================
+   Nhập tay mỗi tháng: số bản Trắng đen / Màu theo phòng ban (phí tự tính = số bản × đơn giá, sửa tay được).
+   Lưu → cập nhật ESG dòng 1.2 “Số bản in mỗi tháng (trắng đen + màu)” và “Số tiền mực in” của tháng đó (phí chưa VAT).
+   Xuất Excel “Printing fee”: 2 sheet Fee <số máy trắng đen> · Fee <số máy màu> như file Allocation printing fee. */
+const PRT_NAME={AD:'ADMIN',PUR:'PURCHASING'},PRT_KEY={ADMIN:'AD',PURCHASING:'PUR',PU:'PUR',HSE:'AZ'};
+const prtCfg=d=>({snB:'',snC:'',vat:0.08,priceB:+d.price||2000,priceC:+d.price||2000,chk:'',apr:'',codes:{},...(d.prt||{})});
+const prtM=()=>{const d=esgDoc(esgYear());return ui.esgIpm!=null?+ui.esgIpm:d?curM(d):new Date().getMonth()};
+const prtList=d=>(d.itp&&d.itp.length?d.itp:ESG_DEPTS.map(x=>({d:x,m:Array(12).fill(null)})));
+/* phí tháng trước: tháng m-1 của năm này, hoặc T12 năm trước */
+function prtPrev(d,dep,m){if(m>0){const o=(d.itp||[]).find(x=>x.d===dep);return o&&o.m[m-1]||null}const p=esgDoc(d.year-1),o=p&&(p.itp||[]).find(x=>x.d===dep);return o&&o.m[11]||null}
+function prtTot(d,m){const T={b:0,bf:0,c:0,cf:0,pb:0,pc:0,has:false};prtList(d).forEach(o=>{const x=o.m&&o.m[m],p=prtPrev(d,o.d,m);if(x){T.has=true;T.b+=+x.b||0;T.bf+=+x.bf||0;T.c+=+x.c||0;T.cf+=+x.cf||0}if(p){T.pb+=+p.bf||0;T.pc+=+p.cf||0}});return T}
+PAGES['esg/itp']={t:'ESG · In theo phòng ban',
+  sub(){const d=esgDoc(esgYear());return d?`Năm ${d.year} · nhập số bản Trắng đen / Màu từng tháng; lưu xong tự cập nhật dòng 1.2 (số bản in, số tiền mực in) của sheet Giấy, in, chất thải`:''},
+  head(){const d=esgDoc(esgYear());return `<div class="bar">${esgYearSel()}<div class="sp"></div><label class="btn" title="File Allocation printing fee: đọc 2 sheet Fee (máy trắng đen, máy màu) của tháng trong file">⬆ Nhập file phí in<input type="file" id="prt-file" accept=".xlsx,.xls" hidden></label>${d?`<button class="btn" data-act="prt-xlsx">⬇ Excel phí in tháng ${prtM()+1}</button>`:''}</div>`},
+  tbl(){const y=esgYear(),d=esgDoc(y);
+    if(!d)return `<div class="empty"><b>Chưa có sổ ESG năm ${esc(y)}.</b><br><button class="btn sm primary" data-act="esg-new" data-y="${esc(y)}">＋ Tạo sổ năm ${esc(y)}</button></div>`;
+    const m=prtM(),C=prtCfg(d),it=prtList(d),used=MON.map((_,i)=>it.some(o=>o.m&&o.m[i])?i:-1).filter(i=>i>=0);
+    const pct=(a,b)=>b?`<span class="${a>b?'neg':'pos'}">${a>b?'▲ +':'▼ '}${Math.round((a-b)/b*100)}%</span>`:'–';
+    const row=(o,j)=>{const x=(o.m||[])[m]||{},p=prtPrev(d,o.d,m)||{},inp=(k,ph='')=>`<td class="gi"><input class="gin" data-ip="${j}" data-ik="${k}" data-nf="int" value="${x[k]!=null&&x[k]!==''?fmtE(x[k],'int'):''}" placeholder="${ph}" inputmode="numeric" aria-label="${esc((PRT_NAME[o.d]||o.d)+' '+k)}"></td>`;
+      return `<tr><th class="gl" scope="row">${esc(PRT_NAME[o.d]||o.d)}</th><td class="gi"><input class="gin gcode" data-pc="${esc(o.d)}" value="${esc(C.codes[o.d]||'')}" placeholder="mã" aria-label="Mã chi phí ${esc(o.d)}"></td>${inp('b')}${inp('bf','tự tính')}${inp('c')}${inp('cf','tự tính')}<td class="gc" data-it="${j}"></td><td class="gc" data-itf="${j}"></td><td class="gb">${fmtE((+p.bf||0)+(+p.cf||0),'int')}</td><td class="gc" data-itd="${j}" data-prev="${(+p.bf||0)+(+p.cf||0)}"></td></tr>`};
+    const T=prtTot(d,m);
+    return `<section class="card esb"><h4>🖨 Số bản in theo phòng ban – tháng ${m+1}/${d.year}</h4>
+      <div class="bar" style="margin:4px 0 8px;flex-wrap:wrap"><label class="fl">Tháng <select class="in" id="esg-ipm">${MON.map((x,i)=>`<option value="${i}" ${i===m?'selected':''}>${x}${used.includes(i)?' ✓':''}</option>`).join('')}</select></label>
+        <label class="fl">Đơn giá trắng đen <input class="in gin" id="prt-pb" data-nf="int" value="${fmtE(C.priceB,'int')}" style="width:80px"> đ</label><label class="fl">Đơn giá màu <input class="in gin" id="prt-pc" data-nf="int" value="${fmtE(C.priceC,'int')}" style="width:80px"> đ</label>
+        <div class="sp"></div><button type="button" class="btn sm" data-act="esg-itp-add">＋ Thêm phòng ban</button><button type="button" class="btn sm primary" data-act="esg-itp-save">💾 Lưu tháng ${m+1} → cập nhật ESG 1.2</button></div>
+      <form id="esg-itp" data-m="${m}"><div class="gw"><table class="gt-tbl itpt"><colgroup><col class="i-l"><col class="i-c"><col><col><col><col><col><col><col><col></colgroup>
+        <thead><tr><th class="gl" rowspan="2">Phòng ban</th><th rowspan="2">Mã</th><th colspan="2">Máy trắng đen${C.snB?' '+esc(C.snB):''}</th><th colspan="2">Máy màu${C.snC?' '+esc(C.snC):''}</th><th rowspan="2">Tổng bản in</th><th rowspan="2">Tổng phí tháng này</th><th rowspan="2">Phí tháng trước</th><th rowspan="2">% chênh lệch</th></tr>
+          <tr><th>Số bản</th><th>Phí (VND)</th><th>Số bản</th><th>Phí (VND)</th></tr></thead>
+        <tbody>${it.map(row).join('')}</tbody>
+        <tfoot><tr><th class="gl">Tổng (chưa VAT)</th><td></td><td class="gt" id="itp-b"></td><td class="gt" id="itp-bf"></td><td class="gt" id="itp-c"></td><td class="gt" id="itp-cf"></td><td class="gt" id="itp-t"></td><td class="gt" id="itp-tf"></td><td class="gt">${fmtE(T.pb+T.pc,'int')}</td><td class="gt" id="itp-td" data-prev="${T.pb+T.pc}"></td></tr>
+          <tr><th class="gl">VAT <input class="in gin" id="prt-vat" data-nf="pct" value="${fmtE(C.vat*100,'pct')}" style="width:52px;display:inline-block"> %</th><td colspan="6"></td><td class="gt" id="itp-vat"></td><td colspan="2"></td></tr>
+          <tr><th class="gl">Tổng thanh toán</th><td colspan="6"></td><td class="gt" id="itp-pay"></td><td class="gt">${fmtE((T.pb+T.pc)*(1+C.vat),'int')}</td><td></td></tr></tfoot></table></div></form>
+      <p class="note">Để trống ô phí thì app tự tính = số bản × đơn giá của máy. Bấm <b>Lưu</b>: số liệu phòng ban được lưu và dòng 1.2 của sheet Giấy, in, chất thải tháng ${m+1} lấy theo tổng bảng này (số bản = trắng đen + màu, số tiền mực in = tổng phí chưa VAT).</p></section>
+      <section class="card esb"><h4>Thông tin in trên phiếu phí in</h4><div class="bar" style="flex-wrap:wrap;gap:10px">
+        <label class="fl">Số máy trắng đen <input class="in" id="prt-snb" value="${esc(C.snB)}" style="width:110px" placeholder="VD 132578"></label><label class="fl">Số máy màu <input class="in" id="prt-snc" value="${esc(C.snC)}" style="width:110px" placeholder="VD 101440"></label>
+        <label class="fl">Checked by <input class="in" id="prt-chk" value="${esc(C.chk)}" style="width:150px"></label><label class="fl">Approved by <input class="in" id="prt-apr" value="${esc(C.apr)}" style="width:150px"></label></div>
+        <p class="note">Lưu cùng nút 💾 Lưu ở trên. Mã phòng ban (cột “Mã”) in vào cột Code của phiếu.</p></section>
+      ${esgPrtYear(d)}`}};
+PAGES['esg/itp'].tm=()=>setTimeout(esgItpTotals,30);
+/* bảng cả năm: số bản và phí theo tháng */
+function esgPrtYear(d){const it=prtList(d),used=MON.map((_,i)=>it.some(o=>o.m&&o.m[i])?i:-1).filter(i=>i>=0);if(!used.length)return '';
+  const cell=x=>x?`<td class="num">${fmtNum((+x.b||0)+(+x.c||0))}<br><small class="muted">${fmtNum((+x.bf||0)+(+x.cf||0))} đ</small></td>`:'<td></td>';
+  return `<section class="card esb"><h4>Tổng hợp cả năm (số bản · phí chưa VAT)</h4><div class="tw"><table class="t eit"><thead><tr><th>Phòng ban</th>${used.map(i=>`<th>${MON[i]}</th>`).join('')}<th>Cả năm</th></tr></thead><tbody>${it.map(o=>`<tr><td><b>${esc(PRT_NAME[o.d]||o.d)}</b></td>${used.map(i=>cell(o.m[i])).join('')}<td class="num"><b>${fmtNum(o.m.reduce((a,x)=>a+(x?(+x.b||0)+(+x.c||0):0),0))}</b><br><small>${fmtNum(o.m.reduce((a,x)=>a+(x?(+x.bf||0)+(+x.cf||0):0),0))} đ</small></td></tr>`).join('')}
+    <tr class="etot"><td><b>TỔNG</b></td>${used.map(i=>{const T=prtTot(d,i);return `<td class="num"><b>${fmtNum(T.b+T.c)}</b><br><small>${fmtNum(T.bf+T.cf)} đ</small></td>`}).join('')}<td></td></tr></tbody></table></div></section>`}
+function esgItpTotals(){const fm=$('#esg-itp');if(!fm)return null;const pb=parseE($('#prt-pb')?.value,'int')||2000,pc=parseE($('#prt-pc')?.value,'int')||2000,vat=(parseE($('#prt-vat')?.value,'dec')??8)/100,T={c:0,cf:0,b:0,bf:0},rows={};
   fm.querySelectorAll('[data-ip]').forEach(el=>{(rows[el.dataset.ip]=rows[el.dataset.ip]||{})[el.dataset.ik]=parseE(el.value,'int')});
-  Object.entries(rows).forEach(([j,r])=>{const cf=r.cf??((r.c||0)*pr),bf=r.bf??((r.b||0)*pr),has=r.c!=null||r.b!=null;T.c+=r.c||0;T.b+=r.b||0;if(has||r.cf!=null)T.cf+=cf;if(has||r.bf!=null)T.bf+=bf;
-    const a=fm.querySelector(`[data-it="${j}"]`),b=fm.querySelector(`[data-itf="${j}"]`);if(a)a.textContent=has?fmtE((r.c||0)+(r.b||0),'int'):'';if(b)b.textContent=has?fmtE((r.c!=null?cf:0)+(r.b!=null?bf:0),'int'):''});
-  [['c',T.c],['cf',T.cf],['b',T.b],['bf',T.bf],['t',T.c+T.b],['tf',T.cf+T.bf]].forEach(([k,v])=>{const e=$('#itp-'+k);if(e)e.textContent=v?fmtE(v,'int'):''});return{T,rows,pr}}
-document.addEventListener('input',ev=>{if(ev.target.closest&&(ev.target.closest('#esg-itp')||ev.target.id==='esg-price'))esgItpTotals()});
+  const dif=(el,a,b)=>{if(!el)return;el.innerHTML=b&&a?`<span class="${a>b?'neg':'pos'}">${a>b?'+':''}${Math.round((a-b)/b*100)}%</span>`:''};
+  Object.entries(rows).forEach(([j,r])=>{const bf=r.bf??((r.b||0)*pb),cf=r.cf??((r.c||0)*pc),has=r.c!=null||r.b!=null||r.bf!=null||r.cf!=null;T.c+=r.c||0;T.b+=r.b||0;if(r.b!=null||r.bf!=null)T.bf+=bf;if(r.c!=null||r.cf!=null)T.cf+=cf;
+    const fee=(r.b!=null||r.bf!=null?bf:0)+(r.c!=null||r.cf!=null?cf:0),a=fm.querySelector(`[data-it="${j}"]`),b=fm.querySelector(`[data-itf="${j}"]`),dd=fm.querySelector(`[data-itd="${j}"]`);
+    if(a)a.textContent=has?fmtE((r.c||0)+(r.b||0),'int'):'';if(b)b.textContent=has?fmtE(fee,'int'):'';dif(dd,has?fee:0,+(dd&&dd.dataset.prev)||0);
+    const ib=fm.querySelector(`[data-ip="${j}"][data-ik="bf"]`),ic=fm.querySelector(`[data-ip="${j}"][data-ik="cf"]`);if(ib)ib.placeholder=r.b!=null?fmtE(r.b*pb,'int'):'tự tính';if(ic)ic.placeholder=r.c!=null?fmtE(r.c*pc,'int'):'tự tính'});
+  const tf=T.cf+T.bf;[['c',T.c],['cf',T.cf],['b',T.b],['bf',T.bf],['t',T.c+T.b],['tf',tf],['vat',tf*vat],['pay',tf*(1+vat)]].forEach(([k,v])=>{const e=$('#itp-'+k);if(e)e.textContent=v?fmtE(Math.round(v),'int'):''});dif($('#itp-td'),tf,+($('#itp-td')?.dataset.prev)||0);
+  return{T,rows,pb,pc,vat}}
+/* sửa số bản: nếu ô phí đang đúng bằng số bản cũ × đơn giá thì để app tự tính lại */
+document.addEventListener('focusin',ev=>{const el=ev.target;if(el.closest&&el.closest('#esg-itp')&&/^[bc]$/.test(el.dataset.ik||''))el.dataset.pv=el.value});
+document.addEventListener('input',ev=>{const el=ev.target;if(el.closest&&el.closest('#esg-itp')&&/^[bc]$/.test(el.dataset.ik||'')){const k=el.dataset.ik,fee=el.closest('tr').querySelector(`[data-ik="${k}f"]`),pr=parseE($(k==='b'?'#prt-pb':'#prt-pc')?.value,'int')||2000,old=parseE(el.dataset.pv??'','int');
+    if(fee&&fee.value&&old!=null&&parseE(fee.value,'int')===old*pr){fee.value=''}el.dataset.pv=el.value}
+  if(el.closest&&(el.closest('#esg-itp')||/^prt-p[bc]$|^prt-vat$/.test(el.id)))esgItpTotals()});
 document.addEventListener('change',ev=>{if(ev.target.id==='esg-ipm'){ui.esgIpm=ev.target.value;refreshTbl();setTimeout(esgItpTotals,30)}});
-const _esgTm=()=>setTimeout(esgItpTotals,30);PAGES['esg/paper'].tm=_esgTm;
 ACT['esg-itp-add']=()=>{const n=prompt('Tên phòng ban (ví dụ HSE):');if(!n||!n.trim())return;const tb=document.querySelector('#esg-itp tbody');if(!tb)return;
   const name=n.trim().toUpperCase();if([...tb.rows].some(tr=>norm(tr.cells[0].textContent)===norm(name)))return toast('Phòng ban này đã có.','warn');
   const j=tb.rows.length,c=k=>`<td class="gi"><input class="gin" data-ip="${j}" data-ik="${k}" data-nf="int" inputmode="numeric" aria-label="${esc(name+' '+k)}"></td>`;
-  tb.insertAdjacentHTML('beforeend',`<tr data-newd="${esc(name)}"><th class="gl" scope="row">${esc(name)} <small class="muted">mới</small></th>${c('c')}${c('cf')}${c('b')}${c('bf')}<td class="gc" data-it="${j}"></td><td class="gc" data-itf="${j}"></td></tr>`);tb.rows[j].querySelector('input').focus()};
+  tb.insertAdjacentHTML('beforeend',`<tr data-newd="${esc(name)}"><th class="gl" scope="row">${esc(name)} <small class="muted">mới</small></th><td class="gi"><input class="gin gcode" data-pc="${esc(name)}" placeholder="mã"></td>${c('b')}${c('bf')}${c('c')}${c('cf')}<td class="gc" data-it="${j}"></td><td class="gc" data-itf="${j}"></td><td class="gb"></td><td class="gc" data-itd="${j}" data-prev="0"></td></tr>`);tb.rows[j].querySelector('[data-ik]').focus()};
+/* lưu một tháng: dữ liệu phòng ban + cấu hình phiếu + cập nhật ESG 1.2 */
+function prtApply(x,m,rows,list,pb,pc){x.itp=list.map((o,j)=>{const mm=[...(o.m||Array(12).fill(null))],r=rows[j];if(r){const has=['c','cf','b','bf'].some(k=>r[k]!=null);mm[m]=has?{b:r.b||0,bf:r.bf??((r.b||0)*pb),c:r.c||0,cf:r.cf??((r.c||0)*pc)}:null}return{d:o.d,m:mm}});
+  let b=0,c=0,f=0,has=false;x.itp.forEach(o=>{const v=o.m[m];if(v){has=true;b+=+v.b||0;c+=+v.c||0;f+=(+v.bf||0)+(+v.cf||0)}});
+  if(has){x.ind.print.act[m]=b+c;x.ind.print.cost[m]=f}return has}
 ACT['esg-itp-save']=()=>{if(!canESG())return;const d=esgDoc(esgYear()),fm=$('#esg-itp');if(!d||!fm)return;const m=+fm.dataset.m,R=esgItpTotals();
   if([...fm.querySelectorAll('[data-ip]')].some(el=>Number.isNaN(parseE(el.value,'int'))))return toast('Có ô không phải số.','error');
-  const it=(d.itp&&d.itp.length?d.itp:ESG_DEPTS.map(q=>({d:q}))).concat([...fm.querySelectorAll('tr[data-newd]')].map(tr=>({d:tr.dataset.newd})));
-  if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id);x.price=R.pr;
-    x.itp=it.map((o,j)=>{const mm=[...(o.m||Array(12).fill(null))],r=R.rows[j];if(r){const has=['c','cf','b','bf'].some(k=>r[k]!=null);mm[m]=has?{c:r.c||0,cf:r.cf??((r.c||0)*R.pr),b:r.b||0,bf:r.bf??((r.b||0)*R.pr)}:null}return{d:o.d,m:mm}});
-    const tot=R.T.c+R.T.b;if(tot){x.ind.print.act[m]=tot;x.ind.print.cost[m]=R.T.cf+R.T.bf;esgAutoTask(d.year,m)}})){refreshTbl();_esgTm();toast(`Đã lưu số liệu in theo phòng ban tháng ${m+1}${R.T.c+R.T.b?' và cập nhật dòng 1.2':''}`)}};
+  const list=prtList(d).concat([...fm.querySelectorAll('tr[data-newd]')].map(tr=>({d:tr.dataset.newd})));
+  const codes={};document.querySelectorAll('[data-pc]').forEach(el=>{if(el.value.trim())codes[el.dataset.pc]=el.value.trim()});
+  let has=false;
+  if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id);x.price=R.pb;x.prt={...prtCfg(x),priceB:R.pb,priceC:R.pc,vat:R.vat,snB:($('#prt-snb')?.value||'').trim(),snC:($('#prt-snc')?.value||'').trim(),chk:($('#prt-chk')?.value||'').trim(),apr:($('#prt-apr')?.value||'').trim(),codes};
+    has=prtApply(x,m,R.rows,list,R.pb,R.pc);if(has)esgAutoTask(d.year,m)})){refreshTbl();setTimeout(esgItpTotals,30);toast(`Đã lưu số liệu in tháng ${m+1}${has?` · ESG 1.2: ${fmtNum(R.T.b+R.T.c)} bản, ${fmtNum(R.T.bf+R.T.cf)} đ`:''}`)}};
+/* nhập file Allocation printing fee: sheet "Fee <số máy>" – cột Department, Code, Pages / Pages Color, This month Cost, Last month Cost; tiêu đề "PRINTING FEE NOV 2026" */
+const MN3=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function prtParse(wb){const out={sheets:[]};
+  wb.SheetNames.filter(n=>/^fee\s*\d+/i.test(n.trim())&&!(wb.Workbook&&(wb.Workbook.Sheets||[]).find(x=>x.name===n&&x.Hidden))).forEach(n=>{const ws=wb.Sheets[n],aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}),N=v=>norm(String(v??'')).trim();
+    let tm=null,ty=null,hi=-1;aoa.forEach((r,i)=>{r.forEach(c=>{const t=String(c||'').toUpperCase(),mm=/PRINTING FEE\s+([A-Z]{3})[A-Z]*\s+(20\d\d)/.exec(t);if(mm){tm=MN3.indexOf(mm[1]);ty=+mm[2]}});if(hi<0&&r.some(c=>N(c)==='department'))hi=i});
+    if(hi<0)return;const H=aoa[hi].map(N),col=re=>H.findIndex(h=>re.test(h)),cD=col(/^department$/),cC=col(/^code$/),cP=col(/^pages/),cT=col(/this month/),cL=col(/last month/),color=/color/.test(H[cP]||'');
+    const rows=[];let code='';for(const r of aoa.slice(hi+1)){const dep=String(r[cD]||'').trim();if(!dep||/^total|^vat/i.test(dep))break;if(String(r[cC]||'').trim())code=String(r[cC]).trim();
+      rows.push({d:PRT_KEY[dep.toUpperCase()]||dep.toUpperCase(),code,p:+r[cP]||0,f:+r[cT]||0,l:cL>=0&&r[cL]!==''?+r[cL]:null})}
+    const vatR=aoa.find(r=>N(r[1])==='vat'||r.some(c=>N(c)==='vat'));let vat=null;if(vatR){const v=vatR.find(c=>typeof c==='number');if(v!=null)vat=v}
+    const sig=aoa.slice(hi).flat().map(String);
+    out.sheets.push({n,sn:(/\d+/.exec(n)||[''])[0],color,m:tm,y:ty,rows,vat});if(tm!=null){out.m=tm;out.y=ty}});
+  if(!out.sheets.length)throw new Error('Không thấy sheet “Fee …” (đang hiện) trong file.');return out}
+document.addEventListener('change',async ev=>{const el=ev.target;if(el.id!=='prt-file'||!el.files||!el.files[0])return;if(!canESG())return;
+  try{const wb=XLSX.read(await el.files[0].arrayBuffer(),{type:'array'}),P=prtParse(wb),d=esgDoc(P.y||esgYear());if(!d)throw new Error(`Chưa có sổ ESG năm ${P.y}. Tạo sổ năm trước khi nhập.`);
+    const m=P.m;if(m==null)throw new Error('Không đọc được tháng trong tiêu đề “PRINTING FEE …”.');
+    const B=P.sheets.find(s=>!s.color),C=P.sheets.find(s=>s.color);
+    if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id),list=prtList(x).map(o=>({d:o.d,m:[...(o.m||Array(12).fill(null))]}));
+      const get=dep=>{let o=list.find(z=>z.d===dep);if(!o){o={d:dep,m:Array(12).fill(null)};list.push(o)}return o};
+      [B,C].filter(Boolean).forEach(S=>S.rows.forEach(r=>{const o=get(r.d),k=S.color?'c':'b';o.m[m]={b:0,bf:0,c:0,cf:0,...(o.m[m]||{}),[k]:r.p,[k+'f']:r.f};
+        if(m>0&&r.l!=null){const pv=o.m[m-1]||{b:0,bf:0,c:0,cf:0,fo:1};if(pv.fo||!(pv[k+'f']))o.m[m-1]={...pv,[k+'f']:r.l}   /* tháng trước chỉ có phí (fo) lấy từ cột Last month Cost */}}));
+      const codes={...prtCfg(x).codes};[B,C].filter(Boolean).forEach(S=>S.rows.forEach(r=>{if(r.code)codes[r.d]=r.code}));
+      x.prt={...prtCfg(x),snB:B?B.sn:prtCfg(x).snB,snC:C?C.sn:prtCfg(x).snC,vat:(B||C).vat??prtCfg(x).vat,codes};
+      const rows={};list.forEach((o,j)=>{const v=o.m[m];if(v)rows[j]={b:v.b,bf:v.bf,c:v.c,cf:v.cf}});prtApply(x,m,rows,list,prtCfg(x).priceB,prtCfg(x).priceC);esgAutoTask(d.year,m)})){
+      ui.esgY=String(d.year);ui.esgIpm=String(m);rerender();toast(`Đã nhập phí in tháng ${m+1}/${d.year} (${P.sheets.map(s=>'Fee '+s.sn).join(', ')}) và cập nhật ESG 1.2`)}}
+  catch(e){console.error(e);toast('Không đọc được file phí in: '+e.message,'error')}finally{el.value=''}});
+/* xuất Excel phiếu phí in tháng: 2 sheet Fee <máy trắng đen> · Fee <máy màu> */
+async function prtXlsx(d,m){await isoLoad();const wb=new ExcelJS.Workbook(),C=prtCfg(d),list=prtList(d);
+  const thin={style:'thin',color:{argb:'FF000000'}},BOX={top:thin,left:thin,bottom:thin,right:thin};
+  [['b',C.snB||'B&W','Pages'],['c',C.snC||'Color','Pages Color']].forEach(([k,sn,ph])=>{const ws=wb.addWorksheet(('Fee '+sn).slice(0,31),{views:[{showGridLines:false}]});
+    ws.columns=[{width:3},{width:6},{width:16},{width:12},{width:11},{width:17},{width:17},{width:15}];
+    ws.mergeCells('B1:H2');const t=ws.getCell('B1');t.value=`PRINTING FEE ${MN3[m]} ${d.year}`;t.font={name:'Arial',size:14,bold:true};t.alignment={horizontal:'center',vertical:'middle'};
+    ws.mergeCells('B3:H3');ws.getCell('B3').value=`Máy ${sn}`;ws.getCell('B3').font={name:'Arial',size:9,italic:true};ws.getCell('B3').alignment={horizontal:'center'};
+    ['No.','Department','Code',ph,'This month Cost','Last month Cost','% of Different'].forEach((h,i)=>{const c=ws.getCell(4,i+2);c.value=h;c.font={name:'Arial',size:10,bold:true};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border=BOX;c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}});ws.getRow(4).height=30;
+    let r=5;list.forEach((o,i)=>{const x=o.m&&o.m[m]||{},p=prtPrev(d,o.d,m)||{};const v=[i+1,PRT_NAME[o.d]||o.d,C.codes[o.d]||'',+x[k]||0,+x[k+'f']||0,p[k+'f']!=null?+p[k+'f']:null];
+      v.forEach((val,j)=>{const c=ws.getCell(r,j+2);c.value=val;c.font={name:'Arial',size:10};c.border=BOX;c.alignment={horizontal:j<3?(j===0?'center':'left'):'right',vertical:'middle'};if(j>=4)c.numFmt='#,##0'});
+      const h=ws.getCell(r,8);h.value={formula:`IF(G${r}=0,"",(F${r}-G${r})/G${r})`};h.numFmt='0%';h.border=BOX;h.font={name:'Arial',size:10};h.alignment={horizontal:'right'};r++});
+    const L=r-1;const lab=(row,text)=>{ws.mergeCells(row,2,row,5);const c=ws.getCell(row,2);c.value=text;c.font={name:'Arial',size:10,bold:true};c.alignment={horizontal:'center'};for(let j=2;j<=8;j++)ws.getCell(row,j).border=BOX};
+    lab(r,'Total');ws.getCell(r,6).value={formula:`SUM(F5:F${L})`};ws.getCell(r,7).value={formula:`SUM(G5:G${L})`};
+    lab(r+1,'VAT');ws.getCell(r+1,6).value=C.vat;ws.getCell(r+1,7).value=C.vat;
+    lab(r+2,'VAT Amount');ws.getCell(r+2,6).value={formula:`F${r}*F${r+1}`};ws.getCell(r+2,7).value={formula:`G${r}*G${r+1}`};
+    lab(r+3,'Total Amount');ws.getCell(r+3,6).value={formula:`ROUND(F${r}+F${r+2},0)`};ws.getCell(r+3,7).value={formula:`ROUND(G${r}+G${r+2},0)`};
+    ws.mergeCells(r,8,r+3,8);const hd=ws.getCell(r,8);hd.value={formula:`IF(G${r+3}=0,"",(F${r+3}-G${r+3})/G${r+3})`};hd.numFmt='0%';hd.alignment={horizontal:'center',vertical:'middle'};hd.font={name:'Arial',size:10,bold:true};
+    for(let y=r;y<=r+3;y++)[6,7].forEach(j=>{const c=ws.getCell(y,j);c.numFmt=y===r+1?'0%':'#,##0';c.font={name:'Arial',size:10,bold:y===r+3};c.alignment={horizontal:'right'}});
+    ws.getCell(r+5,3).value='Checked by';ws.getCell(r+5,7).value='Approved by';ws.getCell(r+8,3).value=C.chk||'';ws.getCell(r+8,7).value=C.apr||'';[[r+5,3],[r+5,7],[r+8,3],[r+8,7]].forEach(([y,x])=>{const c=ws.getCell(y,x);c.font={name:'Arial',size:10,bold:y===r+5};c.alignment={horizontal:'center'}});
+    ws.pageSetup={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:0.5,right:0.5,top:0.7,bottom:0.6,header:0.3,footer:0.3}}});
+  return wb.xlsx.writeBuffer()}
+ACT['prt-xlsx']=async el=>{const d=esgDoc(esgYear());if(!d)return;const m=prtM(),b=el.closest('button');if(b)b.disabled=true;
+  try{const out=await prtXlsx(d,m),blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Printing_fee_${MN3[m]}_${d.year}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast(`Đã xuất phiếu phí in tháng ${m+1}/${d.year}`)}
+  catch(e){console.error(e);toast('Không tạo được file: '+e.message,'error')}finally{if(b)b.disabled=false}};
 
 /* ---------- tự ghi việc vào KPI: “Báo cáo ESG tháng 11.2026” (khi nhập số liệu tháng) · “Báo cáo ESG Quý 3.2026” (khi xuất báo cáo quý) ----------
    Việc nằm ở KPI tháng lưu / xuất lần đầu (giống PPE: tháng làm việc nào ghi tháng đó), deadline = ngày lưu / xuất đầu tiên + 1 ngày, ngày hoàn thành để trống cho người làm tự nhập. */

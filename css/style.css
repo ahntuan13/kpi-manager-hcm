@@ -1152,3 +1152,6 @@ table.eheat .hcur{border-bottom:3px solid #2f7de1}
 .eact.hi{border-left-color:#dc4f47}.eact.md{border-left-color:#d39a1c}.eact.lo{border-left-color:#18a37a}
 .eact .eaa{font-size:13px}
 @media (max-width:860px){.eacts{grid-template-columns:1fr}}
+/* ESG · In theo phòng ban */
+table.itpt col.i-c{width:100px}
+table.itpt .gcode{text-align:left}
