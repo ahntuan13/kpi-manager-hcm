@@ -17,9 +17,9 @@ const ESG_IND=[
   {k:'waste',n:'Rác thải văn phòng',u:'tấn',sec:'paper',icon:'🗑',dec:3},
   {k:'battery',n:'Pin thải bỏ',u:'viên',sec:'paper',icon:'🔋'},
   {k:'bottle',n:'Nước uống đóng chai',u:'chai',sec:'paper',icon:'🧴'},
-  {k:'wpl',n:'Rác nhựa',u:'kg',sec:'paper',icon:'♻️',dec:1,wt:1},
-  {k:'wpa',n:'Rác giấy',u:'kg',sec:'paper',icon:'📦',dec:1,wt:1},
-  {k:'wgen',n:'Rác thải sinh hoạt',u:'kg',sec:'paper',icon:'🗑️',dec:1,wt:1},
+  {k:'wpl',n:'Rác nhựa',u:'g',sec:'paper',icon:'♻️',dec:1,wt:1},
+  {k:'wpa',n:'Rác giấy',u:'g',sec:'paper',icon:'📦',dec:1,wt:1},
+  {k:'wgen',n:'Rác thải sinh hoạt',u:'g',sec:'paper',icon:'🗑️',dec:1,wt:1},
   {k:'km',n:'Km xe sử dụng',u:'km',sec:'fuel',icon:'🚗'},
   {k:'fuel',n:'Xăng tiêu thụ',u:'lít',sec:'fuel',icon:'⛽'}
 ];
@@ -41,7 +41,9 @@ const cmpArr=(d,k,a='act')=>{const x=((d.ind[k]||{})[a])||e12();return CO2K(k)&&
 const cmpU=k=>CO2K(k)?'kg CO2':ESG_IND.find(i=>i.k===k).u;
 const WT=['wpl','wpa','wgen'];   /* 3 loại rác theo dõi riêng */
 /* sổ cũ chưa có chỉ tiêu mới (VD 3 loại rác): thêm dòng trống */
-function esgFix(d){if(d&&d.ind)ESG_IND.forEach(i=>{const x=d.ind[i.k]=d.ind[i.k]||{};['act','tgt','cost','base','baseCost','note'].forEach(a=>{if(!Array.isArray(x[a]))x[a]=e12()})});return d}
+function esgFix(d){if(d&&d.ind){ESG_IND.forEach(i=>{const x=d.ind[i.k]=d.ind[i.k]||{};['act','tgt','cost','base','baseCost','note'].forEach(a=>{if(!Array.isArray(x[a]))x[a]=e12()})});wasteSync(d)}return d}
+/* 1.3 Lượng rác thải (tấn) = tổng nhựa + giấy + sinh hoạt (gram) ÷ 1.000.000 – tháng nào có nhập 3 loại rác thì tự tính */
+function wasteSync(d){const w=d.ind.waste;for(let m=0;m<12;m++){const v=WT.map(k=>d.ind[k].act[m]);if(v.some(x=>x!=null))w.act[m]=Math.round(v.reduce((a,x)=>a+(+x||0),0))/1e6}}
 const MON=Array.from({length:12},(_,i)=>'T'+(i+1));
 const esgDocs=()=>(db.ppe||[]).filter(x=>x.kind==='esg').map(esgFix).sort((a,b)=>b.year-a.year);
 const esgDoc=y=>esgDocs().find(x=>+x.year===+y);
@@ -220,7 +222,7 @@ function esgAssess(d,per){const ms=ESG_PER[per],ytd=ESG_PER.Y.filter(m=>m<=Math.
   {const b=['paper','print','waste'].map(k=>line(k,S(k)));const sb=S('battery');b.push(sb.have.length?`<b>Pin thải bỏ</b>: ${fmtNum(sb.a)} viên (${monL(sb.have)}), trung bình ${fmtK(sb.a/sb.have.length)} viên/tháng.`:'<b>Pin thải bỏ</b>: chưa có số liệu.');
     const sbo=S('bottle');b.push(sbo.st==='nodata'||sbo.st==='none'?`<b>Nước đóng chai</b>: có chỉ tiêu ${fmtNum(sumIdx(d.ind.bottle.tgt,ms))} chai nhưng <span class="tag-warn">chưa ghi nhận số thực tế</span>.`:line('bottle',sbo));
     const ink=S('print').cost;if(ink)b.push(`Chi phí mực in ${ESG_PER_L[per].toLowerCase()}: <b>${fmtNum(ink)} đ</b>.`);
-    const wt=WT.map(k=>S(k)),wsum=wt.reduce((a,s)=>a+s.a,0);if(wsum)b.push(`<b>Rác theo loại</b>: ${wt.map(s=>`${nm(s.k).replace('Rác ','').replace('thải ','')} ${esgN(s.a,s.k)} kg`).join(' · ')} · tỷ lệ tái chế (nhựa + giấy) <b>${pctE((wt[0].a+wt[1].a)/wsum)}</b>.`);
+    const wt=WT.map(k=>S(k)),wsum=wt.reduce((a,s)=>a+s.a,0);if(wsum)b.push(`<b>Rác theo loại</b>: ${wt.map(s=>`${nm(s.k).replace('Rác ','').replace('thải ','')} ${fmtK(s.a/1000)} kg`).join(' · ')} · tỷ lệ tái chế (nhựa + giấy) <b>${pctE((wt[0].a+wt[1].a)/wsum)}</b>.`);
     out.paper=b;['paper','print','waste'].forEach(k=>missRisk('paper',k));loose('paper','print');loose('paper','waste');
     const yp=Y('paper');if(yp.badM.length)risk('paper','Giấy in',`Vượt chỉ tiêu giấy ở ${monL(yp.badM)}${d.ind.paper.note.find(Boolean)?` (${esc(d.ind.paper.note.find(Boolean))})`:''}.`,yp.st==='bad'?'Cao':'TB',`Lũy kế ${esgN(yp.a,'paper')} / ${esgN(yp.t,'paper')} ram.`,'In 2 mặt mặc định, hạn mức ram theo phòng (sheet 3), duyệt / ký số hợp đồng – hồ sơ bàn giao, tái sử dụng giấy 1 mặt để in nháp.','AD / EC / PD');
     const pv=d.ind.paper.act.filter(v=>v!=null);if(pv.length>=4&&new Set(pv.slice(-6)).size===1)risk('paper','Giấy in',`Số ram ${pv.slice(-6).length} tháng gần nhất giống hệt nhau (${pv[pv.length-1]} ram) – có thể là số ước tính, không phải số xuất kho thực tế.`,'TB','Sheet 5 dòng 1.1.','Lấy số theo phiếu xuất kho văn phòng phẩm từng tháng.','AD');
@@ -357,7 +359,7 @@ function esgChartCfg(d,x,opt={}){
   if(x==='cost'){const M=a=>a.map(v=>v==null?null:Math.round(v/1e5)/10);
     return{type:'bar',data:{labels:MON,datasets:[{label:'Điện văn phòng',data:M(d.ind.elec.cost),backgroundColor:ECC.el,stack:'s'},{label:'Điện lạnh OT',data:M(d.ind.ac.cost),backgroundColor:ECC.ac,stack:'s'},{label:'Mực in',data:M(d.ind.print.cost),backgroundColor:ECC.ink,stack:'s'}]},
       options:{...baseOpt(),plugins:lg,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'triệu đồng'}}}}}}
-  if(x==='wmix'){return{type:'bar',data:{labels:MON,datasets:[['wpl','Nhựa',ECC.pl],['wpa','Giấy',ECC.pa],['wgen','Sinh hoạt',ECC.gen]].map(([k,l,c])=>({label:l,data:d.ind[k].act,backgroundColor:c,stack:'s'}))},options:{...baseOpt(),plugins:lg,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'kg'}}}}}}
+  if(x==='wmix'){return{type:'bar',data:{labels:MON,datasets:[['wpl','Nhựa',ECC.pl],['wpa','Giấy',ECC.pa],['wgen','Sinh hoạt',ECC.gen]].map(([k,l,c])=>({label:l,data:d.ind[k].act.map(v=>v==null?null:v/1000),backgroundColor:c,stack:'s'}))},options:{...baseOpt(),plugins:lg,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,title:{display:true,text:'kg'}}}}}}
   const co=x==='co2';
   const act=co?co2Arr(d):cmpArr(d,x),tgt=co?Array.from({length:12},(_,i)=>d.ind.elec.tgt[i]!=null||d.ind.ac.tgt[i]!=null?(+d.ind.elec.tgt[i]||0)+(+d.ind.ac.tgt[i]||0):null):d.ind[x].tgt,base=co?Array.from({length:12},(_,i)=>d.ind.elec.base[i]!=null||d.ind.ac.base[i]!=null?((+d.ind.elec.base[i]||0)+(+d.ind.ac.base[i]||0))*f:null):cmpArr(d,x,'base');
   const col=act.map((v,i)=>v==null?ECC.na:tgt[i]==null?'#2f7de1':v<=tgt[i]?ECC.ok:ECC.bad);
@@ -573,10 +575,10 @@ const ESG_SHEETS={
         {t:'sep'},
         {t:'in',k:'print',a:'act',l:'1.2. Số bản in mỗi tháng (trắng đen + màu)',u:'trang',f:'int'},{t:'in',k:'print',a:'cost',l:'Số tiền mực in',u:'VND',f:'int'},{t:'in',k:'print',a:'tgt',l:`Chỉ tiêu bản in ${d.year}`,u:'trang',f:'int',cls:'tg'},{t:'eval',k:'print',l:'Đánh giá – O: Đạt · X: Không đạt'},{t:'base',k:'print',a:'base',l:`Thực tế cùng kỳ ${d.year-1}`,u:'trang',f:'int'},{t:'note',k:'print',l:'Ghi rõ lý do nếu thấy chỉ số bất thường'}]},
       {h:'2) Theo dõi lượng rác thải hàng tháng (tổng, theo loại: nhựa, giấy, sinh hoạt)',rows:[
-        {t:'in',k:'waste',a:'act',l:`1.3. Lượng rác thải ${d.year}`,u:'tấn',f:'dec3'},{t:'in',k:'waste',a:'tgt',l:'Chỉ tiêu giảm lượng rác thải',u:'tấn',f:'dec3',cls:'tg'},{t:'eval',k:'waste',l:'Đánh giá – O: Đạt · X: Không đạt'},{t:'base',k:'waste',a:'base',l:`Thực tế cùng kỳ ${d.year-1}`,u:'tấn',f:'dec3'},{t:'note',k:'waste',l:'Ghi rõ lý do nếu thấy chỉ số bất thường'},
+        {t:'in',k:'waste',a:'act',l:`1.3. Lượng rác thải ${d.year} (tự tính từ 3 loại rác)`,u:'tấn',f:'dec3'},{t:'in',k:'waste',a:'tgt',l:'Chỉ tiêu giảm lượng rác thải',u:'tấn',f:'dec3',cls:'tg'},{t:'eval',k:'waste',l:'Đánh giá – O: Đạt · X: Không đạt'},{t:'base',k:'waste',a:'base',l:`Thực tế cùng kỳ ${d.year-1}`,u:'tấn',f:'dec3'},{t:'note',k:'waste',l:'Ghi rõ lý do nếu thấy chỉ số bất thường'},
         {t:'sep'},
-        {t:'in',k:'wpl',a:'act',l:'Rác nhựa (chai, ly, bao bì)',u:'kg',f:'dec1'},{t:'in',k:'wpa',a:'act',l:'Rác giấy (giấy vụn, thùng carton)',u:'kg',f:'dec1'},{t:'in',k:'wgen',a:'act',l:'Rác thải sinh hoạt',u:'kg',f:'dec1'},
-        {t:'calc',id:'wtot',l:'Tổng 3 loại rác',u:'kg',f:'dec1',fn:m=>{const v=WT.map(k=>d.ind[k].act[m]);return v.every(x=>x==null)?null:v.reduce((a,x)=>a+(+x||0),0)},sum:true},
+        {t:'in',k:'wpl',a:'act',l:'Rác nhựa (chai, ly, bao bì)',u:'g',f:'dec1'},{t:'in',k:'wpa',a:'act',l:'Rác giấy (giấy vụn, thùng carton)',u:'g',f:'dec1'},{t:'in',k:'wgen',a:'act',l:'Rác thải sinh hoạt',u:'g',f:'dec1'},
+        {t:'calc',id:'wtot',l:'Tổng 3 loại rác (÷ 1.000.000 = tấn ở dòng 1.3)',u:'g',f:'dec1',fn:m=>{const v=WT.map(k=>d.ind[k].act[m]);return v.every(x=>x==null)?null:v.reduce((a,x)=>a+(+x||0),0)},sum:true},
         {t:'calc',id:'wrec',l:'Tỷ lệ tái chế (nhựa + giấy) / tổng',u:'%',f:'pct',fn:m=>{const v=WT.map(k=>+d.ind[k].act[m]||0),t=v[0]+v[1]+v[2];return t?(v[0]+v[1])/t*100:null},sum:'avg'},
         {t:'sep'},
         {t:'in',k:'bottle',a:'act',l:'Nước uống đóng chai',u:'chai',f:'int'},{t:'in',k:'bottle',a:'tgt',l:'Chỉ tiêu (giảm 30%)',u:'chai',f:'int',cls:'tg'},{t:'eval',k:'bottle',l:'Đánh giá – O: Đạt · X: Không đạt'},{t:'base',k:'bottle',a:'base',l:`Thực tế cùng kỳ ${d.year-1}`,u:'chai',f:'int'}]},
@@ -638,7 +640,7 @@ document.addEventListener('focusout',ev=>{const el=ev.target;if(el.classList&&el
 document.addEventListener('change',ev=>{const el=ev.target;if(!el.closest||!el.closest('.esgs'))return;if(!canESG())return;const d=esgDoc(esgYear());if(!d)return;
   if(el.dataset.g){const [k,a,ms]=el.dataset.g.split('|'),m=+ms;let v;
     if(a==='note')v=String(el.value||'').trim()||null;else{v=parseE(el.value,el.dataset.nf);if(Number.isNaN(v)){toast('Ô này cần nhập số (ví dụ 2.450 hoặc 0,082).','error');el.focus();return}if(v!=null&&v<0){toast('Số không được âm.','error');el.focus();return}}
-    if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id),o=x.ind[k];if(!o[a])o[a]=e12();o[a][m]=v;x.upd={at:new Date().toISOString(),by:session?.name||''};if(v!=null&&(a==='act'||a==='cost'))esgAutoTask(d.year,m)})){if(a!=='note'){el.value=fmtE(v,el.dataset.nf);el.dataset.old=el.value}el.classList.add('saved');setTimeout(()=>el.classList.remove('saved'),900);esgRecalc()}return}
+    if(esgSave(()=>{const x=db.ppe.find(z=>z.id===d.id),o=x.ind[k];if(!o[a])o[a]=e12();o[a][m]=v;if(WT.includes(k)&&a==='act')wasteSync(x);x.upd={at:new Date().toISOString(),by:session?.name||''};if(v!=null&&(a==='act'||a==='cost'))esgAutoTask(d.year,m)})){if(a!=='note'){el.value=fmtE(v,el.dataset.nf);el.dataset.old=el.value}el.classList.add('saved');setTimeout(()=>el.classList.remove('saved'),900);if(WT.includes(k)&&a==='act'){const w=document.querySelector(`[data-g="waste|act|${m}"]`),wv=esgDoc(esgYear()).ind.waste.act[m];if(w){w.value=fmtE(wv,w.dataset.nf);w.dataset.old=w.value;w.classList.add('saved');setTimeout(()=>w.classList.remove('saved'),900)}}esgRecalc()}return}
   if(el.dataset.kz!=null||el.dataset.kzr!=null){const i=+(el.dataset.kz??el.dataset.kzr),raw=String(el.value||'').trim();
     const num=raw.replace(/%/g,'').trim(),isN=/^\d+([.,]\d+)?$/.test(num),val=raw===''?null:isN?(+num.replace(',','.'))/100:raw;
     if(typeof val==='number'&&val>1){toast('Tỷ lệ tối đa 100%.','error');el.focus();return}
