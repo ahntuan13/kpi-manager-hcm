@@ -752,24 +752,44 @@ document.addEventListener('change',async ev=>{const el=ev.target;if(el.id!=='prt
   catch(e){console.error(e);toast('Không đọc được file phí in: '+e.message,'error')}finally{el.value=''}});
 /* xuất Excel phiếu phí in tháng: 2 sheet Fee <máy trắng đen> · Fee <máy màu> */
 async function prtXlsx(d,m){await isoLoad();const wb=new ExcelJS.Workbook(),C=prtCfg(d),list=prtList(d);
-  const thin={style:'thin',color:{argb:'FF000000'}},BOX={top:thin,left:thin,bottom:thin,right:thin};
-  [['b',C.snB||'B&W','Pages'],['c',C.snC||'Color','Pages Color']].forEach(([k,sn,ph])=>{const ws=wb.addWorksheet(('Fee '+sn).slice(0,31),{views:[{showGridLines:false}]});
-    ws.columns=[{width:3},{width:6},{width:16},{width:12},{width:11},{width:17},{width:17},{width:15}];
-    ws.mergeCells('B1:H2');const t=ws.getCell('B1');t.value=`PRINTING FEE ${MN3[m]} ${d.year}`;t.font={name:'Arial',size:14,bold:true};t.alignment={horizontal:'center',vertical:'middle'};
-    ws.mergeCells('B3:H3');ws.getCell('B3').value=`Máy ${sn}`;ws.getCell('B3').font={name:'Arial',size:9,italic:true};ws.getCell('B3').alignment={horizontal:'center'};
-    ['No.','Department','Code',ph,'This month Cost','Last month Cost','% of Different'].forEach((h,i)=>{const c=ws.getCell(4,i+2);c.value=h;c.font={name:'Arial',size:10,bold:true};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border=BOX;c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}});ws.getRow(4).height=30;
-    let r=5;list.forEach((o,i)=>{const x=o.m&&o.m[m]||{},p=prtPrev(d,o.d,m)||{};const v=[i+1,PRT_NAME[o.d]||o.d,C.codes[o.d]||'',+x[k]||0,+x[k+'f']||0,p[k+'f']!=null?+p[k+'f']:null];
-      v.forEach((val,j)=>{const c=ws.getCell(r,j+2);c.value=val;c.font={name:'Arial',size:10};c.border=BOX;c.alignment={horizontal:j<3?(j===0?'center':'left'):'right',vertical:'middle'};if(j>=4)c.numFmt='#,##0'});
-      const h=ws.getCell(r,8);h.value={formula:`IF(G${r}=0,"",(F${r}-G${r})/G${r})`};h.numFmt='0%';h.border=BOX;h.font={name:'Arial',size:10};h.alignment={horizontal:'right'};r++});
-    const L=r-1;const lab=(row,text)=>{ws.mergeCells(row,2,row,5);const c=ws.getCell(row,2);c.value=text;c.font={name:'Arial',size:10,bold:true};c.alignment={horizontal:'center'};for(let j=2;j<=8;j++)ws.getCell(row,j).border=BOX};
-    lab(r,'Total');ws.getCell(r,6).value={formula:`SUM(F5:F${L})`};ws.getCell(r,7).value={formula:`SUM(G5:G${L})`};
-    lab(r+1,'VAT');ws.getCell(r+1,6).value=C.vat;ws.getCell(r+1,7).value=C.vat;
-    lab(r+2,'VAT Amount');ws.getCell(r+2,6).value={formula:`F${r}*F${r+1}`};ws.getCell(r+2,7).value={formula:`G${r}*G${r+1}`};
-    lab(r+3,'Total Amount');ws.getCell(r+3,6).value={formula:`ROUND(F${r}+F${r+2},0)`};ws.getCell(r+3,7).value={formula:`ROUND(G${r}+G${r+2},0)`};
-    ws.mergeCells(r,8,r+3,8);const hd=ws.getCell(r,8);hd.value={formula:`IF(G${r+3}=0,"",(F${r+3}-G${r+3})/G${r+3})`};hd.numFmt='0%';hd.alignment={horizontal:'center',vertical:'middle'};hd.font={name:'Arial',size:10,bold:true};
-    for(let y=r;y<=r+3;y++)[6,7].forEach(j=>{const c=ws.getCell(y,j);c.numFmt=y===r+1?'0%':'#,##0';c.font={name:'Arial',size:10,bold:y===r+3};c.alignment={horizontal:'right'}});
-    ws.getCell(r+5,3).value='Checked by';ws.getCell(r+5,7).value='Approved by';ws.getCell(r+8,3).value=C.chk||'';ws.getCell(r+8,7).value=C.apr||'';[[r+5,3],[r+5,7],[r+8,3],[r+8,7]].forEach(([y,x])=>{const c=ws.getCell(y,x);c.font={name:'Arial',size:10,bold:y===r+5};c.alignment={horizontal:'center'}});
-    ws.pageSetup={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,margins:{left:0.5,right:0.5,top:0.7,bottom:0.6,header:0.3,footer:0.3}}});
+  const ink='FF1F3B57',teal='FF1F6F5C',line={style:'thin',color:{argb:'FFB7C4CF'}},BOX={top:line,left:line,bottom:line,right:line},F=(o={})=>({name:'Arial',size:10,color:{argb:ink},...o});
+  const UP='FFFDE4DC',UPT='FFC0392B',DN='FFE3F4EA',DNT='FF11804F';   /* tăng = đỏ ▲, giảm = xanh ▼ (màu chữ theo giá trị) */
+  const PCT2='"▲ +"0%;"▼ "0%;"– "0%',pm=m>0?`${m}/${d.year}`:`12/${d.year-1}`;
+  [['b',C.snB||'B&W','Pages','MÁY IN TRẮNG ĐEN'],['c',C.snC||'Color','Pages Color','MÁY IN MÀU']].forEach(([k,sn,ph,kind])=>{const ws=wb.addWorksheet(('Fee '+sn).slice(0,31),{views:[{showGridLines:false}]});
+    ws.columns=[{width:2},{width:6},{width:17},{width:12},{width:12},{width:17},{width:17},{width:16}];
+    ws.mergeCells('B1:H2');const t=ws.getCell('B1');t.value=`PRINTING FEE ${MN3[m]} ${d.year}`;t.font=F({size:16,bold:true,color:{argb:'FFFFFFFF'}});t.alignment={horizontal:'center',vertical:'middle'};t.fill={type:'pattern',pattern:'solid',fgColor:{argb:teal}};ws.getRow(1).height=20;ws.getRow(2).height=20;
+    ws.mergeCells('B3:H3');const st=ws.getCell('B3');st.value=`${kind} · Máy ${sn} · Tháng ${m+1}/${d.year} so với tháng ${pm}`;st.font=F({size:9,italic:true,color:{argb:'FF4A6378'}});st.alignment={horizontal:'center',vertical:'middle'};st.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8F1EE'}};ws.getRow(3).height=18;
+    ['No.','Department','Code',ph,'This month Cost','Last month Cost','% of Different'].forEach((h,i)=>{const c=ws.getCell(4,i+2);c.value=h;c.font=F({bold:true,color:{argb:'FFFFFFFF'}});c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border=BOX;c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF2E7D6B'}}});ws.getRow(4).height=30;
+    let r=5;const vals=[];list.forEach((o,i)=>{const x=o.m&&o.m[m]||{},p=prtPrev(d,o.d,m)||{},cur=+x[k+'f']||0,prv=p[k+'f']!=null?+p[k+'f']:null;vals.push([cur,prv]);
+      const zebra=i%2?'FFF6F9FB':'FFFFFFFF',v=[i+1,PRT_NAME[o.d]||o.d,C.codes[o.d]||'',+x[k]||0,cur,prv];
+      v.forEach((val,j)=>{const c=ws.getCell(r,j+2);c.value=val;c.font=F();c.border=BOX;c.fill={type:'pattern',pattern:'solid',fgColor:{argb:zebra}};c.alignment={horizontal:j===0||j===2?'center':j===1?'left':'right',vertical:'middle',indent:j===1?1:0};if(j>=3)c.numFmt='#,##0'});
+      const h=ws.getCell(r,8),dif=prv?(cur-prv)/prv:null;h.value={formula:`IF(G${r}=0,"",(F${r}-G${r})/G${r})`,result:dif??''};h.numFmt=PCT2;h.border=BOX;h.font=F({bold:true,color:{argb:dif==null?ink:dif>0?UPT:DNT}});h.alignment={horizontal:'center',vertical:'middle'};
+      h.fill={type:'pattern',pattern:'solid',fgColor:{argb:dif==null?zebra:dif>0?UP:DN}};ws.getRow(r).height=19;r++});
+    const L=r-1;
+    /* thanh dữ liệu so sánh số bản / phí tháng này */
+    ws.addConditionalFormatting({ref:`E5:E${L}`,rules:[{type:'dataBar',cfvo:[{type:'num',value:0},{type:'max'}],color:{argb:'FF7FB8A4'},gradient:true,minLength:0,maxLength:100}]});
+    ws.addConditionalFormatting({ref:`F5:F${L}`,rules:[{type:'dataBar',cfvo:[{type:'num',value:0},{type:'max'}],color:{argb:'FF8FB3D9'},gradient:true,minLength:0,maxLength:100}]});
+    const tc=vals.reduce((a,v)=>a+v[0],0),tp=vals.reduce((a,v)=>a+(v[1]||0),0),vat=+C.vat||0,dif=tp?(tc*(1+vat)-tp*(1+vat))/(tp*(1+vat)):null;
+    const lab=(row,text,fill,bold)=>{ws.mergeCells(row,2,row,5);const c=ws.getCell(row,2);c.value=text;c.font=F({bold:true});c.alignment={horizontal:'right',vertical:'middle',indent:1};for(let j=2;j<=7;j++){const x=ws.getCell(row,j);x.border=BOX;x.fill={type:'pattern',pattern:'solid',fgColor:{argb:fill}}}
+      [6,7].forEach(j=>{const x=ws.getCell(row,j);x.font=F({bold});x.alignment={horizontal:'right',vertical:'middle'}});ws.getRow(row).height=19};
+    lab(r,'Total','FFEEF3F6',true);ws.getCell(r,6).value={formula:`SUM(F5:F${L})`,result:tc};ws.getCell(r,7).value={formula:`SUM(G5:G${L})`,result:tp};
+    lab(r+1,'VAT','FFFFFFFF');ws.getCell(r+1,6).value=vat;ws.getCell(r+1,7).value=vat;
+    lab(r+2,'VAT Amount','FFFFFFFF');ws.getCell(r+2,6).value={formula:`F${r}*F${r+1}`,result:tc*vat};ws.getCell(r+2,7).value={formula:`G${r}*G${r+1}`,result:tp*vat};
+    lab(r+3,'Total Amount','FFDCEFE8',true);ws.getCell(r+3,6).value={formula:`ROUND(F${r}+F${r+2},0)`,result:Math.round(tc*(1+vat))};ws.getCell(r+3,7).value={formula:`ROUND(G${r}+G${r+2},0)`,result:Math.round(tp*(1+vat))};
+    [r+3].forEach(y=>[6,7].forEach(j=>{ws.getCell(y,j).font=F({bold:true,size:11,color:{argb:teal}})}));
+    for(let y=r;y<=r+3;y++)[6,7].forEach(j=>{ws.getCell(y,j).numFmt=y===r+1?'0%':'#,##0'});
+    ws.mergeCells(r,8,r+3,8);const hd=ws.getCell(r,8);hd.value={formula:`IF(G${r+3}=0,"",(F${r+3}-G${r+3})/G${r+3})`,result:dif??''};hd.numFmt=PCT2;hd.alignment={horizontal:'center',vertical:'middle'};hd.font=F({size:14,bold:true,color:{argb:dif==null?ink:dif>0?UPT:DNT}});
+    hd.fill={type:'pattern',pattern:'solid',fgColor:{argb:dif==null?'FFFFFFFF':dif>0?UP:DN}};for(let y=r;y<=r+3;y++)ws.getCell(y,8).border=BOX;
+    /* nhận xét nhanh: phòng tăng / giảm nhiều nhất */
+    const ch=list.map((o,i)=>({n:PRT_NAME[o.d]||o.d,c:vals[i][0],p:vals[i][1]})).filter(x=>x.p),up=[...ch].sort((a,b)=>(b.c-b.p)-(a.c-a.p))[0],dn=[...ch].sort((a,b)=>(a.c-a.p)-(b.c-b.p))[0];
+    const nr=r+5;ws.mergeCells(nr,2,nr,8);const nt=ws.getCell(nr,2);
+    nt.value=tp?`So với tháng ${pm}: tổng thanh toán ${dif>0?'tăng':'giảm'} ${Math.abs(Math.round(dif*100))}% (${(Math.round(tc*(1+vat))-Math.round(tp*(1+vat))).toLocaleString('en-US')} VND).${up&&up.c>up.p?` Tăng nhiều nhất: ${up.n} (+${(up.c-up.p).toLocaleString('en-US')}).`:''}${dn&&dn.c<dn.p?` Giảm nhiều nhất: ${dn.n} (${(dn.c-dn.p).toLocaleString('en-US')}).`:''}`:'Chưa có số liệu tháng trước để so sánh.';
+    nt.font=F({size:9,italic:true,color:{argb:'FF4A6378'}});nt.alignment={wrapText:true,vertical:'top'};ws.getRow(nr).height=30;
+    const sg=nr+2;ws.getCell(sg,3).value='Checked by';ws.getCell(sg,7).value='Approved by';ws.getCell(sg+4,3).value=C.chk||'';ws.getCell(sg+4,7).value=C.apr||'';
+    [[sg,3],[sg,7]].forEach(([y,x])=>{const c=ws.getCell(y,x);c.font=F({bold:true});c.alignment={horizontal:'center'}});
+    [[sg+4,3],[sg+4,7]].forEach(([y,x])=>{const c=ws.getCell(y,x);c.font=F({bold:true});c.alignment={horizontal:'center'};c.border={top:{style:'thin',color:{argb:'FF7A8A99'}}}});
+    ws.pageSetup={paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,printArea:`A1:H${sg+5}`,margins:{left:0.5,right:0.5,top:0.7,bottom:0.6,header:0.3,footer:0.3}};
+    ws.headerFooter={oddFooter:`&L&"Arial,Italic"&8Printing fee ${MN3[m]} ${d.year} – máy ${String(sn).replace(/&/g,'&&')}&R&"Arial,Italic"&8Trang &P / &N`}});
   return wb.xlsx.writeBuffer()}
 ACT['prt-xlsx']=async el=>{const d=esgDoc(esgYear());if(!d)return;const m=prtM(),b=el.closest('button');if(b)b.disabled=true;
   try{const out=await prtXlsx(d,m),blob=new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Printing_fee_${MN3[m]}_${d.year}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast(`Đã xuất phiếu phí in tháng ${m+1}/${d.year}`)}
